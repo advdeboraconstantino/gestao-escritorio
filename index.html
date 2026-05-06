@@ -25,6 +25,8 @@
   const prazosRef = collection(db, "prazos");
   const parceirosRef = collection(db, "parceiros");
   const indicacoesRef = collection(db, "indicacoes");
+  const padRef = collection(db, "pad");
+  const atendRef = collection(db, "atendimentos");
 
   // Expor funções globais para o código legado
   window._fbSave = async function(obj) {
@@ -75,6 +77,24 @@
   window._fbDeleteIndicacao = async function(id) {
     try { await deleteDoc(doc(db, "indicacoes", id)); } catch(e) { console.error(e); }
   };
+  window._fbSavePAD = async function(obj) {
+    try {
+      if (obj.id && typeof obj.id === 'string') { await setDoc(doc(db, "pad", obj.id), obj); }
+      else { const ref = await addDoc(padRef, obj); return ref.id; }
+    } catch(e) { console.error(e); }
+  };
+  window._fbDeletePAD = async function(id) {
+    try { await deleteDoc(doc(db, "pad", id)); } catch(e) { console.error(e); }
+  };
+  window._fbSaveAtend = async function(obj) {
+    try {
+      if (obj.id && typeof obj.id === 'string') { await setDoc(doc(db, "atendimentos", obj.id), obj); }
+      else { const ref = await addDoc(atendRef, obj); return ref.id; }
+    } catch(e) { console.error(e); }
+  };
+  window._fbDeleteAtend = async function(id) {
+    try { await deleteDoc(doc(db, "atendimentos", id)); } catch(e) { console.error(e); }
+  };
 
   window._fbListen = function(callback) {
     return onSnapshot(colRef, function(snapshot) {
@@ -113,6 +133,16 @@
       window.INDICACOES = [];
       snap.forEach(function(d){ window.INDICACOES.push(Object.assign({id:d.id}, d.data())); });
       if (document.getElementById('pg-parceiros').classList.contains('on')) renderParceiros();
+    });
+    onSnapshot(padRef, function(snap) {
+      window.PAD = [];
+      snap.forEach(function(d){ window.PAD.push(Object.assign({id:d.id}, d.data())); });
+      if (document.getElementById('pg-pad').classList.contains('on')) renderPAD();
+    });
+    onSnapshot(atendRef, function(snap) {
+      window.ATENDIMENTOS = [];
+      snap.forEach(function(d){ window.ATENDIMENTOS.push(Object.assign({id:d.id}, d.data())); });
+      if (document.getElementById('pg-atendimentos').classList.contains('on')) renderAtendimentos();
     });
   });
 </script>
@@ -394,6 +424,8 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
   <button class="aba on" onclick="mudarAba('clientes',this)">⚖️ Clientes &amp; Processos</button>
   <button class="aba" onclick="mudarAba('recebimentos',this)">💰 Previsão de Recebimentos</button>
   <button class="aba" onclick="mudarAba('prazos',this)">⏱️ Prazos &amp; Intimações <span class="abadge" id="badge-prazos">0</span></button>
+  <button class="aba" onclick="mudarAba('pad',this)">📁 PAD</button>
+  <button class="aba" onclick="mudarAba('atendimentos',this)">📝 Atendimentos</button>
   <button class="aba" onclick="mudarAba('parceiros',this)">🤝 Advogados Parceiros</button>
   <button class="aba" onclick="mudarAba('relatorios',this)">📊 Relatórios Financeiros</button>
   <button class="aba" onclick="mudarAba('alertas',this)">🔔 Alertas <span class="abadge" id="badge-n">0</span></button>
@@ -501,6 +533,217 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
   </div>
 
   <div id="prazos-lista"></div>
+</div>
+
+<!-- ===== PÁGINA: PAD ===== -->
+<div class="pg" id="pg-pad">
+  <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+    <div class="card"><div class="card-l">Total de PADs</div><div class="card-v" id="pad-tot">0</div><div class="card-s">cadastrados</div></div>
+    <div class="card"><div class="card-l">Em Andamento</div><div class="card-v" id="pad-and" style="color:#D4B84A">0</div><div class="card-s">processos ativos</div></div>
+    <div class="card"><div class="card-l">Arquivados</div><div class="card-v" id="pad-arq" style="color:var(--tw)">0</div><div class="card-s">encerrados</div></div>
+    <div class="card"><div class="card-l">Honorários a Receber</div><div class="card-v" id="pad-hon" style="color:#7ec492">R$ 0</div><div class="card-s">em aberto</div></div>
+  </div>
+  <div class="toolbar">
+    <div class="tb-l">
+      <div class="sw"><span class="sw-ic">🔍</span><input type="text" id="pad-busca" placeholder="Buscar cliente ou órgão..." oninput="renderPAD()"></div>
+      <select class="sel" id="pad-filtro-sit" onchange="renderPAD()">
+        <option value="">Todas as situações</option>
+        <option value="Em andamento">Em andamento</option>
+        <option value="Aguardando defesa">Aguardando defesa</option>
+        <option value="Defesa apresentada">Defesa apresentada</option>
+        <option value="Aguardando julgamento">Aguardando julgamento</option>
+        <option value="Recurso interposto">Recurso interposto</option>
+        <option value="Arquivado">Arquivado</option>
+        <option value="Penalidade aplicada">Penalidade aplicada</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-o" onclick="exportPADcsv()">⬇ CSV</button>
+      <button class="btn-v" onclick="abrirModalPAD(null)">+ Novo PAD</button>
+    </div>
+  </div>
+  <div class="tbl-box">
+    <div class="tbl-bar"><div class="tbl-tit">Processos Administrativos Disciplinares</div><div class="tbl-cnt" id="pad-cnt">0 registros</div></div>
+    <div class="tbl-sc"><table>
+      <thead><tr>
+        <th>Cliente</th><th>Órgão Público</th><th>Nº Processo Adm.</th>
+        <th>Honorários</th><th>Modalidade</th><th>Situação Atual</th><th>Data Cadastro</th><th>Obs.</th><th>Ações</th>
+      </tr></thead>
+      <tbody id="pad-tbody"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- MODAL PAD -->
+<div id="ov-pad" style="position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;display:none;overflow-y:auto;padding:20px;" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal" style="max-width:640px;">
+    <div class="mo-head">
+      <div><div class="mo-tit" id="pad-mo-tit">Novo PAD</div><div class="mo-sub">Processo Administrativo Disciplinar</div></div>
+      <button class="mo-cls" onclick="document.getElementById('ov-pad').style.display='none'">✕</button>
+    </div>
+    <div style="padding:20px 26px;">
+      <div class="sec">Identificação</div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Nome do Cliente *</label><input class="fi" id="pad-nome" placeholder="Nome completo"></div>
+        <div class="fg"><label class="fl">Órgão Público *</label><input class="fi" id="pad-orgao" placeholder="Ex.: SEDUC SP, PMESP, Prefeitura..."></div>
+      </div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Nº do Processo Administrativo</label><input class="fi" id="pad-numproc" placeholder="Ex.: PAD-2025/001234"></div>
+        <div class="fg"><label class="fl">Data de Abertura</label><input type="date" class="fi" id="pad-data"></div>
+      </div>
+      <div class="sec">Financeiro</div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Valor dos Honorários (R$)</label><input class="fi" id="pad-hon-val" placeholder="0,00" oninput="fmtMoeda(this)"></div>
+        <div class="fg"><label class="fl">Modalidade de Pagamento</label>
+          <select class="fi" id="pad-hon-mod" onchange="togglePADparc()">
+            <option value="avista">À vista</option>
+            <option value="parcelado">Parcelado</option>
+          </select>
+        </div>
+      </div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Situação do Pagamento</label>
+          <select class="fi" id="pad-hon-sit">
+            <option value="nao">Não pago</option>
+            <option value="sim">Pago</option>
+          </select>
+        </div>
+        <div class="fg" id="pad-grp-nparc" style="display:none;"><label class="fl">Número de Parcelas</label>
+          <input type="number" class="fi" id="pad-hon-nparc" min="1" max="60" placeholder="Ex.: 3" oninput="gerarParcPAD()">
+        </div>
+      </div>
+      <div id="pad-parc-lista" class="parc-box"></div>
+      <div class="sec">Situação Processual</div>
+      <div class="gr" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Situação Atual *</label>
+          <select class="fi" id="pad-situacao">
+            <option value="Em andamento">Em andamento</option>
+            <option value="Aguardando defesa">Aguardando defesa</option>
+            <option value="Defesa apresentada">Defesa apresentada</option>
+            <option value="Aguardando julgamento">Aguardando julgamento</option>
+            <option value="Recurso interposto">Recurso interposto</option>
+            <option value="Arquivado">Arquivado</option>
+            <option value="Penalidade aplicada">Penalidade aplicada</option>
+          </select>
+        </div>
+      </div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">WhatsApp do Cliente</label><input class="fi" id="pad-whats" placeholder="(12) 99999-9999" oninput="fmtTel(this)"></div>
+        <div class="fg"><label class="fl">E-mail do Cliente</label><input type="email" class="fi" id="pad-email" placeholder="cliente@email.com"></div>
+      </div>
+      <div class="gr" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Observações</label><input class="fi" id="pad-obs" placeholder="Notas relevantes sobre o processo"></div>
+      </div>
+    </div>
+    <div class="mo-foot">
+      <button class="btn-o" onclick="document.getElementById('ov-pad').style.display='none'">Cancelar</button>
+      <button class="btn-v" onclick="salvarPAD()">✓ Salvar PAD</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PÁGINA: ATENDIMENTOS ===== -->
+<div class="pg" id="pg-atendimentos">
+  <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+    <div class="card"><div class="card-l">Total</div><div class="card-v" id="at-tot">0</div><div class="card-s">atendimentos</div></div>
+    <div class="card"><div class="card-l">Parecer Pendente</div><div class="card-v" id="at-par" style="color:#D4B84A">0</div><div class="card-s">aguardando</div></div>
+    <div class="card"><div class="card-l">Análise Documental</div><div class="card-v" id="at-doc" style="color:var(--ch)">0</div><div class="card-s">em análise</div></div>
+    <div class="card"><div class="card-l">Concluídos</div><div class="card-v" id="at-conc" style="color:#7ec492">0</div><div class="card-s">finalizados</div></div>
+  </div>
+  <div class="toolbar">
+    <div class="tb-l">
+      <div class="sw"><span class="sw-ic">🔍</span><input type="text" id="at-busca" placeholder="Buscar cliente..." oninput="renderAtendimentos()"></div>
+      <select class="sel" id="at-filtro-tipo" onchange="renderAtendimentos()">
+        <option value="">Todos os tipos</option>
+        <option value="Parecer">Parecer</option>
+        <option value="Análise Documental">Análise Documental</option>
+        <option value="Consulta">Consulta</option>
+      </select>
+      <select class="sel" id="at-filtro-sit" onchange="renderAtendimentos()">
+        <option value="">Todas as situações</option>
+        <option value="Pendente">Pendente</option>
+        <option value="Em andamento">Em andamento</option>
+        <option value="Concluído">Concluído</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-o" onclick="exportAtendCSV()">⬇ CSV</button>
+      <button class="btn-v" onclick="abrirModalAtend(null)">+ Novo Atendimento</button>
+    </div>
+  </div>
+  <div class="tbl-box">
+    <div class="tbl-bar"><div class="tbl-tit">Atendimentos sem Processo</div><div class="tbl-cnt" id="at-cnt">0 registros</div></div>
+    <div class="tbl-sc"><table>
+      <thead><tr>
+        <th>Cliente</th><th>Data</th><th>Tipo</th><th>Situação</th>
+        <th>Localização dos Docs</th><th>Detalhe</th><th>Obs.</th><th>Ações</th>
+      </tr></thead>
+      <tbody id="at-tbody"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- MODAL ATENDIMENTO -->
+<div id="ov-atend" style="position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;display:none;overflow-y:auto;padding:20px;" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal" style="max-width:600px;">
+    <div class="mo-head">
+      <div><div class="mo-tit" id="at-mo-tit">Novo Atendimento</div><div class="mo-sub">Atendimento sem processo — parecer ou análise</div></div>
+      <button class="mo-cls" onclick="document.getElementById('ov-atend').style.display='none'">✕</button>
+    </div>
+    <div style="padding:20px 26px;">
+      <div class="sec">Dados do Atendimento</div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Nome do Cliente *</label><input class="fi" id="at-nome" placeholder="Nome completo"></div>
+        <div class="fg"><label class="fl">Data do Atendimento *</label><input type="date" class="fi" id="at-data"></div>
+      </div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Tipo *</label>
+          <select class="fi" id="at-tipo">
+            <option value="Parecer">Parecer</option>
+            <option value="Análise Documental">Análise Documental</option>
+            <option value="Consulta">Consulta</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Situação</label>
+          <select class="fi" id="at-situacao">
+            <option value="Pendente">Pendente</option>
+            <option value="Em andamento">Em andamento</option>
+            <option value="Concluído">Concluído</option>
+          </select>
+        </div>
+      </div>
+      <div class="gr" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Assunto / Descrição *</label><input class="fi" id="at-assunto" placeholder="Descreva o objeto do atendimento"></div>
+      </div>
+      <div class="sec">Localização dos Documentos</div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Onde estão os documentos?</label>
+          <select class="fi" id="at-doc-local" onchange="toggleAtendDocDetalhe()">
+            <option value="">Não aplicável</option>
+            <option value="Pasta no Drive">Pasta no Drive</option>
+            <option value="E-mail Dra. Débora">E-mail Dra. Débora</option>
+            <option value="WhatsApp">WhatsApp</option>
+            <option value="Físico no escritório">Físico no escritório</option>
+            <option value="Outro">Outro</option>
+          </select>
+        </div>
+        <div class="fg" id="at-grp-doc-det"><label class="fl">Identificação / Link / Pasta</label>
+          <input class="fi" id="at-doc-det" placeholder="Ex.: link do Drive, nº e-mail, pasta...">
+        </div>
+      </div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">WhatsApp do Cliente</label><input class="fi" id="at-whats" placeholder="(12) 99999-9999" oninput="fmtTel(this)"></div>
+        <div class="fg"><label class="fl">E-mail do Cliente</label><input type="email" class="fi" id="at-email" placeholder="cliente@email.com"></div>
+      </div>
+      <div class="gr" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Observações</label><input class="fi" id="at-obs" placeholder="Notas adicionais"></div>
+      </div>
+    </div>
+    <div class="mo-foot">
+      <button class="btn-o" onclick="document.getElementById('ov-atend').style.display='none'">Cancelar</button>
+      <button class="btn-v" onclick="salvarAtend()">✓ Salvar Atendimento</button>
+    </div>
+  </div>
 </div>
 
 <!-- ===== PÁGINA: ADVOGADOS PARCEIROS ===== -->
@@ -1037,11 +1280,15 @@ var DB = [];
 var PRAZOS = [];
 var PARCEIROS = [];
 var INDICACOES = [];
+var PAD = [];
+var ATENDIMENTOS = [];
 var editId = null;
 var delId = null;
 var editPrazoId = null;
 var editParceiroId = null;
 var editIndicacaoId = null;
+var editPADId = null;
+var editAtendId = null;
 var sCol = 'data', sDir = 'desc';
 
 function loadDB() { }
@@ -1058,6 +1305,8 @@ function mudarAba(id, btn) {
   if (id === 'relatorios') iniciarRelatorios();
   if (id === 'prazos') renderPrazos();
   if (id === 'parceiros') renderParceiros();
+  if (id === 'pad') renderPAD();
+  if (id === 'atendimentos') renderAtendimentos();
 }
 
 // ========== MODAL ==========
@@ -2378,6 +2627,249 @@ function exportParceirosCSV() {
   var blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a'); a.href=url; a.download='parceiros.csv'; a.click(); URL.revokeObjectURL(url);
+  toast('✓ CSV exportado');
+}
+
+// ========== PAD ==========
+function abrirModalPAD(id) {
+  editPADId = id;
+  ['pad-nome','pad-orgao','pad-numproc','pad-data','pad-hon-val','pad-hon-nparc','pad-obs','pad-whats','pad-email'].forEach(function(f){ setVal(f,''); });
+  setVal('pad-hon-mod','avista'); setVal('pad-hon-sit','nao'); setVal('pad-situacao','Em andamento');
+  document.getElementById('pad-grp-nparc').style.display='none';
+  document.getElementById('pad-parc-lista').innerHTML='';
+  if (id) {
+    var p = (PAD||[]).find(function(x){ return x.id===id; });
+    if (!p) return;
+    document.getElementById('pad-mo-tit').textContent = 'Editar PAD';
+    setVal('pad-nome',p.nome||''); setVal('pad-orgao',p.orgao||'');
+    setVal('pad-numproc',p.numproc||''); setVal('pad-data',p.data||'');
+    setVal('pad-hon-val',p.honVal||''); setVal('pad-hon-mod',p.honMod||'avista');
+    setVal('pad-hon-sit',p.honSit||'nao'); setVal('pad-situacao',p.situacao||'Em andamento');
+    setVal('pad-obs',p.obs||'');
+    setVal('pad-whats',p.whats||'');
+    setVal('pad-email',p.email||'');
+    if (p.honMod==='parcelado') {
+      document.getElementById('pad-grp-nparc').style.display='block';
+      setVal('pad-hon-nparc', p.parcelas ? p.parcelas.length : '');
+      renderParcelasExistentes2('pad', p.parcelas||[], p.honVal);
+    }
+  } else {
+    document.getElementById('pad-mo-tit').textContent = 'Novo PAD';
+    setVal('pad-data', new Date().toISOString().split('T')[0]);
+  }
+  document.getElementById('ov-pad').style.display='block';
+}
+
+function togglePADparc() {
+  var v = getVal('pad-hon-mod')==='parcelado';
+  document.getElementById('pad-grp-nparc').style.display = v?'block':'none';
+  if (!v) document.getElementById('pad-parc-lista').innerHTML='';
+}
+
+function gerarParcPAD() {
+  var n = parseInt(getVal('pad-hon-nparc'))||0;
+  var vTot = parseMoeda(getVal('pad-hon-val'));
+  var vU = n>0 ? vTot/n : 0;
+  var box = document.getElementById('pad-parc-lista');
+  var ex = coletarParc2('pad');
+  box.innerHTML='';
+  for (var i=0;i<n;i++) {
+    var e=ex[i]||{};
+    var row=document.createElement('div'); row.className='parc-row';
+    row.innerHTML='<span class="parc-n">'+(i+1)+'ª</span><input type="date" class="parc-d" id="pad-d-'+i+'" value="'+(e.data||'')+'"><span class="parc-vl">R$ '+fmtVal(vU)+'</span><div class="parc-pg'+(e.pago?' pago':'')+'" id="pad-pg-wrap-'+i+'"><input type="checkbox" id="pad-pg-'+i+'" '+(e.pago?'checked':'')+' onchange="document.getElementById(\'pad-pg-wrap-'+i+'\').className=\'parc-pg\'+(this.checked?\' pago\':\'\')">&nbsp;<label for="pad-pg-'+i+'">Pago</label></div>';
+    box.appendChild(row);
+  }
+}
+
+function renderParcelasExistentes2(tipo, parcelas, valorTotal) {
+  var n=parcelas.length, vU=n>0?parseMoeda(valorTotal)/n:0;
+  var box=document.getElementById(tipo+'-parc-lista'); box.innerHTML='';
+  parcelas.forEach(function(p,i){
+    var row=document.createElement('div'); row.className='parc-row';
+    row.innerHTML='<span class="parc-n">'+(i+1)+'ª</span><input type="date" class="parc-d" id="'+tipo+'-d-'+i+'" value="'+(p.data||'')+'"><span class="parc-vl">R$ '+fmtVal(vU)+'</span><div class="parc-pg'+(p.pago?' pago':'')+'" id="'+tipo+'-pg-wrap-'+i+'"><input type="checkbox" id="'+tipo+'-pg-'+i+'" '+(p.pago?'checked':'')+' onchange="document.getElementById(\''+tipo+'-pg-wrap-'+i+'\').className=\'parc-pg\'+(this.checked?\' pago\':\'\')">&nbsp;<label for="'+tipo+'-pg-'+i+'">Pago</label></div>';
+    box.appendChild(row);
+  });
+}
+
+function coletarParc2(tipo) {
+  var res=[]; var i=0;
+  while (true) { var d=document.getElementById(tipo+'-d-'+i); if(!d) break; res.push({data:d.value, pago:(document.getElementById(tipo+'-pg-'+i)||{}).checked||false}); i++; }
+  return res;
+}
+
+function salvarPAD() {
+  var nome=getVal('pad-nome'), orgao=getVal('pad-orgao');
+  if (!nome) { toast('Informe o nome do cliente',true); return; }
+  if (!orgao) { toast('Informe o órgão público',true); return; }
+  var mod=getVal('pad-hon-mod');
+  var obj = {
+    nome:nome, orgao:orgao, numproc:getVal('pad-numproc'), data:getVal('pad-data'),
+    honVal:getVal('pad-hon-val'), honMod:mod, honSit:getVal('pad-hon-sit'),
+    parcelas: mod==='parcelado' ? coletarParc2('pad') : [],
+    situacao:getVal('pad-situacao'), obs:getVal('pad-obs'),
+    whats:getVal('pad-whats'), email:getVal('pad-email')
+  };
+  if (editPADId) { obj.id=editPADId; window._fbSavePAD(obj); toast('✓ PAD atualizado'); }
+  else { window._fbSavePAD(obj); toast('✓ PAD cadastrado'); }
+  document.getElementById('ov-pad').style.display='none'; editPADId=null;
+}
+
+function renderPAD() {
+  var busca=(getVal('pad-busca')||'').toLowerCase();
+  var fSit=getVal('pad-filtro-sit');
+  var lista=(PAD||[]).filter(function(p){
+    var okB=!busca||(p.nome||'').toLowerCase().includes(busca)||(p.orgao||'').toLowerCase().includes(busca);
+    return okB && (!fSit||p.situacao===fSit);
+  });
+  lista.sort(function(a,b){ return (b.data||'')>(a.data||'')?1:-1; });
+
+  var and=0,arq=0,honAb=0;
+  (PAD||[]).forEach(function(p){
+    if (p.situacao==='Arquivado') arq++; else and++;
+    if (p.honSit==='nao') honAb+=parseMoeda(p.honVal);
+  });
+  setTxt('pad-tot',(PAD||[]).length); setTxt('pad-and',and); setTxt('pad-arq',arq);
+  setTxt('pad-hon','R$ '+fmtVal(honAb));
+  document.getElementById('pad-cnt').textContent=lista.length+' registro'+(lista.length!==1?'s':'');
+
+  var sitCores={'Em andamento':'#D4B84A','Aguardando defesa':'var(--ch)','Defesa apresentada':'#7ec492','Aguardando julgamento':'#D4B84A','Recurso interposto':'var(--ch)','Arquivado':'var(--tw)','Penalidade aplicada':'var(--rc)'};
+  var tbody=document.getElementById('pad-tbody');
+  if (!lista.length) { tbody.innerHTML='<tr><td colspan="9"><div class="vazio"><div class="vazio-ic">📁</div><div class="vazio-t">Nenhum PAD cadastrado</div><div class="vazio-s">Clique em "+ Novo PAD" para cadastrar</div></div></td></tr>'; return; }
+  tbody.innerHTML=lista.map(function(p){
+    var cor=sitCores[p.situacao]||'var(--tw)';
+    var honHtml=p.honVal?'<div style="font-size:11px;color:var(--ch);font-weight:600">R$ '+esc(p.honVal)+'</div><span class="bgp '+(p.honSit==='sim'?'ok':'no')+'">'+(p.honSit==='sim'?'Pago':'Pendente')+'</span>':'—';
+    return '<tr>'+
+      '<td style="font-weight:600;color:var(--tp)">'+esc(p.nome||'')+'<br>'+
+        (p.whats?'<a href="https://wa.me/55'+p.whats.replace(/\D/g,'')+'" target="_blank" style="font-size:10px;color:var(--ch)">📱 '+esc(p.whats)+'</a> ':'')+
+        (p.email?'<a href="mailto:'+esc(p.email)+'" style="font-size:10px;color:var(--tw)">✉️ '+esc(p.email)+'</a>':'')+
+      '</td>'+
+      '<td style="color:var(--ch)">'+esc(p.orgao||'')+'</td>'+
+      '<td style="font-size:11px;color:var(--tw)">'+esc(p.numproc||'—')+'</td>'+
+      '<td>'+honHtml+'</td>'+
+      '<td style="font-size:11px;color:var(--tw)">'+esc(p.honMod||'')+'</td>'+
+      '<td><span style="font-size:11px;font-weight:600;color:'+cor+'">'+esc(p.situacao||'')+'</span></td>'+
+      '<td style="font-size:11px;color:var(--tw)">'+fmtData(p.data)+'</td>'+
+      '<td style="font-size:11px;color:var(--tw);max-width:140px;overflow:hidden;text-overflow:ellipsis">'+esc(p.obs||'')+'</td>'+
+      '<td><div class="acoes">'+
+        '<button class="btn-ic" title="Editar" onclick="abrirModalPAD(\''+p.id+'\')">✏️</button>'+
+        '<button class="btn-ic x" title="Excluir" onclick="excluirPAD(\''+p.id+'\')">🗑️</button>'+
+      '</div></td>'+
+    '</tr>';
+  }).join('');
+}
+
+function excluirPAD(id) {
+  if (!confirm('Excluir este PAD?')) return;
+  window._fbDeletePAD(id); toast('PAD removido');
+}
+
+function exportPADcsv() {
+  var h=['Cliente','Órgão','Nº Processo','Honorários','Modalidade','Situação Pagto','Situação Processual','Data','Obs'];
+  var rows=(PAD||[]).map(function(p){ return [p.nome,p.orgao,p.numproc,p.honVal,p.honMod,p.honSit==='sim'?'Pago':'Pendente',p.situacao,fmtData(p.data),p.obs]; });
+  var csv=[h].concat(rows).map(function(r){ return r.map(function(v){ return '"'+(v||'').toString().replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
+  var blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download='pad.csv'; a.click(); URL.revokeObjectURL(url);
+  toast('✓ CSV exportado');
+}
+
+// ========== ATENDIMENTOS ==========
+function abrirModalAtend(id) {
+  editAtendId = id;
+  ['at-nome','at-data','at-assunto','at-doc-det','at-whats','at-email','at-obs'].forEach(function(f){ setVal(f,''); });
+  setVal('at-tipo','Parecer'); setVal('at-situacao','Pendente'); setVal('at-doc-local','');
+  if (id) {
+    var a=(ATENDIMENTOS||[]).find(function(x){ return x.id===id; });
+    if (!a) return;
+    document.getElementById('at-mo-tit').textContent='Editar Atendimento';
+    setVal('at-nome',a.nome||''); setVal('at-data',a.data||'');
+    setVal('at-tipo',a.tipo||'Parecer'); setVal('at-situacao',a.situacao||'Pendente');
+    setVal('at-assunto',a.assunto||''); setVal('at-doc-local',a.docLocal||'');
+    setVal('at-doc-det',a.docDet||''); setVal('at-whats',a.whats||'');
+    setVal('at-email',a.email||''); setVal('at-obs',a.obs||'');
+  } else {
+    document.getElementById('at-mo-tit').textContent='Novo Atendimento';
+    setVal('at-data',new Date().toISOString().split('T')[0]);
+  }
+  document.getElementById('ov-atend').style.display='block';
+}
+
+function toggleAtendDocDetalhe() { /* always visible */ }
+
+function salvarAtend() {
+  var nome=getVal('at-nome');
+  if (!nome) { toast('Informe o nome do cliente',true); return; }
+  var obj={
+    nome:nome, data:getVal('at-data'), tipo:getVal('at-tipo'),
+    situacao:getVal('at-situacao'), assunto:getVal('at-assunto'),
+    docLocal:getVal('at-doc-local'), docDet:getVal('at-doc-det'),
+    contato:getVal('at-whats'), docLocal:getVal('at-doc-local'), docDet:getVal('at-doc-det'),
+    whats:getVal('at-whats'), email:getVal('at-email'), obs:getVal('at-obs')
+  };
+  if (editAtendId) { obj.id=editAtendId; window._fbSaveAtend(obj); toast('✓ Atendimento atualizado'); }
+  else { window._fbSaveAtend(obj); toast('✓ Atendimento cadastrado'); }
+  document.getElementById('ov-atend').style.display='none'; editAtendId=null;
+}
+
+function renderAtendimentos() {
+  var busca=(getVal('at-busca')||'').toLowerCase();
+  var fTipo=getVal('at-filtro-tipo');
+  var fSit=getVal('at-filtro-sit');
+  var lista=(ATENDIMENTOS||[]).filter(function(a){
+    var okB=!busca||(a.nome||'').toLowerCase().includes(busca)||(a.assunto||'').toLowerCase().includes(busca);
+    return okB&&(!fTipo||a.tipo===fTipo)&&(!fSit||a.situacao===fSit);
+  });
+  lista.sort(function(a,b){ return (b.data||'')>(a.data||'')?1:-1; });
+
+  var par=0,doc=0,conc=0;
+  (ATENDIMENTOS||[]).forEach(function(a){
+    if(a.situacao==='Concluído') conc++;
+    else if(a.tipo==='Análise Documental') doc++;
+    else par++;
+  });
+  setTxt('at-tot',(ATENDIMENTOS||[]).length); setTxt('at-par',par); setTxt('at-doc',doc); setTxt('at-conc',conc);
+  document.getElementById('at-cnt').textContent=lista.length+' registro'+(lista.length!==1?'s':'');
+
+  var docIcons={'Pasta no Drive':'📂','E-mail Dra. Débora':'📧','WhatsApp':'📱','Físico no escritório':'🗂️','Outro':'📎'};
+  var sitCores={'Pendente':'#D4B84A','Em andamento':'var(--ch)','Concluído':'#7ec492'};
+  var tbody=document.getElementById('at-tbody');
+  if (!lista.length) { tbody.innerHTML='<tr><td colspan="8"><div class="vazio"><div class="vazio-ic">📝</div><div class="vazio-t">Nenhum atendimento cadastrado</div><div class="vazio-s">Clique em "+ Novo Atendimento"</div></div></td></tr>'; return; }
+  tbody.innerHTML=lista.map(function(a){
+    var docHtml='—';
+    if (a.docLocal) {
+      var ic=docIcons[a.docLocal]||'📎';
+      docHtml='<div style="font-size:11px;">'+(ic)+' '+esc(a.docLocal)+'</div>';
+      if (a.docDet) docHtml+='<div style="font-size:10px;color:var(--tw)">'+esc(a.docDet)+'</div>';
+    }
+    return '<tr>'+
+      '<td style="font-weight:600;color:var(--tp)">'+esc(a.nome||'')+'<br>'+
+        (a.whats?'<a href="https://wa.me/55'+a.whats.replace(/\D/g,'')+'" target="_blank" style="font-size:10px;color:var(--ch)">📱 '+esc(a.whats)+'</a> ':'')+
+        (a.email?'<a href="mailto:'+esc(a.email)+'" style="font-size:10px;color:var(--tw)">✉️ '+esc(a.email)+'</a>':'')+
+      '</td>'+
+      '<td style="font-size:11px;color:var(--tw);white-space:nowrap">'+fmtData(a.data)+'</td>'+
+      '<td><span class="bgt">'+esc(a.tipo||'')+'</span></td>'+
+      '<td><span style="font-size:11px;font-weight:600;color:'+(sitCores[a.situacao]||'var(--tw)')+'">'+esc(a.situacao||'')+'</span></td>'+
+      '<td>'+docHtml+'</td>'+
+      '<td style="font-size:11px;color:var(--ts);max-width:160px;overflow:hidden;text-overflow:ellipsis">'+esc(a.assunto||'')+'</td>'+
+      '<td style="font-size:11px;color:var(--tw)">'+esc(a.obs||'')+'</td>'+
+      '<td><div class="acoes">'+
+        '<button class="btn-ic" title="Editar" onclick="abrirModalAtend(\''+a.id+'\')">✏️</button>'+
+        '<button class="btn-ic x" title="Excluir" onclick="excluirAtend(\''+a.id+'\')">🗑️</button>'+
+      '</div></td>'+
+    '</tr>';
+  }).join('');
+}
+
+function excluirAtend(id) {
+  if (!confirm('Excluir este atendimento?')) return;
+  window._fbDeleteAtend(id); toast('Atendimento removido');
+}
+
+function exportAtendCSV() {
+  var h=['Cliente','Data','Tipo','Situação','Assunto','Local Docs','Detalhe Docs','Contato','Obs'];
+  var rows=(ATENDIMENTOS||[]).map(function(a){ return [a.nome,fmtData(a.data),a.tipo,a.situacao,a.assunto,a.docLocal,a.docDet,a.contato,a.obs]; });
+  var csv=[h].concat(rows).map(function(r){ return r.map(function(v){ return '"'+(v||'').toString().replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
+  var blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download='atendimentos.csv'; a.click(); URL.revokeObjectURL(url);
   toast('✓ CSV exportado');
 }
 
