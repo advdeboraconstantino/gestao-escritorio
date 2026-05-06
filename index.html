@@ -1447,7 +1447,7 @@ function renderTabela() {
 
       html += '<tr>' +
         '<td class="td-nm">' +
-          '<span style="cursor:pointer;text-decoration:underline dotted;color:var(--ch)" onclick="abrirDetalhe('+c.id+')">'+esc(c.nome)+'</span>' +
+          '<span style="cursor:pointer;text-decoration:underline dotted;color:var(--ch)" onclick="abrirDetalhe(\''+c.id+'\')">'+esc(c.nome)+'</span>' +
           (c.orgao ? '<span class="sub">'+esc(c.orgao)+'</span>' : '') +
           (qtdProc > 1 ? '<span class="sub" style="color:var(--do)">'+qtdProc+' processos</span>' : '') +
           alertaHtml +
@@ -1465,10 +1465,10 @@ function renderTabela() {
         '<td style="min-width:180px;">' + buildAndamentoCell(c) + '</td>' +
         '<td style="min-width:120px;">'+exitoHtml+comissaoHtml+'</td>' +
         '<td><div class="acoes">' +
-          '<button class="btn-ic" title="Ver detalhes" onclick="abrirDetalhe('+c.id+')">👁</button>' +
-          '<button class="btn-ic" title="Editar" onclick="abrirModal('+c.id+')">✏️</button>' +
-          '<button class="btn-ic" title="Alternar status" onclick="toggleStatus('+c.id+')">🔄</button>' +
-          '<button class="btn-ic x" title="Excluir" onclick="pedirDel('+c.id+')">🗑️</button>' +
+          '<button class="btn-ic" title="Ver detalhes" onclick="abrirDetalhe(\''+c.id+'\')">👁</button>' +
+          '<button class="btn-ic" title="Editar" onclick="abrirModal(\''+c.id+'\')">✏️</button>' +
+          '<button class="btn-ic" title="Alternar status" onclick="toggleStatus(\''+c.id+'\')">🔄</button>' +
+          '<button class="btn-ic x" title="Excluir" onclick="pedirDel(\''+c.id+'\')">🗑️</button>' +
         '</div></td>' +
       '</tr>';
     });
@@ -1589,7 +1589,7 @@ function renderAlertasFull() {
       return '<div class="alrt '+(a.diff>=0?'am':'')+'">' +
         '<span style="font-size:16px">'+(a.diff<0?'🚨':'⚠️')+'</span>' +
         '<div><strong>'+esc(a.nome)+' — '+a.nat+' '+a.idx+'ª parcela</strong>' +
-        '<span>'+(a.diff<0?'VENCIDA há '+Math.abs(a.diff)+'d':a.diff===0?'Vence HOJE':'Vence em '+a.diff+'d')+' — '+fmtData(a.data)+' — <a href="javascript:void(0)" onclick="abrirModal('+a.cid+')" style="color:var(--ch)">editar</a></span></div></div>';
+        '<span>'+(a.diff<0?'VENCIDA há '+Math.abs(a.diff)+'d':a.diff===0?'Vence HOJE':'Vence em '+a.diff+'d')+' — '+fmtData(a.data)+' — <a href="javascript:void(0)" onclick="abrirModal(\''+a.cid+'\')" style="color:var(--ch)">editar</a></span></div></div>';
     }).join('');
 }
 
@@ -2391,6 +2391,4 @@ document.addEventListener('keydown', function(e){
 });
 // Dados carregados pelo Firebase listener em tempo real (ver módulo acima)
 
-</script>
-</body>
-</html>
+</
