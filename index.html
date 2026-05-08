@@ -1982,32 +1982,14 @@ function renderTabela() {
         });
       });
 
-      var qtdProc = DB.filter(function(x){ return x.nome === c.nome; }).length;
+      var qtdProc = (c.processos && c.processos.length) ? c.processos.length : 1;
+    }); // fim lista.forEach
+    tbody.innerHTML = html;
+  } // fim else
 
-      var taxaHtml = '—';
-      if (c.taxa) {
-        var tPagas = c.taxa.mod === 'parcelado' ? (c.taxa.parcelas||[]).filter(function(p){return p.pago;}).length : null;
-        var tTotal = c.taxa.mod === 'parcelado' ? (c.taxa.parcelas||[]).length : null;
-        taxaHtml = '<div style="font-size:11px;">R$ '+(c.taxa.valor||'0')+'</div>' +
-          '<span class="bgp '+(c.taxa.pago?'ok':'no')+'">'+(c.taxa.pago?'Paga':'Pendente')+'</span>' +
-          (tTotal ? '<div style="font-size:10px;color:var(--tw);margin-top:1px;">'+tPagas+'/'+tTotal+' pagas</div>' : '');
-      }
-
-      var honHtml = '—';
-      if (c.hon) {
-        var hPagas = c.hon.mod === 'parcelado' ? (c.hon.parcelas||[]).filter(function(p){return p.pago;}).length : null;
-        var hTotal = c.hon.mod === 'parcelado' ? (c.hon.parcelas||[]).length : null;
-        honHtml = '<div style="font-size:11px;">R$ '+(c.hon.valor||'0')+'</div>' +
-          '<span class="bgp '+(c.hon.pago?'ok':'no')+'">'+(c.hon.pago?'Pago':'Pendente')+'</span>' +
-          (hTotal ? '<div style="font-size:10px;color:var(--tw);margin-top:1px;">'+hPagas+'/'+hTotal+' pagas</div>' : '');
-      }
-
-      // ÊXITO E COMISSÃO
-      var exitoHtml = '—';
-      var isExito = (c.pagamento === 'Êxito (percentual)' || c.pagamento === 'Êxito + fixo');
-      if (isExito && c.exitoPct) {
-        exitoHtml = '<div style="font-size:11px;color:var(--ch);font-weight:600;">Êxito: '+c.exitoPct+'%</div>';
-      }
+  atualizarStats();
+  atualizarFiltroTipo();
+  renderAlertasBanner();
 
 // ========== DETALHE CLIENTE ==========
 function abrirDetalhe(id) {
