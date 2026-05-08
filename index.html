@@ -414,6 +414,13 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
 .aud-hoje{background:rgba(212,184,74,.08);border-left:3px solid #D4B84A;}
 .aud-passada{opacity:.65;}
 
+/* PROCESSO CARD (múltiplos processos por cliente) */
+.proc-item{background:var(--fp);border:1px solid var(--bd);border-radius:8px;margin-bottom:14px;overflow:hidden;}
+.proc-item-head{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(180,138,74,.06);border-bottom:1px solid var(--bd);cursor:pointer;}
+.proc-item-num{font-size:12px;font-weight:600;color:var(--ch);}
+.proc-item-tipo{font-size:11px;color:var(--tw);margin-top:2px;}
+.proc-item-body{padding:14px 16px;}
+
 @media(max-width:860px){.hdr-stats{display:none;}.pg{padding:14px;}.gr2,.gr3{grid-template-columns:1fr;}.parc-row{grid-template-columns:28px 1fr 1fr auto;}}
 @media(max-width:580px){.cards{grid-template-columns:1fr 1fr;}.modal{margin:10px auto;}.mo-panel{padding:16px;}}
 </style>
@@ -487,14 +494,10 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
         <thead>
           <tr>
             <th onclick="sortBy('nome')">Cliente ▾</th>
-            <th onclick="sortBy('data')">Contrato ▾</th>
-            <th onclick="sortBy('tipo')">Tipo de Ação ▾</th>
-            <th>Processo / Fase</th>
-            <th onclick="sortBy('valor')">Valor ▾</th>
+            <th>Processos / Tipo / Status</th>
+            <th onclick="sortBy('valor')">Valor Total ▾</th>
             <th>Taxa Adm.</th>
             <th>Honorários</th>
-            <th onclick="sortBy('status')">Status ▾</th>
-            <th>Último Andamento</th>
             <th>Êxito / Comissão</th>
             <th>Ações</th>
           </tr>
@@ -1135,206 +1138,79 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
   <div id="alertas-full"></div>
 </div>
 
+<datalist id="tipos-list">
+  <option value="PAD / Processo Administrativo Disciplinar">
+  <option value="Reintegração ao Cargo">
+  <option value="Progressão e Promoção">
+  <option value="Licença Médica / Assiduidade">
+  <option value="Abono de Permanência">
+  <option value="Insalubridade">
+  <option value="Desvio de Função">
+  <option value="Bonificação por Resultados">
+  <option value="Estágio Probatório">
+  <option value="Revisão Remuneratória">
+  <option value="Aposentadoria / Pensão">
+  <option value="Descongelamento de Tempo (LC 226/2026)">
+  <option value="Piso do Magistério (Lei 15.326/2026)">
+  <option value="Adicionais Temporais">
+  <option value="Nomeação / Concurso Público">
+</datalist>
+<datalist id="fases-list">
+  <option value="Petição Inicial protocolada">
+  <option value="Aguardando citação">
+  <option value="Contestação apresentada">
+  <option value="Fase de instrução">
+  <option value="Audiência designada">
+  <option value="Aguardando sentença">
+  <option value="Sentença proferida">
+  <option value="Recurso em andamento">
+  <option value="Trânsito em julgado">
+  <option value="Fase de execução">
+  <option value="Cumprimento de sentença">
+</datalist>
+
 <!-- ===== OVERLAY / MODAL CADASTRO ===== -->
 <div id="overlay" onclick="overlayClick(event)">
-  <div class="modal" id="modal">
+  <div class="modal" id="modal" style="max-width:820px;">
     <div class="mo-head">
       <div>
         <div class="mo-tit" id="mo-tit">Novo Cliente</div>
-        <div class="mo-sub" id="mo-sub">Preencha os dados do contrato</div>
+        <div class="mo-sub" id="mo-sub">Dados pessoais + processos vinculados</div>
       </div>
       <button class="mo-cls" onclick="fecharModal()">✕</button>
     </div>
     <div class="mo-abas">
-      <button class="mo-aba on" id="tab-btn-0" onclick="moAba(0)">📋 Dados Gerais</button>
-      <button class="mo-aba" id="tab-btn-1" onclick="moAba(1)">💳 Financeiro</button>
-      <button class="mo-aba" id="tab-btn-2" onclick="moAba(2)">📬 Contato</button>
+      <button class="mo-aba on" id="tab-btn-0" onclick="moAba(0)">👤 Dados Pessoais</button>
+      <button class="mo-aba" id="tab-btn-1" onclick="moAba(1)">⚖️ Processos</button>
     </div>
 
-    <!-- PAINEL 0: DADOS GERAIS -->
+    <!-- PAINEL 0: DADOS PESSOAIS -->
     <div class="mo-panel on" id="tab-0">
       <div class="sec">Identificação</div>
       <div class="gr gr2">
         <div class="fg"><label class="fl">Nome Completo *</label><input class="fi" id="f-nome" placeholder="Nome completo do cliente"></div>
-        <div class="fg"><label class="fl">Data do Contrato *</label><input type="date" class="fi" id="f-data"></div>
+        <div class="fg"><label class="fl">CPF / Matrícula</label><input class="fi" id="f-cpf" placeholder="000.000.000-00"></div>
       </div>
-      <div class="gr">
-        <div class="fg"><label class="fl">Tipo de Ação *</label>
-          <input class="fi" id="f-tipo" list="tipos-list" placeholder="Ex.: Reintegração ao Cargo">
-          <datalist id="tipos-list">
-            <option value="PAD / Processo Administrativo Disciplinar">
-            <option value="Reintegração ao Cargo">
-            <option value="Progressão e Promoção">
-            <option value="Licença Médica / Assiduidade">
-            <option value="Abono de Permanência">
-            <option value="Insalubridade">
-            <option value="Desvio de Função">
-            <option value="Bonificação por Resultados">
-            <option value="Estágio Probatório">
-            <option value="Revisão Remuneratória">
-            <option value="Aposentadoria / Pensão">
-            <option value="Descongelamento de Tempo (LC 226/2026)">
-            <option value="Piso do Magistério (Lei 15.326/2026)">
-            <option value="Adicionais Temporais">
-            <option value="Nomeação / Concurso Público">
-          </datalist>
-        </div>
-      </div>
-      <div class="sec">Processo Judicial</div>
-      <div class="gr gr2">
-        <div class="fg"><label class="fl">Status *</label>
-          <select class="fi" id="f-status" onchange="toggleProtocolado()">
-            <option value="">Selecione...</option>
-            <option value="Ainda não protocolado">Ainda não protocolado</option>
-            <option value="Protocolado">Protocolado</option>
-          </select>
-        </div>
-        <div class="fg"><label class="fl">Valor do Processo (R$) *</label><input class="fi" id="f-valor" placeholder="0,00" oninput="fmtMoeda(this)"></div>
-      </div>
-      <div id="grp-proc" style="display:none;">
-        <div class="gr gr2">
-          <div class="fg"><label class="fl">Número do Processo</label><input class="fi" id="f-numproc" placeholder="0000000-00.0000.0.00.0000"></div>
-          <div class="fg"><label class="fl">Fase Processual</label>
-            <input class="fi" id="f-fase" list="fases-list" placeholder="Ex.: Petição Inicial">
-            <datalist id="fases-list">
-              <option value="Petição Inicial protocolada">
-              <option value="Aguardando citação">
-              <option value="Contestação apresentada">
-              <option value="Fase de instrução">
-              <option value="Audiência designada">
-              <option value="Aguardando sentença">
-              <option value="Sentença proferida">
-              <option value="Recurso em andamento">
-              <option value="Trânsito em julgado">
-              <option value="Fase de execução">
-              <option value="Cumprimento de sentença">
-            </datalist>
-          </div>
-        </div>
-      </div>
-      <div class="gr">
-        <div class="fg"><label class="fl">Observações</label><input class="fi" id="f-obs" placeholder="Notas adicionais (opcional)"></div>
-      </div>
-    </div>
-
-    <!-- PAINEL 1: FINANCEIRO -->
-    <div class="mo-panel" id="tab-1">
-
-      <div class="sec">Taxa Administrativa</div>
-      <div class="chk-row"><input type="checkbox" id="ck-taxa" onchange="toggleTaxa()"><label for="ck-taxa">Taxa administrativa foi cobrada</label></div>
-      <div id="grp-taxa" style="display:none;">
-        <div class="gr gr3">
-          <div class="fg"><label class="fl">Valor (R$)</label><input class="fi" id="f-taxa-val" placeholder="0,00" oninput="fmtMoeda(this);calcComissao()"></div>
-          <div class="fg"><label class="fl">Modalidade</label>
-            <select class="fi" id="f-taxa-mod" onchange="toggleTaxaParc()">
-              <option value="avista">À vista</option>
-              <option value="parcelado">Parcelado</option>
-            </select>
-          </div>
-          <div class="fg"><label class="fl">Situação</label>
-            <select class="fi" id="f-taxa-sit" onchange="calcComissao()">
-              <option value="nao">Não paga</option>
-              <option value="sim">Paga</option>
-            </select>
-          </div>
-        </div>
-        <div id="grp-taxa-parc" style="display:none;">
-          <div class="fg" style="margin-bottom:10px;"><label class="fl">Número de Parcelas</label>
-            <input type="number" class="fi" id="f-taxa-np" min="1" max="60" placeholder="Ex.: 3" oninput="gerarParc('taxa')">
-          </div>
-          <div class="parc-box" id="taxa-parc"></div>
-        </div>
-      </div>
-
-      <div class="sec">Honorários Iniciais</div>
-      <div class="chk-row"><input type="checkbox" id="ck-hon" onchange="toggleHon()"><label for="ck-hon">Honorários iniciais foram cobrados</label></div>
-      <div id="grp-hon" style="display:none;">
-        <div class="gr gr3">
-          <div class="fg"><label class="fl">Valor (R$)</label><input class="fi" id="f-hon-val" placeholder="0,00" oninput="fmtMoeda(this)"></div>
-          <div class="fg"><label class="fl">Modalidade</label>
-            <select class="fi" id="f-hon-mod" onchange="toggleHonParc()">
-              <option value="avista">À vista</option>
-              <option value="parcelado">Parcelado</option>
-            </select>
-          </div>
-          <div class="fg"><label class="fl">Situação</label>
-            <select class="fi" id="f-hon-sit">
-              <option value="nao">Não pago</option>
-              <option value="sim">Pago</option>
-            </select>
-          </div>
-        </div>
-        <div id="grp-hon-parc" style="display:none;">
-          <div class="fg" style="margin-bottom:10px;"><label class="fl">Número de Parcelas</label>
-            <input type="number" class="fi" id="f-hon-np" min="1" max="60" placeholder="Ex.: 6" oninput="gerarParc('hon')">
-          </div>
-          <div class="parc-box" id="hon-parc"></div>
-        </div>
-      </div>
-
-      <div class="sec">Honorários do Processo</div>
-      <div class="gr gr2">
-        <div class="fg"><label class="fl">Forma de Honorários</label>
-          <select class="fi" id="f-pagamento" onchange="toggleExito()">
-            <option value="">Selecione...</option>
-            <option value="Êxito (percentual)">Êxito (percentual)</option>
-            <option value="Honorários fixos">Honorários fixos</option>
-            <option value="Êxito + fixo">Êxito + fixo</option>
-            <option value="Parcelado">Parcelado</option>
-            <option value="À vista">À vista</option>
-          </select>
-        </div>
-        <div class="fg" id="grp-exito" style="display:none;">
-          <label class="fl">Percentual de Êxito (%)</label>
-          <select class="fi" id="f-exito-pct" onchange="document.getElementById('grp-exito-custom').style.display=(this.value==='outro'?'block':'none')">
-            <option value="">Selecione...</option>
-            <option value="10">10%</option>
-            <option value="15">15%</option>
-            <option value="20">20%</option>
-            <option value="25">25%</option>
-            <option value="30">30%</option>
-            <option value="33">33%</option>
-            <option value="35">35%</option>
-            <option value="40">40%</option>
-            <option value="outro">Outro %</option>
-          </select>
-        </div>
-      </div>
-      <div id="grp-exito-custom" style="display:none;">
-        <div class="fg"><label class="fl">Percentual personalizado (%)</label>
-          <input type="number" class="fi" id="f-exito-custom" min="1" max="100" placeholder="Ex.: 28">
-        </div>
-      </div>
-
-      <div class="sec">Comissão do Setor Comercial</div>
-      <div style="font-size:11px;color:var(--tw);margin-bottom:10px;">Calculada sobre o valor das taxas efetivamente pagas</div>
-      <div class="gr gr2">
-        <div class="fg"><label class="fl">Percentual de Comissão</label>
-          <select class="fi" id="f-comissao-pct" onchange="calcComissao()">
-            <option value="">Sem comissão</option>
-            <option value="20">20%</option>
-            <option value="30">30%</option>
-            <option value="40">40%</option>
-            <option value="50">50%</option>
-          </select>
-        </div>
-        <div class="fg"><label class="fl">Comissão Calculada</label>
-          <div class="fi" id="f-comissao-calc" style="background:rgba(0,0,0,.2);color:var(--ch);cursor:default;display:flex;align-items:center;">R$ 0,00</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- PAINEL 2: CONTATO -->
-    <div class="mo-panel" id="tab-2">
-      <div class="sec">Dados de Contato</div>
       <div class="gr gr2">
         <div class="fg"><label class="fl">E-mail</label><input type="email" class="fi" id="f-email" placeholder="cliente@email.com"></div>
         <div class="fg"><label class="fl">WhatsApp</label><input class="fi" id="f-whats" placeholder="(12) 99999-9999" oninput="fmtTel(this)"></div>
       </div>
       <div class="gr gr2">
-        <div class="fg"><label class="fl">CPF / Matrícula</label><input class="fi" id="f-cpf" placeholder="000.000.000-00"></div>
-        <div class="fg"><label class="fl">Órgão / Repartição</label><input class="fi" id="f-orgao" placeholder="Ex.: SEDUC SP, PMESP..."></div>
+        <div class="fg"><label class="fl">Órgão / Repartição</label><input class="fi" id="f-orgao" placeholder="Ex.: SEDUC SP, PMESP, Prefeitura..."></div>
+        <div class="fg"><label class="fl">Observações Gerais</label><input class="fi" id="f-obs-geral" placeholder="Notas sobre o cliente"></div>
       </div>
+      <div style="margin-top:14px;padding:12px 14px;background:rgba(63,103,73,.07);border:1px solid rgba(63,103,73,.2);border-radius:7px;font-size:12px;color:var(--ts);line-height:1.6;">
+        💡 <strong style="color:var(--ch)">Cliente com múltiplos processos?</strong> Cadastre os dados pessoais aqui e adicione quantos processos quiser na aba <strong>⚖️ Processos</strong>. Cada processo tem seus próprios dados financeiros, contrato e número.
+      </div>
+    </div>
+
+    <!-- PAINEL 1: PROCESSOS -->
+    <div class="mo-panel" id="tab-1">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <div style="font-size:12px;color:var(--ts);">Adicione um ou mais processos para este cliente.</div>
+        <button class="btn-v" onclick="adicionarProcesso()" style="font-size:12px;padding:7px 14px;">+ Adicionar Processo</button>
+      </div>
+      <div id="processos-lista"></div>
     </div>
 
     <div class="mo-foot">
@@ -1483,80 +1359,383 @@ function mudarAba(id, btn) {
   if (id === 'audiencias') renderAudiencias();
 }
 
-// ========== MODAL ==========
+// ========== MODAL — MÚLTIPLOS PROCESSOS ==========
+var processosEdicao = [];
+
 function abrirModal(id) {
   editId = id;
   moAba(0);
-  limparForm();
+  processosEdicao = [];
 
   if (id !== null) {
     var c = DB.find(function(x){ return x.id === id; });
     if (!c) return;
     document.getElementById('mo-tit').textContent = 'Editar Cliente';
     document.getElementById('mo-sub').textContent = c.nome || '';
-    setVal('f-nome', c.nome);
-    setVal('f-data', c.data);
-    setVal('f-tipo', c.tipo);
-    setVal('f-status', c.status);
-    setVal('f-numproc', c.numproc || '');
-    setVal('f-fase', c.fase || '');
-    setVal('f-valor', c.valor);
-    setVal('f-obs', c.obs || '');
-    setVal('f-email', c.email || '');
-    setVal('f-whats', c.whats || '');
-    setVal('f-cpf', c.cpf || '');
-    setVal('f-orgao', c.orgao || '');
-    setVal('f-pagamento', c.pagamento || '');
-    toggleExito();
-    // Êxito percentual
-    var exitoVal = c.exitoPct || '';
-    var exitoOpts = ['10','15','20','25','30','33','35','40'];
-    if (exitoVal && exitoOpts.indexOf(exitoVal) === -1 && exitoVal !== '') {
-      setVal('f-exito-pct','outro');
-      setVal('f-exito-custom', exitoVal);
-      document.getElementById('grp-exito-custom').style.display = 'block';
+    setVal('f-nome', c.nome||'');
+    setVal('f-cpf', c.cpf||'');
+    setVal('f-email', c.email||'');
+    setVal('f-whats', c.whats||'');
+    setVal('f-orgao', c.orgao||'');
+    setVal('f-obs-geral', c.obsGeral||c.obs||'');
+    // Carregar processos: novo formato (array) ou legado (campo único)
+    if (c.processos && c.processos.length) {
+      processosEdicao = JSON.parse(JSON.stringify(c.processos));
     } else {
-      setVal('f-exito-pct', exitoVal);
-      document.getElementById('grp-exito-custom').style.display = 'none';
-    }
-    setVal('f-comissao-pct', c.comissaoPct || '');
-    toggleProtocolado();
-
-    // Taxa
-    if (c.taxa) {
-      document.getElementById('ck-taxa').checked = true;
-      toggleTaxa();
-      setVal('f-taxa-val', c.taxa.valor || '');
-      setVal('f-taxa-mod', c.taxa.mod || 'avista');
-      setVal('f-taxa-sit', c.taxa.pago ? 'sim' : 'nao');
-      if (c.taxa.mod === 'parcelado') {
-        toggleTaxaParc();
-        setVal('f-taxa-np', c.taxa.parcelas ? c.taxa.parcelas.length : '');
-        carregarParc('taxa', c.taxa.parcelas || [], c.taxa.valor);
-      }
-    }
-    // Hon
-    if (c.hon) {
-      document.getElementById('ck-hon').checked = true;
-      toggleHon();
-      setVal('f-hon-val', c.hon.valor || '');
-      setVal('f-hon-mod', c.hon.mod || 'avista');
-      setVal('f-hon-sit', c.hon.pago ? 'sim' : 'nao');
-      if (c.hon.mod === 'parcelado') {
-        toggleHonParc();
-        setVal('f-hon-np', c.hon.parcelas ? c.hon.parcelas.length : '');
-        carregarParc('hon', c.hon.parcelas || [], c.hon.valor);
-      }
+      // Migrar registro legado para o novo formato
+      processosEdicao = [{
+        tipo: c.tipo||'', data: c.data||'', status: c.status||'',
+        valor: c.valor||'', numproc: c.numproc||'', fase: c.fase||'',
+        pagamento: c.pagamento||'', exitoPct: c.exitoPct||'',
+        comissaoPct: c.comissaoPct||'', obs: c.obs||'',
+        taxa: c.taxa||null, hon: c.hon||null
+      }];
     }
   } else {
     document.getElementById('mo-tit').textContent = 'Novo Cliente';
-    document.getElementById('mo-sub').textContent = 'Preencha os dados do contrato';
-    var hoje = new Date();
-    var iso = hoje.toISOString().split('T')[0];
-    setVal('f-data', iso);
+    document.getElementById('mo-sub').textContent = 'Dados pessoais + processos';
+    setVal('f-nome',''); setVal('f-cpf','');
+    setVal('f-email',''); setVal('f-whats','');
+    setVal('f-orgao',''); setVal('f-obs-geral','');
+    processosEdicao = [novoProcessoObj()];
   }
-
+  renderProcessosLista();
   document.getElementById('overlay').classList.add('on');
+}
+
+function novoProcessoObj() {
+  return {
+    tipo:'', data: new Date().toISOString().split('T')[0],
+    status:'', valor:'', numproc:'', fase:'',
+    pagamento:'', exitoPct:'', comissaoPct:'', obs:'',
+    taxa: null, hon: null
+  };
+}
+
+function adicionarProcesso() {
+  coletarProcessosDoDOM();
+  processosEdicao.push(novoProcessoObj());
+  renderProcessosLista();
+  // Rolar para o novo
+  setTimeout(function(){
+    var lista = document.getElementById('processos-lista');
+    lista.scrollTop = lista.scrollHeight;
+  }, 100);
+}
+
+function removerProcesso(idx) {
+  if (processosEdicao.length <= 1) { toast('O cliente precisa ter ao menos um processo', true); return; }
+  if (!confirm('Remover este processo do cliente?')) return;
+  coletarProcessosDoDOM();
+  processosEdicao.splice(idx, 1);
+  renderProcessosLista();
+}
+
+function coletarProcessosDoDOM() {
+  // Sincroniza processosEdicao com os valores atuais dos campos
+  processosEdicao.forEach(function(p, idx) {
+    var pref = 'p'+idx+'-';
+    p.tipo      = getVal(pref+'tipo');
+    p.data      = getVal(pref+'data');
+    p.status    = getVal(pref+'status');
+    p.valor     = getVal(pref+'valor');
+    p.numproc   = getVal(pref+'numproc');
+    p.fase      = getVal(pref+'fase');
+    p.pagamento = getVal(pref+'pagamento');
+    p.obs       = getVal(pref+'obs');
+    var exitoEl = document.getElementById(pref+'exito-pct');
+    var customEl = document.getElementById(pref+'exito-custom');
+    p.exitoPct  = (exitoEl && exitoEl.value === 'outro') ? (customEl ? customEl.value : '') : (exitoEl ? exitoEl.value : '');
+    p.comissaoPct = getVal(pref+'comissao-pct');
+    // Taxa
+    var ckTaxa = document.getElementById(pref+'ck-taxa');
+    if (ckTaxa && ckTaxa.checked) {
+      var tMod = getVal(pref+'taxa-mod');
+      p.taxa = {
+        valor: getVal(pref+'taxa-val'), mod: tMod,
+        pago: getVal(pref+'taxa-sit') === 'sim',
+        parcelas: tMod === 'parcelado' ? coletarParcP(pref+'taxa') : []
+      };
+    } else { p.taxa = null; }
+    // Hon
+    var ckHon = document.getElementById(pref+'ck-hon');
+    if (ckHon && ckHon.checked) {
+      var hMod = getVal(pref+'hon-mod');
+      p.hon = {
+        valor: getVal(pref+'hon-val'), mod: hMod,
+        pago: getVal(pref+'hon-sit') === 'sim',
+        parcelas: hMod === 'parcelado' ? coletarParcP(pref+'hon') : []
+      };
+    } else { p.hon = null; }
+  });
+}
+
+function coletarParcP(prefTipo) {
+  var resultado = [], i = 0;
+  while (true) {
+    var d = document.getElementById(prefTipo+'-d-'+i);
+    var pg = document.getElementById(prefTipo+'-pg-'+i);
+    var vl = document.getElementById(prefTipo+'-vl-'+i);
+    if (!d) break;
+    resultado.push({ data: d.value, pago: pg ? pg.checked : false, valorParcela: vl ? vl.value : '' });
+    i++;
+  }
+  return resultado;
+}
+
+function renderProcessosLista() {
+  var cont = document.getElementById('processos-lista');
+  if (!cont) return;
+  cont.innerHTML = '';
+  processosEdicao.forEach(function(p, idx) {
+    cont.appendChild(buildProcessoCard(p, idx));
+  });
+}
+
+function buildProcessoCard(p, idx) {
+  var pref = 'p'+idx+'-';
+  var wrap = document.createElement('div');
+  wrap.className = 'proc-item';
+  wrap.id = 'proc-card-'+idx;
+
+  var label = (p.tipo || 'Processo '+(idx+1)) + (p.numproc ? ' — '+p.numproc : '');
+  var isExito = (p.pagamento === 'Êxito (percentual)' || p.pagamento === 'Êxito + fixo');
+  var taxaTemParc = p.taxa && p.taxa.mod === 'parcelado';
+  var honTemParc  = p.hon  && p.hon.mod  === 'parcelado';
+
+  wrap.innerHTML =
+    '<div class="proc-item-head" onclick="toggleProcCard('+idx+')">' +
+      '<div><div class="proc-item-num">⚖️ '+(idx+1)+'º Processo — '+esc(p.tipo||'Novo processo')+'</div>' +
+        (p.numproc ? '<div class="proc-item-tipo">'+esc(p.numproc)+'</div>' : '') +
+      '</div>' +
+      '<div style="display:flex;gap:6px;align-items:center;">' +
+        '<button type="button" onclick="event.stopPropagation();removerProcesso('+idx+')" class="btn-ic x" title="Remover este processo">🗑️</button>' +
+        '<span style="font-size:16px;color:var(--tw)" id="proc-arrow-'+idx+'">▾</span>' +
+      '</div>' +
+    '</div>' +
+    '<div class="proc-item-body" id="proc-body-'+idx+'">' +
+
+    // DADOS GERAIS
+    '<div class="sec" style="margin-top:0;">Dados do Processo</div>' +
+    '<div class="gr" style="margin-bottom:10px;">' +
+      '<div class="fg"><label class="fl">Tipo de Ação *</label>' +
+        '<input class="fi" id="'+pref+'tipo" list="tipos-list" value="'+esc(p.tipo||'')+'" placeholder="Ex.: Reintegração ao Cargo">' +
+      '</div>' +
+    '</div>' +
+    '<div class="gr gr3" style="margin-bottom:10px;">' +
+      '<div class="fg"><label class="fl">Data do Contrato</label><input type="date" class="fi" id="'+pref+'data" value="'+(p.data||'')+'"></div>' +
+      '<div class="fg"><label class="fl">Status</label>' +
+        '<select class="fi" id="'+pref+'status">' +
+          '<option value=""'+(p.status===''?' selected':'')+'>Selecione...</option>' +
+          '<option value="Ainda não protocolado"'+(p.status==='Ainda não protocolado'?' selected':'')+'>Ainda não protocolado</option>' +
+          '<option value="Protocolado"'+(p.status==='Protocolado'?' selected':'')+'>Protocolado</option>' +
+        '</select>' +
+      '</div>' +
+      '<div class="fg"><label class="fl">Valor do Processo (R$)</label><input class="fi" id="'+pref+'valor" value="'+esc(p.valor||'')+'" placeholder="0,00" oninput="fmtMoeda(this)"></div>' +
+    '</div>' +
+    '<div class="gr gr2" style="margin-bottom:10px;">' +
+      '<div class="fg"><label class="fl">Nº do Processo</label><input class="fi" id="'+pref+'numproc" value="'+esc(p.numproc||'')+'" placeholder="0000000-00.0000.0.00.0000"></div>' +
+      '<div class="fg"><label class="fl">Fase Processual</label>' +
+        '<input class="fi" id="'+pref+'fase" list="fases-list" value="'+esc(p.fase||'')+'" placeholder="Ex.: Petição Inicial">' +
+      '</div>' +
+    '</div>' +
+    '<div class="gr" style="margin-bottom:10px;">' +
+      '<div class="fg"><label class="fl">Observações deste processo</label><input class="fi" id="'+pref+'obs" value="'+esc(p.obs||'')+'" placeholder="Notas adicionais"></div>' +
+    '</div>' +
+
+    // TAXA
+    '<div class="sec">Taxa Administrativa</div>' +
+    '<div class="chk-row"><input type="checkbox" id="'+pref+'ck-taxa" '+(p.taxa?'checked':'')+' onchange="toggleProcTaxa('+idx+')"><label for="'+pref+'ck-taxa">Taxa administrativa foi cobrada</label></div>' +
+    '<div id="'+pref+'grp-taxa" style="display:'+(p.taxa?'block':'none')+';">' +
+      '<div class="gr gr3" style="margin-bottom:8px;">' +
+        '<div class="fg"><label class="fl">Valor (R$)</label><input class="fi" id="'+pref+'taxa-val" value="'+esc((p.taxa&&p.taxa.valor)||'')+'" placeholder="0,00" oninput="fmtMoeda(this)"></div>' +
+        '<div class="fg"><label class="fl">Modalidade</label>' +
+          '<select class="fi" id="'+pref+'taxa-mod" onchange="toggleProcTaxaParc('+idx+')">' +
+            '<option value="avista"'+((!p.taxa||p.taxa.mod==='avista')?' selected':'')+'>À vista</option>' +
+            '<option value="parcelado"'+((p.taxa&&p.taxa.mod==='parcelado')?' selected':'')+'>Parcelado</option>' +
+          '</select>' +
+        '</div>' +
+        '<div class="fg"><label class="fl">Situação</label>' +
+          '<select class="fi" id="'+pref+'taxa-sit">' +
+            '<option value="nao"'+((p.taxa&&p.taxa.pago)?'':' selected')+'>Não paga</option>' +
+            '<option value="sim"'+((p.taxa&&p.taxa.pago)?' selected':'')+'>Paga</option>' +
+          '</select>' +
+        '</div>' +
+      '</div>' +
+      '<div id="'+pref+'grp-taxa-parc" style="display:'+(taxaTemParc?'block':'none')+';">' +
+        '<div class="fg" style="margin-bottom:8px;"><label class="fl">Número de Parcelas</label>' +
+          '<input type="number" class="fi" id="'+pref+'taxa-np" value="'+(taxaTemParc?(p.taxa.parcelas||[]).length:'')+'" min="1" max="60" placeholder="Ex.: 3" oninput="gerarParcP(\''+pref+'taxa\',this.value,document.getElementById(\''+pref+'taxa-val\').value)">' +
+        '</div>' +
+        '<div class="parc-box" id="'+pref+'taxa-parc-box"></div>' +
+      '</div>' +
+    '</div>' +
+
+    // HONORÁRIOS
+    '<div class="sec">Honorários Iniciais</div>' +
+    '<div class="chk-row"><input type="checkbox" id="'+pref+'ck-hon" '+(p.hon?'checked':'')+' onchange="toggleProcHon('+idx+')"><label for="'+pref+'ck-hon">Honorários iniciais foram cobrados</label></div>' +
+    '<div id="'+pref+'grp-hon" style="display:'+(p.hon?'block':'none')+';">' +
+      '<div class="gr gr3" style="margin-bottom:8px;">' +
+        '<div class="fg"><label class="fl">Valor (R$)</label><input class="fi" id="'+pref+'hon-val" value="'+esc((p.hon&&p.hon.valor)||'')+'" placeholder="0,00" oninput="fmtMoeda(this)"></div>' +
+        '<div class="fg"><label class="fl">Modalidade</label>' +
+          '<select class="fi" id="'+pref+'hon-mod" onchange="toggleProcHonParc('+idx+')">' +
+            '<option value="avista"'+((!p.hon||p.hon.mod==='avista')?' selected':'')+'>À vista</option>' +
+            '<option value="parcelado"'+((p.hon&&p.hon.mod==='parcelado')?' selected':'')+'>Parcelado</option>' +
+          '</select>' +
+        '</div>' +
+        '<div class="fg"><label class="fl">Situação</label>' +
+          '<select class="fi" id="'+pref+'hon-sit">' +
+            '<option value="nao"'+((p.hon&&p.hon.pago)?'':' selected')+'>Não pago</option>' +
+            '<option value="sim"'+((p.hon&&p.hon.pago)?' selected':'')+'>Pago</option>' +
+          '</select>' +
+        '</div>' +
+      '</div>' +
+      '<div id="'+pref+'grp-hon-parc" style="display:'+(honTemParc?'block':'none')+';">' +
+        '<div class="fg" style="margin-bottom:8px;"><label class="fl">Número de Parcelas</label>' +
+          '<input type="number" class="fi" id="'+pref+'hon-np" value="'+(honTemParc?(p.hon.parcelas||[]).length:'')+'" min="1" max="60" placeholder="Ex.: 6" oninput="gerarParcP(\''+pref+'hon\',this.value,document.getElementById(\''+pref+'hon-val\').value)">' +
+        '</div>' +
+        '<div class="parc-box" id="'+pref+'hon-parc-box"></div>' +
+      '</div>' +
+    '</div>' +
+
+    // HONORÁRIOS DO PROCESSO
+    '<div class="sec">Honorários do Processo</div>' +
+    '<div class="gr gr2" style="margin-bottom:8px;">' +
+      '<div class="fg"><label class="fl">Forma</label>' +
+        '<select class="fi" id="'+pref+'pagamento" onchange="toggleProcExito('+idx+')">' +
+          '<option value=""'+(p.pagamento===''?' selected':'')+'>Selecione...</option>' +
+          '<option value="Êxito (percentual)"'+(p.pagamento==='Êxito (percentual)'?' selected':'')+'>Êxito (percentual)</option>' +
+          '<option value="Honorários fixos"'+(p.pagamento==='Honorários fixos'?' selected':'')+'>Honorários fixos</option>' +
+          '<option value="Êxito + fixo"'+(p.pagamento==='Êxito + fixo'?' selected':'')+'>Êxito + fixo</option>' +
+          '<option value="Parcelado"'+(p.pagamento==='Parcelado'?' selected':'')+'>Parcelado</option>' +
+          '<option value="À vista"'+(p.pagamento==='À vista'?' selected':'')+'>À vista</option>' +
+        '</select>' +
+      '</div>' +
+      '<div class="fg" id="'+pref+'grp-exito" style="display:'+(isExito?'block':'none')+';">' +
+        '<label class="fl">Percentual de Êxito (%)</label>' +
+        '<select class="fi" id="'+pref+'exito-pct" onchange="document.getElementById(\''+pref+'grp-exito-custom\').style.display=(this.value===\'outro\'?\'block\':\'none\')">' +
+          '<option value="">Selecione...</option>' +
+          ['10','15','20','25','30','33','35','40'].map(function(v){
+            return '<option value="'+v+'"'+(p.exitoPct===v?' selected':'')+'>'+v+'%</option>';
+          }).join('') +
+          '<option value="outro"'+(p.exitoPct&&['10','15','20','25','30','33','35','40'].indexOf(p.exitoPct)===-1?' selected':'')+'>Outro %</option>' +
+        '</select>' +
+      '</div>' +
+    '</div>' +
+    '<div id="'+pref+'grp-exito-custom" style="display:'+(p.exitoPct&&['10','15','20','25','30','33','35','40'].indexOf(p.exitoPct)===-1?'block':'none')+';">' +
+      '<div class="fg" style="margin-bottom:8px;"><label class="fl">Percentual personalizado (%)</label>' +
+        '<input type="number" class="fi" id="'+pref+'exito-custom" value="'+esc((['10','15','20','25','30','33','35','40'].indexOf(p.exitoPct)===-1&&p.exitoPct)?p.exitoPct:'')+'" min="1" max="100" placeholder="Ex.: 28">' +
+      '</div>' +
+    '</div>' +
+    '<div class="gr gr2" style="margin-bottom:8px;">' +
+      '<div class="fg"><label class="fl">Comissão Setor Comercial</label>' +
+        '<select class="fi" id="'+pref+'comissao-pct">' +
+          '<option value=""'+(p.comissaoPct===''?' selected':'')+'>Sem comissão</option>' +
+          ['20','30','40','50'].map(function(v){
+            return '<option value="'+v+'"'+(p.comissaoPct===v?' selected':'')+'>'+v+'%</option>';
+          }).join('') +
+        '</select>' +
+      '</div>' +
+    '</div>' +
+    '</div>'; // fim proc-item-body
+
+  // Carregar parcelas salvas após inserir no DOM
+  setTimeout(function() {
+    if (p.taxa && p.taxa.mod === 'parcelado' && p.taxa.parcelas && p.taxa.parcelas.length) {
+      carregarParcP(pref+'taxa', p.taxa.parcelas, p.taxa.valor);
+    }
+    if (p.hon && p.hon.mod === 'parcelado' && p.hon.parcelas && p.hon.parcelas.length) {
+      carregarParcP(pref+'hon', p.hon.parcelas, p.hon.valor);
+    }
+  }, 50);
+
+  return wrap;
+}
+
+function toggleProcCard(idx) {
+  var body = document.getElementById('proc-body-'+idx);
+  var arrow = document.getElementById('proc-arrow-'+idx);
+  if (!body) return;
+  var aberto = body.style.display !== 'none';
+  body.style.display = aberto ? 'none' : 'block';
+  if (arrow) arrow.textContent = aberto ? '▸' : '▾';
+}
+
+function toggleProcTaxa(idx) {
+  var pref = 'p'+idx+'-';
+  var ck = document.getElementById(pref+'ck-taxa');
+  document.getElementById(pref+'grp-taxa').style.display = ck.checked ? 'block' : 'none';
+}
+function toggleProcHon(idx) {
+  var pref = 'p'+idx+'-';
+  var ck = document.getElementById(pref+'ck-hon');
+  document.getElementById(pref+'grp-hon').style.display = ck.checked ? 'block' : 'none';
+}
+function toggleProcTaxaParc(idx) {
+  var pref = 'p'+idx+'-';
+  var v = document.getElementById(pref+'taxa-mod').value === 'parcelado';
+  document.getElementById(pref+'grp-taxa-parc').style.display = v ? 'block' : 'none';
+  if (!v) document.getElementById(pref+'taxa-parc-box').innerHTML = '';
+}
+function toggleProcHonParc(idx) {
+  var pref = 'p'+idx+'-';
+  var v = document.getElementById(pref+'hon-mod').value === 'parcelado';
+  document.getElementById(pref+'grp-hon-parc').style.display = v ? 'block' : 'none';
+  if (!v) document.getElementById(pref+'hon-parc-box').innerHTML = '';
+}
+function toggleProcExito(idx) {
+  var pref = 'p'+idx+'-';
+  var v = document.getElementById(pref+'pagamento').value;
+  var isExito = (v === 'Êxito (percentual)' || v === 'Êxito + fixo');
+  document.getElementById(pref+'grp-exito').style.display = isExito ? 'block' : 'none';
+}
+
+function gerarParcP(prefTipo, n, valTotal) {
+  n = parseInt(n) || 0;
+  var vUnit = n > 0 ? parseMoeda(valTotal) / n : 0;
+  var box = document.getElementById(prefTipo+'-parc-box');
+  if (!box) return;
+  var existentes = coletarParcP(prefTipo);
+  box.innerHTML = '';
+  for (var i = 0; i < n; i++) {
+    var ex = existentes[i] || {};
+    var vParcela = ex.valorParcela || fmtVal(vUnit);
+    var row = document.createElement('div');
+    row.className = 'parc-row';
+    row.style.gridTemplateColumns = '28px 1fr 1fr auto';
+    row.innerHTML =
+      '<span class="parc-n">'+(i+1)+'ª</span>' +
+      '<input type="date" class="parc-d" id="'+prefTipo+'-d-'+i+'" value="'+(ex.data||'')+'">' +
+      '<input type="text" class="parc-d" id="'+prefTipo+'-vl-'+i+'" value="'+vParcela+'" oninput="fmtMoeda(this)" style="background:rgba(180,138,74,.06);border:1px solid rgba(180,138,74,.2);border-radius:4px;padding:4px 7px;color:var(--ch);font-size:12px;font-weight:600;text-align:right;width:100%;" placeholder="0,00">' +
+      '<div class="parc-pg'+(ex.pago?' pago':'')+'" id="'+prefTipo+'-pg-wrap-'+i+'">' +
+        '<input type="checkbox" id="'+prefTipo+'-pg-'+i+'" '+(ex.pago?'checked':'')+' onchange="document.getElementById(\''+prefTipo+'-pg-wrap-'+i+'\').className=\'parc-pg\'+(this.checked?\' pago\':\'\')">' +
+        '<label for="'+prefTipo+'-pg-'+i+'">Pago</label>' +
+      '</div>';
+    box.appendChild(row);
+  }
+}
+
+function carregarParcP(prefTipo, parcelas, valorTotal) {
+  var n = parcelas.length;
+  var vUnit = n > 0 ? parseMoeda(valorTotal) / n : 0;
+  var box = document.getElementById(prefTipo+'-parc-box');
+  if (!box) return;
+  box.innerHTML = '';
+  for (var i = 0; i < n; i++) {
+    var p = parcelas[i];
+    var vParcela = p.valorParcela || fmtVal(vUnit);
+    var row = document.createElement('div');
+    row.className = 'parc-row';
+    row.style.gridTemplateColumns = '28px 1fr 1fr auto';
+    row.innerHTML =
+      '<span class="parc-n">'+(i+1)+'ª</span>' +
+      '<input type="date" class="parc-d" id="'+prefTipo+'-d-'+i+'" value="'+(p.data||'')+'">' +
+      '<input type="text" class="parc-d" id="'+prefTipo+'-vl-'+i+'" value="'+vParcela+'" oninput="fmtMoeda(this)" style="background:rgba(180,138,74,.06);border:1px solid rgba(180,138,74,.2);border-radius:4px;padding:4px 7px;color:var(--ch);font-size:12px;font-weight:600;text-align:right;width:100%;" placeholder="0,00">' +
+      '<div class="parc-pg'+(p.pago?' pago':'')+'" id="'+prefTipo+'-pg-wrap-'+i+'">' +
+        '<input type="checkbox" id="'+prefTipo+'-pg-'+i+'" '+(p.pago?'checked':'')+' onchange="document.getElementById(\''+prefTipo+'-pg-wrap-'+i+'\').className=\'parc-pg\'+(this.checked?\' pago\':\'\')">' +
+        '<label for="'+prefTipo+'-pg-'+i+'">Pago</label>' +
+      '</div>';
+    box.appendChild(row);
+  }
 }
 
 function fecharModal() {
@@ -1569,33 +1748,15 @@ function overlayClick(e) {
 }
 
 function limparForm() {
-  var ids = ['f-nome','f-data','f-tipo','f-status','f-numproc','f-fase','f-valor','f-obs',
-             'f-email','f-whats','f-cpf','f-orgao','f-pagamento',
-             'f-taxa-val','f-taxa-np','f-hon-val','f-hon-np'];
-  ids.forEach(function(id){ setVal(id, ''); });
-  document.getElementById('ck-taxa').checked = false;
-  document.getElementById('ck-hon').checked = false;
-  document.getElementById('grp-taxa').style.display = 'none';
-  document.getElementById('grp-hon').style.display = 'none';
-  document.getElementById('grp-taxa-parc').style.display = 'none';
-  document.getElementById('grp-hon-parc').style.display = 'none';
-  document.getElementById('grp-proc').style.display = 'none';
-  document.getElementById('taxa-parc').innerHTML = '';
-  document.getElementById('hon-parc').innerHTML = '';
-  setVal('f-taxa-mod','avista');
-  setVal('f-taxa-sit','nao');
-  setVal('f-hon-mod','avista');
-  setVal('f-hon-sit','nao');
-  setVal('f-exito-pct','');
-  setVal('f-exito-custom','');
-  setVal('f-comissao-pct','');
-  document.getElementById('grp-exito').style.display = 'none';
-  document.getElementById('grp-exito-custom').style.display = 'none';
-  document.getElementById('f-comissao-calc').textContent = 'R$ 0,00';
+  setVal('f-nome',''); setVal('f-cpf','');
+  setVal('f-email',''); setVal('f-whats','');
+  setVal('f-orgao',''); setVal('f-obs-geral','');
+  processosEdicao = [];
+  renderProcessosLista();
 }
 
 function moAba(n) {
-  for (var i = 0; i < 3; i++) {
+  for (var i = 0; i < 2; i++) {
     document.getElementById('tab-btn-'+i).classList.remove('on');
     document.getElementById('tab-'+i).classList.remove('on');
   }
@@ -1603,174 +1764,38 @@ function moAba(n) {
   document.getElementById('tab-'+n).classList.add('on');
 }
 
-// ========== TOGGLES ==========
-function toggleProtocolado() {
-  var v = document.getElementById('f-status').value === 'Protocolado';
-  document.getElementById('grp-proc').style.display = v ? 'block' : 'none';
-}
-function toggleTaxa() {
-  document.getElementById('grp-taxa').style.display = document.getElementById('ck-taxa').checked ? 'block' : 'none';
-}
-function toggleHon() {
-  document.getElementById('grp-hon').style.display = document.getElementById('ck-hon').checked ? 'block' : 'none';
-}
-function toggleTaxaParc() {
-  var v = document.getElementById('f-taxa-mod').value === 'parcelado';
-  document.getElementById('grp-taxa-parc').style.display = v ? 'block' : 'none';
-  if (!v) document.getElementById('taxa-parc').innerHTML = '';
-}
-function toggleHonParc() {
-  var v = document.getElementById('f-hon-mod').value === 'parcelado';
-  document.getElementById('grp-hon-parc').style.display = v ? 'block' : 'none';
-  if (!v) document.getElementById('hon-parc').innerHTML = '';
-}
-function toggleExito() {
-  var v = document.getElementById('f-pagamento').value;
-  var isExito = (v === 'Êxito (percentual)' || v === 'Êxito + fixo');
-  document.getElementById('grp-exito').style.display = isExito ? 'block' : 'none';
-  if (!isExito) {
-    setVal('f-exito-pct','');
-    setVal('f-exito-custom','');
-    document.getElementById('grp-exito-custom').style.display = 'none';
-  }
-}
-function calcComissao() {
-  var pct = parseInt(document.getElementById('f-comissao-pct').value) || 0;
-  if (!pct) { document.getElementById('f-comissao-calc').textContent = 'R$ 0,00'; return; }
-  // Calcular base: soma das taxas pagas (à vista paga, ou parcelas marcadas como pagas)
-  var base = 0;
-  if (document.getElementById('ck-taxa').checked) {
-    var mod = document.getElementById('f-taxa-mod').value;
-    var sit = document.getElementById('f-taxa-sit').value;
-    var valTaxa = parseMoeda(document.getElementById('f-taxa-val').value);
-    if (mod === 'avista') {
-      if (sit === 'sim') base += valTaxa;
-    } else {
-      var np = parseInt(document.getElementById('f-taxa-np').value) || 0;
-      for (var i = 0; i < np; i++) {
-        var ck = document.getElementById('taxa-pg-'+i);
-        var vlEl = document.getElementById('taxa-vl-'+i);
-        if (ck && ck.checked) {
-          var vParc = vlEl ? parseMoeda(vlEl.value) : (np > 0 ? valTaxa / np : 0);
-          base += vParc;
-        }
-      }
-    }
-  }
-  var comissao = base * pct / 100;
-  document.getElementById('f-comissao-calc').textContent = 'R$ ' + fmtVal(comissao);
-}
-
-// ========== PARCELAS ==========
-function gerarParc(tipo) {
-  var n = parseInt(document.getElementById('f-'+tipo+'-np').value) || 0;
-  var valTotal = parseMoeda(document.getElementById('f-'+tipo+'-val').value);
-  var vUnit = n > 0 ? valTotal / n : 0;
-  var box = document.getElementById(tipo+'-parc');
-  // Preservar datas existentes
-  var existentes = coletarParc(tipo);
-  box.innerHTML = '';
-  for (var i = 0; i < n; i++) {
-    var ex = existentes[i] || {};
-    var vParcela = ex.valorParcela !== undefined ? ex.valorParcela : fmtVal(vUnit);
-    var row = document.createElement('div');
-    row.className = 'parc-row';
-    row.style.gridTemplateColumns = '28px 1fr 1fr auto';
-    row.innerHTML =
-      '<span class="parc-n">'+(i+1)+'ª</span>' +
-      '<input type="date" class="parc-d" id="'+tipo+'-d-'+i+'" value="'+(ex.data||'')+'">' +
-      '<input type="text" class="parc-d" id="'+tipo+'-vl-'+i+'" value="'+vParcela+'" oninput="fmtMoeda(this)" style="background:rgba(180,138,74,.06);border:1px solid rgba(180,138,74,.2);border-radius:4px;padding:4px 7px;color:var(--ch);font-size:12px;font-weight:600;text-align:right;width:100%;" placeholder="0,00" title="Clique para editar o valor desta parcela">' +
-      '<div class="parc-pg'+(ex.pago?' pago':'')+'" id="'+tipo+'-pg-wrap-'+i+'">' +
-        '<input type="checkbox" id="'+tipo+'-pg-'+i+'" '+(ex.pago?'checked':'')+' onchange="document.getElementById(\''+tipo+'-pg-wrap-'+i+'\').className=\'parc-pg\'+(this.checked?\' pago\':\'\')">' +
-        '<label for="'+tipo+'-pg-'+i+'">Pago</label>' +
-      '</div>';
-    box.appendChild(row);
-  }
-}
-
-function carregarParc(tipo, parcelas, valorTotal) {
-  var n = parcelas.length;
-  var vUnit = n > 0 ? parseMoeda(valorTotal) / n : 0;
-  var box = document.getElementById(tipo+'-parc');
-  box.innerHTML = '';
-  for (var i = 0; i < n; i++) {
-    var p = parcelas[i];
-    var vParcela = p.valorParcela !== undefined ? p.valorParcela : fmtVal(vUnit);
-    var row = document.createElement('div');
-    row.className = 'parc-row';
-    row.style.gridTemplateColumns = '28px 1fr 1fr auto';
-    row.innerHTML =
-      '<span class="parc-n">'+(i+1)+'ª</span>' +
-      '<input type="date" class="parc-d" id="'+tipo+'-d-'+i+'" value="'+(p.data||'')+'">' +
-      '<input type="text" class="parc-d" id="'+tipo+'-vl-'+i+'" value="'+vParcela+'" oninput="fmtMoeda(this)" style="background:rgba(180,138,74,.06);border:1px solid rgba(180,138,74,.2);border-radius:4px;padding:4px 7px;color:var(--ch);font-size:12px;font-weight:600;text-align:right;width:100%;" placeholder="0,00" title="Clique para editar o valor desta parcela">' +
-      '<div class="parc-pg'+(p.pago?' pago':'')+'" id="'+tipo+'-pg-wrap-'+i+'">' +
-        '<input type="checkbox" id="'+tipo+'-pg-'+i+'" '+(p.pago?'checked':'')+' onchange="document.getElementById(\''+tipo+'-pg-wrap-'+i+'\').className=\'parc-pg\'+(this.checked?\' pago\':\'\')">' +
-        '<label for="'+tipo+'-pg-'+i+'">Pago</label>' +
-      '</div>';
-    box.appendChild(row);
-  }
-}
-
-function coletarParc(tipo) {
-  var resultado = [];
-  var i = 0;
-  while (true) {
-    var d = document.getElementById(tipo+'-d-'+i);
-    var p = document.getElementById(tipo+'-pg-'+i);
-    var vl = document.getElementById(tipo+'-vl-'+i);
-    if (!d) break;
-    resultado.push({ data: d.value, pago: p ? p.checked : false, valorParcela: vl ? vl.value : '' });
-    i++;
-  }
-  return resultado;
-}
-
-// ========== SALVAR ==========
+// ========== SALVAR CLIENTE ==========
 function salvar() {
   var nome = getVal('f-nome');
-  var data = getVal('f-data');
-  var tipo = getVal('f-tipo');
-  var status = getVal('f-status');
-  var valor = getVal('f-valor');
-
   if (!nome) { toast('Informe o nome do cliente', true); moAba(0); return; }
-  if (!data) { toast('Informe a data do contrato', true); moAba(0); return; }
-  if (!tipo) { toast('Informe o tipo de ação', true); moAba(0); return; }
-  if (!status) { toast('Informe o status do processo', true); moAba(0); return; }
-  if (!valor) { toast('Informe o valor do processo', true); moAba(0); return; }
 
-  var taxa = null;
-  if (document.getElementById('ck-taxa').checked) {
-    var tMod = getVal('f-taxa-mod');
-    taxa = {
-      valor: getVal('f-taxa-val'),
-      mod: tMod,
-      pago: getVal('f-taxa-sit') === 'sim',
-      parcelas: tMod === 'parcelado' ? coletarParc('taxa') : []
-    };
-  }
+  coletarProcessosDoDOM();
 
-  var hon = null;
-  if (document.getElementById('ck-hon').checked) {
-    var hMod = getVal('f-hon-mod');
-    hon = {
-      valor: getVal('f-hon-val'),
-      mod: hMod,
-      pago: getVal('f-hon-sit') === 'sim',
-      parcelas: hMod === 'parcelado' ? coletarParc('hon') : []
-    };
+  if (!processosEdicao.length || !processosEdicao[0].tipo) {
+    toast('Adicione ao menos um processo com o tipo de ação', true); moAba(1); return;
   }
 
   var obj = {
-    nome: nome, data: data, tipo: tipo, status: status,
-    numproc: getVal('f-numproc'), fase: getVal('f-fase'),
-    valor: valor, obs: getVal('f-obs'),
-    pagamento: getVal('f-pagamento'),
-    exitoPct: getVal('f-exito-pct') === 'outro' ? getVal('f-exito-custom') : getVal('f-exito-pct'),
-    comissaoPct: getVal('f-comissao-pct'),
-    email: getVal('f-email'), whats: getVal('f-whats'),
-    cpf: getVal('f-cpf'), orgao: getVal('f-orgao'),
-    taxa: taxa, hon: hon
+    nome: nome,
+    cpf: getVal('f-cpf'),
+    email: getVal('f-email'),
+    whats: getVal('f-whats'),
+    orgao: getVal('f-orgao'),
+    obsGeral: getVal('f-obs-geral'),
+    processos: processosEdicao,
+    // Campos legado para compatibilidade com relatórios e alertas
+    tipo: processosEdicao[0].tipo,
+    data: processosEdicao[0].data,
+    status: processosEdicao[0].status,
+    valor: processosEdicao[0].valor,
+    numproc: processosEdicao[0].numproc,
+    fase: processosEdicao[0].fase,
+    pagamento: processosEdicao[0].pagamento,
+    exitoPct: processosEdicao[0].exitoPct,
+    comissaoPct: processosEdicao[0].comissaoPct,
+    taxa: processosEdicao[0].taxa,
+    hon: processosEdicao[0].hon,
+    obs: processosEdicao[0].obs
   };
 
   if (editId !== null) {
@@ -1778,14 +1803,23 @@ function salvar() {
     window._fbSave(obj);
     toast('✓ Cliente atualizado');
   } else {
-    window._fbSave(obj).then(function(newId) {
-      // Firebase listener atualiza DB automaticamente
-    });
+    window._fbSave(obj);
     toast('✓ Cliente cadastrado');
   }
-
   fecharModal();
 }
+
+// Stubs de toggles legados (não mais usados, mantidos para segurança)
+function toggleProtocolado(){}
+function toggleTaxa(){}
+function toggleHon(){}
+function toggleTaxaParc(){}
+function toggleHonParc(){}
+function toggleExito(){}
+function calcComissao(){}
+function gerarParc(){}
+function carregarParc(){}
+function coletarParc(){ return []; }
 
 // ========== RENDER TABELA ==========
 function renderTabela() {
@@ -1794,11 +1828,129 @@ function renderTabela() {
   var fTp = document.getElementById('fTp').value;
 
   var lista = DB.filter(function(c) {
-    var okB = !busca || (c.nome||'').toLowerCase().includes(busca) || (c.tipo||'').toLowerCase().includes(busca) || (c.numproc||'').toLowerCase().includes(busca);
-    var okS = !fSt || c.status === fSt;
-    var okT = !fTp || c.tipo === fTp;
+    var procs = c.processos || [c];
+    var okB = !busca ||
+      (c.nome||'').toLowerCase().includes(busca) ||
+      procs.some(function(p){ return (p.tipo||'').toLowerCase().includes(busca) || (p.numproc||'').toLowerCase().includes(busca); });
+    var okS = !fSt || procs.some(function(p){ return p.status === fSt; }) || c.status === fSt;
+    var okT = !fTp || procs.some(function(p){ return p.tipo === fTp; }) || c.tipo === fTp;
     return okB && okS && okT;
   });
+
+  lista.sort(function(a, b) {
+    var va = a[sCol]||'', vb = b[sCol]||'';
+    if (sCol === 'valor') { va = parseMoeda(va); vb = parseMoeda(vb); }
+    if (va < vb) return sDir === 'asc' ? -1 : 1;
+    if (va > vb) return sDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  document.getElementById('tbl-cnt').textContent = lista.length + ' cliente' + (lista.length !== 1 ? 's' : '');
+  var tbody = document.getElementById('tbody');
+
+  if (!lista.length) {
+    tbody.innerHTML = '<tr><td colspan="10"><div class="vazio"><div class="vazio-ic">⚖️</div><div class="vazio-t">Nenhum cliente encontrado</div><div class="vazio-s">Clique em "+ Novo Cliente" para cadastrar</div></div></td></tr>';
+  } else {
+    var html = '';
+    lista.forEach(function(c) {
+      var hoje = new Date(); hoje.setHours(0,0,0,0);
+      var procs = c.processos && c.processos.length ? c.processos : [{
+        tipo: c.tipo, data: c.data, status: c.status, valor: c.valor,
+        numproc: c.numproc, fase: c.fase, pagamento: c.pagamento,
+        exitoPct: c.exitoPct, comissaoPct: c.comissaoPct,
+        taxa: c.taxa, hon: c.hon, obs: c.obs
+      }];
+      var nProcs = procs.length;
+
+      // Alertas de parcelas (todos os processos)
+      var alertaHtml = '';
+      procs.forEach(function(proc) {
+        ['taxa','hon'].forEach(function(tp) {
+          if (!proc[tp] || proc[tp].mod !== 'parcelado') return;
+          (proc[tp].parcelas||[]).forEach(function(p, i) {
+            if (p.pago || !p.data) return;
+            var d = new Date(p.data+'T00:00:00');
+            var diff = Math.round((d - hoje) / 86400000);
+            var nat = tp === 'taxa' ? 'Taxa' : 'Hon.';
+            var procLabel = nProcs > 1 ? ' ('+esc(proc.tipo||'proc')+'): ' : ': ';
+            if (diff < 0) alertaHtml += '<div style="font-size:10px;color:#e89090;margin-top:2px;">🚨 '+nat+procLabel+(i+1)+'ª VENCIDA</div>';
+            else if (diff <= 7) alertaHtml += '<div style="font-size:10px;color:#D4B84A;margin-top:2px;">⚠ '+nat+procLabel+(i+1)+'ª vence em '+diff+'d</div>';
+          });
+        });
+      });
+
+      // Coluna Processos — resumo compacto
+      var procsHtml = '';
+      procs.forEach(function(proc, pi) {
+        var esajUrl = proc.numproc ? 'https://esaj.tjsp.jus.br/cpopg/search.do?cbPesquisa=NUMPROC&dadosConsulta.valorConsultaNuUnificado='+encodeURIComponent(proc.numproc)+'&dadosConsulta.tipoNuProcesso=UNIFICADO' : '';
+        procsHtml += '<div style="margin-bottom:'+(pi<procs.length-1?'8':'0')+'px;padding-bottom:'+(pi<procs.length-1?'8':'0')+'px;border-bottom:'+(pi<procs.length-1?'1px solid rgba(180,138,74,.1)':'none')+'">' +
+          '<div style="font-size:10px;font-weight:600;color:var(--ch);">'+(nProcs>1?'#'+(pi+1)+' ':'')+''+esc(proc.tipo||'—')+'</div>' +
+          (proc.numproc ? '<div style="font-size:10px;color:var(--tw);">'+esc(proc.numproc)+'</div>' : '') +
+          (proc.fase ? '<div style="font-size:9px;color:var(--tw);">'+esc(proc.fase)+'</div>' : '') +
+          '<span class="bgs '+(proc.status==='Protocolado'?'sp':'sn')+'" style="font-size:9px;padding:1px 5px;">'+esc(proc.status||'—')+'</span>' +
+          (esajUrl ? ' <a href="'+esajUrl+'" target="_blank" style="font-size:9px;color:#1a73e8;text-decoration:none;">🔍 ESAJ</a>' : '') +
+        '</div>';
+      });
+
+      // Financeiro consolidado (todos os processos)
+      var taxaHtml = '', honHtml = '', exitoHtml = '', comissaoHtml = '';
+      procs.forEach(function(proc, pi) {
+        var label = nProcs > 1 ? '<span style="font-size:9px;color:var(--tw);">#'+(pi+1)+'</span> ' : '';
+        if (proc.taxa) {
+          var tPagas = proc.taxa.mod === 'parcelado' ? (proc.taxa.parcelas||[]).filter(function(p){return p.pago;}).length : null;
+          var tTotal = proc.taxa.mod === 'parcelado' ? (proc.taxa.parcelas||[]).length : null;
+          taxaHtml += '<div style="font-size:11px;margin-bottom:2px;">'+label+'R$ '+(proc.taxa.valor||'0')+' <span class="bgp '+(proc.taxa.pago?'ok':'no')+'">'+(proc.taxa.pago?'Paga':'Pend.')+'</span>'+(tTotal?' <span style="font-size:9px;color:var(--tw);">'+tPagas+'/'+tTotal+'</span>':'')+'</div>';
+        }
+        if (proc.hon) {
+          var hPagas = proc.hon.mod === 'parcelado' ? (proc.hon.parcelas||[]).filter(function(p){return p.pago;}).length : null;
+          var hTotal = proc.hon.mod === 'parcelado' ? (proc.hon.parcelas||[]).length : null;
+          honHtml += '<div style="font-size:11px;margin-bottom:2px;">'+label+'R$ '+(proc.hon.valor||'0')+' <span class="bgp '+(proc.hon.pago?'ok':'no')+'">'+(proc.hon.pago?'Pago':'Pend.')+'</span>'+(hTotal?' <span style="font-size:9px;color:var(--tw);">'+hPagas+'/'+hTotal+'</span>':'')+'</div>';
+        }
+        var isExito = (proc.pagamento === 'Êxito (percentual)' || proc.pagamento === 'Êxito + fixo');
+        if (isExito && proc.exitoPct) exitoHtml += '<div style="font-size:11px;color:var(--ch);font-weight:600;">'+label+'Êxito: '+proc.exitoPct+'%</div>';
+        if (proc.comissaoPct) {
+          var base = 0;
+          if (proc.taxa) {
+            if (proc.taxa.mod==='avista') { if(proc.taxa.pago) base += parseMoeda(proc.taxa.valor); }
+            else { var ps=proc.taxa.parcelas||[]; var vU=ps.length>0?parseMoeda(proc.taxa.valor)/ps.length:0; ps.forEach(function(p){if(p.pago)base+=vU;}); }
+          }
+          var comV = base * parseInt(proc.comissaoPct) / 100;
+          comissaoHtml += '<div style="font-size:10px;color:var(--tw);">'+label+proc.comissaoPct+'% = <span style="color:'+(comV>0?'#e89090':'var(--tw)')+'">R$'+fmtVal(comV)+'</span></div>';
+        }
+      });
+      if (!taxaHtml) taxaHtml = '—';
+      if (!honHtml) honHtml = '—';
+      if (!exitoHtml) exitoHtml = '—';
+
+      // Valor total
+      var valorTotal = procs.reduce(function(s,p){ return s + parseMoeda(p.valor); }, 0);
+
+      html += '<tr>' +
+        '<td class="td-nm">' +
+          '<span style="cursor:pointer;text-decoration:underline dotted;color:var(--ch)" onclick="abrirDetalhe(\''+c.id+'\')">'+esc(c.nome)+'</span>' +
+          (c.orgao ? '<span class="sub">'+esc(c.orgao)+'</span>' : '') +
+          (nProcs > 1 ? '<span class="sub" style="color:var(--do);font-weight:600;">'+nProcs+' processos</span>' : '') +
+          alertaHtml +
+        '</td>' +
+        '<td style="font-size:11px;min-width:180px;">'+procsHtml+'</td>' +
+        '<td style="font-weight:600;color:var(--ch);white-space:nowrap;">R$ '+fmtVal(valorTotal)+'</td>' +
+        '<td>'+taxaHtml+'</td>' +
+        '<td>'+honHtml+'</td>' +
+        '<td style="min-width:110px;">'+exitoHtml+comissaoHtml+'</td>' +
+        '<td><div class="acoes">' +
+          '<button class="btn-ic" title="Ver detalhes" onclick="abrirDetalhe(\''+c.id+'\')">👁</button>' +
+          '<button class="btn-ic" title="Editar" onclick="abrirModal(\''+c.id+'\')">✏️</button>' +
+          '<button class="btn-ic x" title="Excluir" onclick="pedirDel(\''+c.id+'\')">🗑️</button>' +
+        '</div></td>' +
+      '</tr>';
+    });
+    tbody.innerHTML = html;
+  }
+
+  atualizarStats();
+  atualizarFiltroTipo();
+  renderAlertasBanner();
+}
 
   lista.sort(function(a, b) {
     var va = a[sCol]||'', vb = b[sCol]||'';
@@ -1857,60 +2009,6 @@ function renderTabela() {
         exitoHtml = '<div style="font-size:11px;color:var(--ch);font-weight:600;">Êxito: '+c.exitoPct+'%</div>';
       }
 
-      var comissaoHtml = '';
-      if (c.comissaoPct) {
-        // Calcular base paga da taxa
-        var basePaga = 0;
-        if (c.taxa) {
-          if (c.taxa.mod === 'avista') {
-            if (c.taxa.pago) basePaga += parseMoeda(c.taxa.valor);
-          } else {
-            var ps = c.taxa.parcelas || [];
-            var vU = ps.length > 0 ? parseMoeda(c.taxa.valor) / ps.length : 0;
-            ps.forEach(function(p){ if(p.pago) basePaga += vU; });
-          }
-        }
-        var comVal = basePaga * parseInt(c.comissaoPct) / 100;
-        comissaoHtml = '<div style="font-size:10px;color:var(--tw);margin-top:3px;">Comissão: '+c.comissaoPct+'%</div>' +
-          '<div style="font-size:11px;color:'+(comVal>0?'#e89090':'var(--tw)')+';">R$ '+fmtVal(comVal)+'</div>' +
-          (basePaga > 0 ? '<div style="font-size:9px;color:var(--tw);">base paga: R$'+fmtVal(basePaga)+'</div>' : '<div style="font-size:9px;color:var(--tw);">sem base paga ainda</div>');
-      }
-
-      html += '<tr>' +
-        '<td class="td-nm">' +
-          '<span style="cursor:pointer;text-decoration:underline dotted;color:var(--ch)" onclick="abrirDetalhe(\''+c.id+'\')">'+esc(c.nome)+'</span>' +
-          (c.orgao ? '<span class="sub">'+esc(c.orgao)+'</span>' : '') +
-          (qtdProc > 1 ? '<span class="sub" style="color:var(--do)">'+qtdProc+' processos</span>' : '') +
-          alertaHtml +
-        '</td>' +
-        '<td style="font-size:11px;color:var(--tw);white-space:nowrap">'+fmtData(c.data)+'</td>' +
-        '<td><span class="bgt" title="'+esc(c.tipo||'')+'">'+esc(c.tipo||'')+'</span></td>' +
-        '<td style="font-size:11px;min-width:130px;">' +
-          (c.numproc ? '<div style="color:var(--ch);font-weight:600;font-size:11px;">'+esc(c.numproc)+'</div>' : '') +
-          (c.fase ? '<div style="color:var(--tw);font-size:10px;margin-top:2px;">'+esc(c.fase)+'</div>' : '') +
-        '</td>' +
-        '<td style="font-weight:600;color:var(--ch);white-space:nowrap;">R$ '+(c.valor||'0,00')+'<div style="font-size:10px;color:var(--tw);font-weight:400;">'+esc(c.pagamento||'')+'</div></td>' +
-        '<td>'+taxaHtml+'</td>' +
-        '<td>'+honHtml+'</td>' +
-        '<td><span class="bgs '+(c.status==='Protocolado'?'sp':'sn')+'">'+esc(c.status)+'</span></td>' +
-        '<td style="min-width:180px;">' + buildAndamentoCell(c) + '</td>' +
-        '<td style="min-width:120px;">'+exitoHtml+comissaoHtml+'</td>' +
-        '<td><div class="acoes">' +
-          '<button class="btn-ic" title="Ver detalhes" onclick="abrirDetalhe(\''+c.id+'\')">👁</button>' +
-          '<button class="btn-ic" title="Editar" onclick="abrirModal(\''+c.id+'\')">✏️</button>' +
-          '<button class="btn-ic" title="Alternar status" onclick="toggleStatus(\''+c.id+'\')">🔄</button>' +
-          '<button class="btn-ic x" title="Excluir" onclick="pedirDel(\''+c.id+'\')">🗑️</button>' +
-        '</div></td>' +
-      '</tr>';
-    });
-    tbody.innerHTML = html;
-  }
-
-  atualizarStats();
-  atualizarFiltroTipo();
-  renderAlertasBanner();
-}
-
 // ========== DETALHE CLIENTE ==========
 function abrirDetalhe(id) {
   var c = DB.find(function(x){ return x.id === id; });
@@ -1921,20 +2019,31 @@ function abrirDetalhe(id) {
   var cont = '';
   if (c.email) cont += '<div class="det-lk">📧 <a href="mailto:'+esc(c.email)+'">'+esc(c.email)+'</a></div>';
   if (c.whats) cont += '<div class="det-lk">📱 <a href="https://wa.me/55'+c.whats.replace(/\D/g,'')+'" target="_blank">'+esc(c.whats)+'</a></div>';
+  if (c.obsGeral) cont += '<div class="det-lk" style="color:var(--tw)">📝 '+esc(c.obsGeral)+'</div>';
   document.getElementById('det-cont').innerHTML = cont || '<span style="color:var(--tw);font-size:12px;">Sem dados de contato cadastrados</span>';
 
-  var procs = DB.filter(function(x){ return x.nome === c.nome; });
+  var procs = c.processos && c.processos.length ? c.processos : [{
+    tipo:c.tipo, data:c.data, status:c.status, valor:c.valor,
+    numproc:c.numproc, fase:c.fase, pagamento:c.pagamento,
+    exitoPct:c.exitoPct, taxa:c.taxa, hon:c.hon, obs:c.obs
+  }];
+
   var html = '<div style="font-size:10px;color:var(--tw);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">'+procs.length+' processo(s) vinculado(s)</div>';
-  procs.forEach(function(p) {
+  procs.forEach(function(p, pi) {
+    var esajUrl = p.numproc ? 'https://esaj.tjsp.jus.br/cpopg/search.do?cbPesquisa=NUMPROC&dadosConsulta.valorConsultaNuUnificado='+encodeURIComponent(p.numproc)+'&dadosConsulta.tipoNuProcesso=UNIFICADO' : '';
     html += '<div class="proc-card">' +
-      '<div class="pc-hdr"><span class="pc-tipo">'+esc(p.tipo||'')+'</span><span class="bgs '+(p.status==='Protocolado'?'sp':'sn')+'">'+esc(p.status)+'</span></div>' +
+      '<div class="pc-hdr">' +
+        '<span class="pc-tipo">'+(procs.length>1?'#'+(pi+1)+' ':'')+''+esc(p.tipo||'')+'</span>' +
+        '<span class="bgs '+(p.status==='Protocolado'?'sp':'sn')+'">'+esc(p.status||'—')+'</span>' +
+      '</div>' +
       '<div class="pc-grid">' +
-        '<div class="pc-it"><div class="lbl">Data Contrato</div><div class="val">'+fmtData(p.data)+'</div></div>' +
+        '<div class="pc-it"><div class="lbl">Data Contrato</div><div class="val">'+fmtData(p.data||'')+'</div></div>' +
         '<div class="pc-it"><div class="lbl">Valor</div><div class="val">R$ '+(p.valor||'0,00')+'</div></div>' +
-        (p.numproc?'<div class="pc-it"><div class="lbl">Nº Processo</div><div class="val">'+esc(p.numproc)+'</div></div>':'') +
+        (p.numproc?'<div class="pc-it"><div class="lbl">Nº Processo</div><div class="val">'+esc(p.numproc)+(esajUrl?' <a href="'+esajUrl+'" target="_blank" style="color:#1a73e8;font-size:10px;">🔍 ESAJ</a>':'')+'</div></div>':'') +
         (p.fase?'<div class="pc-it"><div class="lbl">Fase</div><div class="val">'+esc(p.fase)+'</div></div>':'') +
+        (p.pagamento?'<div class="pc-it"><div class="lbl">Honorários</div><div class="val">'+esc(p.pagamento)+(p.exitoPct?' — '+p.exitoPct+'%':'')+'</div></div>':'') +
         (p.taxa?'<div class="pc-it"><div class="lbl">Taxa Adm.</div><div class="val">R$ '+esc(p.taxa.valor||'0')+' — '+(p.taxa.pago?'<span style="color:#7ec492">Paga</span>':'<span style="color:var(--ch)">Pendente</span>')+'</div></div>':'') +
-        (p.hon?'<div class="pc-it"><div class="lbl">Honorários</div><div class="val">R$ '+esc(p.hon.valor||'0')+' — '+(p.hon.pago?'<span style="color:#7ec492">Pago</span>':'<span style="color:var(--ch)">Pendente</span>')+'</div></div>':'') +
+        (p.hon?'<div class="pc-it"><div class="lbl">Honorários Iniciais</div><div class="val">R$ '+esc(p.hon.valor||'0')+' — '+(p.hon.pago?'<span style="color:#7ec492">Pago</span>':'<span style="color:var(--ch)">Pendente</span>')+'</div></div>':'') +
         (p.obs?'<div class="pc-it" style="grid-column:1/-1"><div class="lbl">Obs.</div><div class="val">'+esc(p.obs)+'</div></div>':'') +
       '</div></div>';
   });
@@ -1948,15 +2057,19 @@ function renderRecebimentos() {
   var parcelas = [];
 
   DB.forEach(function(c) {
-    ['taxa','hon'].forEach(function(tp) {
-      if (!c[tp] || c[tp].mod !== 'parcelado') return;
-      var nat = tp === 'taxa' ? 'Taxa Administrativa' : 'Honorários';
-      var ps = c[tp].parcelas || [];
-      var vUnit = ps.length > 0 ? parseMoeda(c[tp].valor) / ps.length : 0;
-      ps.forEach(function(p, i) {
-        if (!p.data) return;
-        var d = new Date(p.data+'T00:00:00');
-        parcelas.push({ nome:c.nome, tipo:c.tipo, nat:nat, num:i+1, tot:ps.length, data:d, dataStr:p.data, val:vUnit, pago:p.pago });
+    var procs = c.processos && c.processos.length ? c.processos : [c];
+    procs.forEach(function(proc) {
+      ['taxa','hon'].forEach(function(tp) {
+        if (!proc[tp] || proc[tp].mod !== 'parcelado') return;
+        var nat = tp === 'taxa' ? 'Taxa Administrativa' : 'Honorários';
+        var ps = proc[tp].parcelas || [];
+        var vUnit = ps.length > 0 ? parseMoeda(proc[tp].valor) / ps.length : 0;
+        ps.forEach(function(p, i) {
+          if (!p.data) return;
+          var d = new Date(p.data+'T00:00:00');
+          var vP = p.valorParcela ? parseMoeda(p.valorParcela) : vUnit;
+          parcelas.push({ nome:c.nome, tipo:proc.tipo||c.tipo, nat:nat, num:i+1, tot:ps.length, data:d, dataStr:p.data, val:vP, pago:p.pago });
+        });
       });
     });
   });
@@ -2028,14 +2141,17 @@ function coletarAlertas(dias) {
   var hoje = new Date(); hoje.setHours(0,0,0,0);
   var res = [];
   DB.forEach(function(c) {
-    ['taxa','hon'].forEach(function(tp) {
-      if (!c[tp] || c[tp].mod !== 'parcelado') return;
-      var nat = tp === 'taxa' ? 'Taxa Adm.' : 'Honorários';
-      (c[tp].parcelas||[]).forEach(function(p, i) {
-        if (p.pago || !p.data) return;
-        var d = new Date(p.data+'T00:00:00');
-        var diff = Math.round((d - hoje) / 86400000);
-        if (diff <= dias) res.push({ cid:c.id, nome:c.nome, nat:nat, idx:i+1, diff:diff, data:p.data });
+    var procs = c.processos && c.processos.length ? c.processos : [c];
+    procs.forEach(function(proc) {
+      ['taxa','hon'].forEach(function(tp) {
+        if (!proc[tp] || proc[tp].mod !== 'parcelado') return;
+        var nat = tp === 'taxa' ? 'Taxa Adm.' : 'Honorários';
+        (proc[tp].parcelas||[]).forEach(function(p, i) {
+          if (p.pago || !p.data) return;
+          var d = new Date(p.data+'T00:00:00');
+          var diff = Math.round((d - hoje) / 86400000);
+          if (diff <= dias) res.push({ cid:c.id, nome:c.nome, nat:nat, idx:i+1, diff:diff, data:p.data, tipo:proc.tipo||'' });
+        });
       });
     });
   });
@@ -2046,19 +2162,21 @@ function coletarAlertas(dias) {
 // ========== STATS ==========
 function atualizarStats() {
   var tot = DB.length;
-  var pro = DB.filter(function(c){ return c.status==='Protocolado'; }).length;
-  var vol = DB.reduce(function(s,c){ return s+parseMoeda(c.valor); },0);
-  var recAberto = 0;
+  var pro = 0, vol = 0, recAberto = 0;
   DB.forEach(function(c) {
-    ['taxa','hon'].forEach(function(tp) {
-      if (!c[tp]) return;
-      if (c[tp].mod==='parcelado') {
-        var ps = c[tp].parcelas||[];
-        var vU = ps.length>0 ? parseMoeda(c[tp].valor)/ps.length : 0;
-        ps.forEach(function(p){ if(!p.pago) recAberto+=vU; });
-      } else if (!c[tp].pago) {
-        recAberto += parseMoeda(c[tp].valor);
-      }
+    var procs = c.processos && c.processos.length ? c.processos : [c];
+    procs.forEach(function(proc) {
+      if (proc.status === 'Protocolado') pro++;
+      vol += parseMoeda(proc.valor);
+      ['taxa','hon'].forEach(function(tp) {
+        if (!proc[tp]) return;
+        if (proc[tp].mod === 'parcelado') {
+          var ps = proc[tp].parcelas||[];
+          ps.forEach(function(p){ if(!p.pago) recAberto += p.valorParcela ? parseMoeda(p.valorParcela) : (ps.length>0?parseMoeda(proc[tp].valor)/ps.length:0); });
+        } else if (!proc[tp].pago) {
+          recAberto += parseMoeda(proc[tp].valor);
+        }
+      });
     });
   });
   var fmt = function(v){ return v>=1000?'R$'+(v/1000).toFixed(0)+'k':'R$'+v.toFixed(0); };
@@ -2070,7 +2188,10 @@ function atualizarStats() {
 
 function atualizarFiltroTipo() {
   var tipos = [];
-  DB.forEach(function(c){ if(c.tipo && tipos.indexOf(c.tipo)<0) tipos.push(c.tipo); });
+  DB.forEach(function(c){
+    var procs = c.processos && c.processos.length ? c.processos : [c];
+    procs.forEach(function(p){ if(p.tipo && tipos.indexOf(p.tipo)<0) tipos.push(p.tipo); });
+  });
   tipos.sort();
   var sel = document.getElementById('fTp');
   var cur = sel.value;
@@ -2398,61 +2519,46 @@ function exportRelCSV() {
   toast('✓ Relatório exportado');
 }
 
-// ========== DATAJUD — ANDAMENTO AUTOMÁTICO ==========
-var DATAJUD_KEY = 'cDZHYzlZa0JadVREZDJCendQbXY6SkJlTzNjLV9TRENyQk1RdnFKZGRQdw==';
+// ========== CONSULTA PROCESSUAL — TJSP/ESAJ ==========
 var andamentosCache = {};
 
 function buildAndamentoCell(c) {
   if (!c.numproc) return '<span style="color:var(--tw);font-size:10px;">Sem nº processo</span>';
+
   var cache = andamentosCache[c.numproc];
+  var cacheHtml = '';
   if (cache) {
-    return '<div class="andamento-chip" title="'+esc(cache.nome)+'">📋 '+esc(cache.nome.substring(0,40))+'</div>' +
-           '<div style="font-size:9px;color:var(--tw);margin-top:2px;">'+fmtData(cache.data.split('T')[0])+'</div>' +
-           '<button class="btn-atualizar" onclick="buscarAndamento(\''+esc(c.numproc)+'\')">↻ Atualizar</button>';
+    cacheHtml = '<div class="andamento-chip" title="'+esc(cache.nome)+'">📋 '+esc(cache.nome.substring(0,38))+'</div>' +
+                '<div style="font-size:9px;color:var(--tw);margin-top:2px;">'+fmtData(cache.data)+'</div>';
   }
-  return '<button class="btn-atualizar" onclick="buscarAndamento(\''+esc(c.numproc)+'\')">🔍 Consultar TJSP</button>';
+
+  // Extrair número limpo e código foro para montar link ESAJ
+  var numLimpo = c.numproc.replace(/\D/g,''); // ex: 10000010020238260001
+  // Dígito verificador e foro ficam nos últimos 7 dígitos (NNNNNNN = digito(2)+tribunal(4)+foro(4))
+  // O ESAJ aceita o número completo na busca
+  var esajUrl = 'https://esaj.tjsp.jus.br/cpopg/search.do?conversationId=&cbPesquisa=NUMPROC&numeroDigitoAnoUnificado='+encodeURIComponent(c.numproc)+'&foroNumeroUnificado=&dadosConsulta.valorConsultaNuUnificado='+encodeURIComponent(c.numproc)+'&dadosConsulta.valorConsulta=&dadosConsulta.tipoNuProcesso=UNIFICADO';
+  var pjeUrl = 'https://pje.tjsp.jus.br/pje/ConsultaPublica/listView.seam?CA='+encodeURIComponent(numLimpo);
+  var cnj1gUrl = 'https://api-publica.datajud.cnj.jus.br/api_publica_tjsp/_search';
+
+  return cacheHtml +
+    '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:'+(cache?'4':'0')+'px;">' +
+      '<a href="'+esajUrl+'" target="_blank" class="btn-atualizar" style="text-decoration:none;color:var(--ch);display:inline-flex;align-items:center;gap:3px;" title="Consultar no ESAJ — 1º Grau">🔍 ESAJ 1G</a>' +
+      '<a href="https://esaj.tjsp.jus.br/cposg/search.do?conversationId=&cbPesquisa=NUMPROC&dadosConsulta.valorConsultaNuUnificado='+encodeURIComponent(c.numproc)+'&dadosConsulta.tipoNuProcesso=UNIFICADO" target="_blank" class="btn-atualizar" style="text-decoration:none;color:var(--tw);display:inline-flex;align-items:center;gap:3px;" title="Consultar no ESAJ — 2º Grau">🔍 ESAJ 2G</a>' +
+      '<button class="btn-atualizar" onclick="registrarAndamento(\''+esc(c.id)+'\')" title="Registrar andamento manualmente">✏️ Anotar</button>' +
+    '</div>';
 }
 
-function buscarAndamento(numproc) {
-  if (!numproc) return;
-  var numLimpo = numproc.replace(/[.\-]/g,'');
-  var url = 'https://api-publica.datajud.cnj.jus.br/api_publica_tjsp/_search';
-  var body = JSON.stringify({ query: { match: { numeroProcesso: numproc } }, size: 1 });
-
-  // Marcar botão como carregando
-  var btns = document.querySelectorAll('.btn-atualizar');
-  btns.forEach(function(b){ if(b.onclick && b.onclick.toString().includes(numproc)) { b.textContent = '⏳'; b.classList.add('loading'); } });
-
-  fetch(url, {
-    method: 'POST',
-    headers: { 'Authorization': 'APIKey '+DATAJUD_KEY, 'Content-Type': 'application/json' },
-    body: body
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(data) {
-    if (data.hits && data.hits.hits && data.hits.hits.length > 0) {
-      var proc = data.hits.hits[0]._source;
-      var movimentos = proc.movimentos || [];
-      if (movimentos.length > 0) {
-        // Pegar o mais recente
-        movimentos.sort(function(a,b){ return new Date(b.dataHora) - new Date(a.dataHora); });
-        var ult = movimentos[0];
-        andamentosCache[numproc] = { nome: ult.nome || ult.descricao || 'Movimento registrado', data: ult.dataHora || new Date().toISOString() };
-        toast('✓ Andamento atualizado: '+ult.nome);
-      } else {
-        andamentosCache[numproc] = { nome: 'Processo localizado — sem movimentos registrados', data: new Date().toISOString() };
-        toast('Processo localizado no DataJud');
-      }
-    } else {
-      andamentosCache[numproc] = { nome: 'Processo não localizado no DataJud/CNJ', data: new Date().toISOString() };
-      toast('Processo não encontrado no DataJud', true);
-    }
-    renderTabela();
-  })
-  .catch(function(e) {
-    toast('DataJud indisponível no momento — tente mais tarde', true);
-    renderTabela();
-  });
+function registrarAndamento(id) {
+  var c = DB.find(function(x){ return x.id === id; });
+  if (!c) return;
+  var texto = prompt('Cole o último andamento do processo de ' + c.nome + ':\n(copie do ESAJ e cole aqui)', '');
+  if (!texto || !texto.trim()) return;
+  andamentosCache[c.numproc] = {
+    nome: texto.trim(),
+    data: new Date().toISOString().split('T')[0]
+  };
+  toast('✓ Andamento registrado');
+  renderTabela();
 }
 
 // ========== PRAZOS & INTIMAÇÕES ==========
