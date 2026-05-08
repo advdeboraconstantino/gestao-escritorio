@@ -27,6 +27,7 @@
   const indicacoesRef = collection(db, "indicacoes");
   const padRef = collection(db, "pad");
   const atendRef = collection(db, "atendimentos");
+  const audRef = collection(db, "audiencias");
 
   // Expor funções globais para o código legado
   window._fbSave = async function(obj) {
@@ -95,6 +96,15 @@
   window._fbDeleteAtend = async function(id) {
     try { await deleteDoc(doc(db, "atendimentos", id)); } catch(e) { console.error(e); }
   };
+  window._fbSaveAud = async function(obj) {
+    try {
+      if (obj.id && typeof obj.id === 'string') { await setDoc(doc(db, "audiencias", obj.id), obj); }
+      else { const ref = await addDoc(audRef, obj); return ref.id; }
+    } catch(e) { console.error(e); }
+  };
+  window._fbDeleteAud = async function(id) {
+    try { await deleteDoc(doc(db, "audiencias", id)); } catch(e) { console.error(e); }
+  };
 
   window._fbListen = function(callback) {
     return onSnapshot(colRef, function(snapshot) {
@@ -143,6 +153,12 @@
       window.ATENDIMENTOS = [];
       snap.forEach(function(d){ window.ATENDIMENTOS.push(Object.assign({id:d.id}, d.data())); });
       if (document.getElementById('pg-atendimentos').classList.contains('on')) renderAtendimentos();
+    });
+    onSnapshot(audRef, function(snap) {
+      window.AUDIENCIAS = [];
+      snap.forEach(function(d){ window.AUDIENCIAS.push(Object.assign({id:d.id}, d.data())); });
+      if (document.getElementById('pg-audiencias').classList.contains('on')) renderAudiencias();
+      atualizarBadgeAudiencias();
     });
   });
 </script>
@@ -394,6 +410,10 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
 ::-webkit-scrollbar-track{background:var(--fp);}
 ::-webkit-scrollbar-thumb{background:var(--bd);border-radius:3px;}
 
+/* AUDIÊNCIAS — destaque urgente */
+.aud-hoje{background:rgba(212,184,74,.08);border-left:3px solid #D4B84A;}
+.aud-passada{opacity:.65;}
+
 @media(max-width:860px){.hdr-stats{display:none;}.pg{padding:14px;}.gr2,.gr3{grid-template-columns:1fr;}.parc-row{grid-template-columns:28px 1fr 1fr auto;}}
 @media(max-width:580px){.cards{grid-template-columns:1fr 1fr;}.modal{margin:10px auto;}.mo-panel{padding:16px;}}
 </style>
@@ -422,11 +442,11 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
 <!-- ABAS -->
 <nav class="abas">
   <button class="aba on" onclick="mudarAba('clientes',this)">⚖️ Clientes &amp; Processos</button>
-  <button class="aba" onclick="mudarAba('recebimentos',this)">💰 A Receber</button>
-  <button class="aba" onclick="mudarAba('recebidos',this)">✅ Recebidos</button>
+  <button class="aba" onclick="mudarAba('recebimentos',this)">💰 Previsão de Recebimentos</button>
   <button class="aba" onclick="mudarAba('prazos',this)">⏱️ Prazos &amp; Intimações <span class="abadge" id="badge-prazos">0</span></button>
   <button class="aba" onclick="mudarAba('pad',this)">📁 PAD</button>
   <button class="aba" onclick="mudarAba('atendimentos',this)">📝 Atendimentos</button>
+  <button class="aba" onclick="mudarAba('audiencias',this)">🏛️ Audiências <span class="abadge" id="badge-aud">0</span></button>
   <button class="aba" onclick="mudarAba('parceiros',this)">🤝 Advogados Parceiros</button>
   <button class="aba" onclick="mudarAba('relatorios',this)">📊 Relatórios Financeiros</button>
   <button class="aba" onclick="mudarAba('alertas',this)">🔔 Alertas <span class="abadge" id="badge-n">0</span></button>
@@ -440,7 +460,6 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
     <div class="card"><div class="card-l">Aguardando</div><div class="card-v" id="c-pen">0</div><div class="card-s">A protocolar</div></div>
     <div class="card"><div class="card-l">Volume Total</div><div class="card-v" id="c-vol">R$ 0</div><div class="card-s">Soma dos processos</div></div>
     <div class="card"><div class="card-l">A Receber</div><div class="card-v" id="c-rec" style="color:#7ec492">R$ 0</div><div class="card-s">Parcelas em aberto</div></div>
-    <div class="card" style="cursor:pointer" onclick="mudarAba('recebidos',document.querySelector('.aba[onclick*=recebidos]'))"><div class="card-l">Recebidos</div><div class="card-v" id="c-recebido" style="color:#7ec492">R$ 0</div><div class="card-s">Total confirmado</div></div>
   </div>
   <div class="alertas-wrap" id="alertas-wrap"></div>
   <div class="toolbar">
@@ -452,16 +471,6 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
         <option value="Ainda não protocolado">Ainda não protocolado</option>
       </select>
       <select class="sel" id="fTp" onchange="renderTabela()"><option value="">Todos os tipos</option></select>
-      <select class="sel" id="fMes" onchange="renderTabela()">
-        <option value="">Todos os meses</option>
-        <option value="1">Janeiro</option><option value="2">Fevereiro</option>
-        <option value="3">Março</option><option value="4">Abril</option>
-        <option value="5">Maio</option><option value="6">Junho</option>
-        <option value="7">Julho</option><option value="8">Agosto</option>
-        <option value="9">Setembro</option><option value="10">Outubro</option>
-        <option value="11">Novembro</option><option value="12">Dezembro</option>
-      </select>
-      <select class="sel" id="fAno" onchange="renderTabela()"><option value="">Todos os anos</option></select>
     </div>
     <div style="display:flex;gap:8px;">
       <button class="btn-o" onclick="exportCSV()">⬇ CSV</button>
@@ -517,57 +526,6 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
     <div class="tbl-box"><div class="tbl-sc"><table>
       <thead><tr><th>Cliente</th><th>Tipo</th><th>Natureza</th><th>Parcela</th><th>Vencimento</th><th>Valor</th><th>Situação</th></tr></thead>
       <tbody id="recAll"></tbody>
-    </table></div></div>
-  </div>
-</div>
-
-<!-- ===== PÁGINA: RECEBIDOS ===== -->
-<div class="pg" id="pg-recebidos">
-  <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
-    <div class="card"><div class="card-l">Total Recebido</div><div class="card-v" id="rcb-total" style="color:#7ec492">R$ 0</div><div class="card-s">no período filtrado</div></div>
-    <div class="card"><div class="card-l">Taxas Recebidas</div><div class="card-v" id="rcb-taxas" style="color:var(--do)">R$ 0</div><div class="card-s">administrativas</div></div>
-    <div class="card"><div class="card-l">Honorários Recebidos</div><div class="card-v" id="rcb-hon" style="color:var(--ch)">R$ 0</div><div class="card-s">iniciais</div></div>
-    <div class="card"><div class="card-l">Comissões Geradas</div><div class="card-v" id="rcb-com" style="color:#e89090">R$ 0</div><div class="card-s">setor comercial</div></div>
-  </div>
-
-  <!-- FILTROS -->
-  <div class="rel-filtros" style="margin-bottom:20px;">
-    <div style="display:flex;align-items:center;gap:6px;">
-      <label style="font-size:10px;color:var(--ch);text-transform:uppercase;letter-spacing:.9px;">Período</label>
-      <select class="sel" id="rcb-modo" onchange="toggleRcbModo()">
-        <option value="mes">Mensal</option>
-        <option value="ano">Anual</option>
-        <option value="todos">Tudo</option>
-      </select>
-    </div>
-    <div style="display:flex;align-items:center;gap:6px;" id="rcb-grp-mes">
-      <label style="font-size:10px;color:var(--ch);text-transform:uppercase;letter-spacing:.9px;">Mês</label>
-      <select class="sel" id="rcb-mes">
-        <option value="1">Janeiro</option><option value="2">Fevereiro</option>
-        <option value="3">Março</option><option value="4">Abril</option>
-        <option value="5">Maio</option><option value="6">Junho</option>
-        <option value="7">Julho</option><option value="8">Agosto</option>
-        <option value="9">Setembro</option><option value="10">Outubro</option>
-        <option value="11">Novembro</option><option value="12">Dezembro</option>
-      </select>
-    </div>
-    <div style="display:flex;align-items:center;gap:6px;" id="rcb-grp-ano">
-      <label style="font-size:10px;color:var(--ch);text-transform:uppercase;letter-spacing:.9px;">Ano</label>
-      <select class="sel" id="rcb-ano"></select>
-    </div>
-    <button class="btn-v" onclick="renderRecebidos()" style="padding:8px 18px;">🔍 Filtrar</button>
-    <button class="btn-o" onclick="exportRecebidosCSV()">⬇ CSV</button>
-  </div>
-
-  <div class="rec-sec">
-    <div class="rec-tit">✅ Pagamentos Confirmados</div>
-    <div class="tbl-box"><div class="tbl-sc"><table>
-      <thead><tr>
-        <th>Cliente</th><th>Tipo de Ação</th><th>Natureza</th>
-        <th>Parcela</th><th>Data do Pagto</th><th>Valor Recebido</th>
-        <th>Comissão Devida</th><th>Agenda</th>
-      </tr></thead>
-      <tbody id="rcb-tbody"></tbody>
     </table></div></div>
   </div>
 </div>
@@ -738,7 +696,7 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
     <div class="tbl-bar"><div class="tbl-tit">Atendimentos sem Processo</div><div class="tbl-cnt" id="at-cnt">0 registros</div></div>
     <div class="tbl-sc"><table>
       <thead><tr>
-        <th>Cliente</th><th>Data</th><th>Devolutiva</th><th>Tipo</th><th>Situação</th>
+        <th>Cliente</th><th>Data</th><th>Tipo</th><th>Situação</th>
         <th>Localização dos Docs</th><th>Detalhe</th><th>Obs.</th><th>Ações</th>
       </tr></thead>
       <tbody id="at-tbody"></tbody>
@@ -758,14 +716,6 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
       <div class="gr gr2" style="margin-bottom:13px;">
         <div class="fg"><label class="fl">Nome do Cliente *</label><input class="fi" id="at-nome" placeholder="Nome completo"></div>
         <div class="fg"><label class="fl">Data do Atendimento *</label><input type="date" class="fi" id="at-data"></div>
-      </div>
-      <div class="gr gr2" style="margin-bottom:13px;">
-        <div class="fg"><label class="fl">Prazo para Devolutiva ao Cliente</label>
-          <input type="date" class="fi" id="at-prazo-dev">
-        </div>
-        <div class="fg"><label class="fl" style="color:#e89090;">📅 Adicionar ao Google Agenda</label>
-          <button type="button" class="btn-o" onclick="adicionarAtendAgenda()" style="width:100%;text-align:center;padding:9px;">📅 Exportar para Agenda</button>
-        </div>
       </div>
       <div class="gr gr2" style="margin-bottom:13px;">
         <div class="fg"><label class="fl">Tipo *</label>
@@ -809,17 +759,165 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
       <div class="gr" style="margin-bottom:13px;">
         <div class="fg"><label class="fl">Observações</label><input class="fi" id="at-obs" placeholder="Notas adicionais"></div>
       </div>
+      <div style="background:rgba(63,103,73,.08);border:1px solid rgba(63,103,73,.25);border-radius:8px;padding:14px 16px;margin-top:6px;">
+        <div style="font-size:11px;color:var(--ch);font-weight:600;text-transform:uppercase;letter-spacing:.9px;margin-bottom:10px;">📅 Google Agenda + E-mail</div>
+        <div style="font-size:12px;color:var(--ts);margin-bottom:10px;line-height:1.6;">
+          Salve o atendimento e use os botoes abaixo para agendar no Google Agenda com os dados preenchidos automaticamente. O convite sera enviado para <strong style="color:var(--ch)">deboraewenne@gmail.com</strong> e <strong style="color:var(--ch)">documentoprocessoadvocacia@gmail.com</strong>.
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button type="button" class="btn-v" id="btn-at-agenda" onclick="abrirAgendaAtend()" style="background:linear-gradient(135deg,#1a73e8,#1557b0);opacity:.5;cursor:not-allowed;" disabled>
+            📅 Abrir no Google Agenda
+          </button>
+          <button type="button" class="btn-o" id="btn-at-email" onclick="enviarEmailAtend()" style="opacity:.5;cursor:not-allowed;" disabled>
+            ✉️ Enviar e-mail de aviso
+          </button>
+        </div>
+        <div style="font-size:10px;color:var(--tw);margin-top:8px;" id="at-agenda-hint">Preencha os dados e salve para ativar os botoes.</div>
+      </div>
     </div>
     <div class="mo-foot">
       <button class="btn-o" onclick="document.getElementById('ov-atend').style.display='none'">Cancelar</button>
-      <button class="btn-v" onclick="salvarAtend()">✓ Salvar Atendimento</button>
+      <button class="btn-v" onclick="salvarAtend()">✓ Salvar + Ativar Agenda</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PÁGINA: AUDIÊNCIAS ===== -->
+<div class="pg" id="pg-audiencias">
+  <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+    <div class="card"><div class="card-l">Total</div><div class="card-v" id="au-tot">0</div><div class="card-s">audiências cadastradas</div></div>
+    <div class="card"><div class="card-l">Próximas (7 dias)</div><div class="card-v" id="au-prox" style="color:#D4B84A">0</div><div class="card-s">agendadas</div></div>
+    <div class="card"><div class="card-l">Administrativas</div><div class="card-v" id="au-adm" style="color:var(--ch)">0</div><div class="card-s">proc. administrativo</div></div>
+    <div class="card"><div class="card-l">Judiciais</div><div class="card-v" id="au-jud" style="color:var(--vi)">0</div><div class="card-s">proc. judicial</div></div>
+    <div class="card"><div class="card-l">Realizadas</div><div class="card-v" id="au-real" style="color:#7ec492">0</div><div class="card-s">concluídas</div></div>
+  </div>
+  <div class="toolbar">
+    <div class="tb-l">
+      <div class="sw"><span class="sw-ic">🔍</span><input type="text" id="au-busca" placeholder="Buscar cliente ou local..." oninput="renderAudiencias()"></div>
+      <select class="sel" id="au-filtro-tipo" onchange="renderAudiencias()">
+        <option value="">Todos os tipos</option>
+        <option value="Administrativo">Administrativo</option>
+        <option value="Judicial">Judicial</option>
+      </select>
+      <select class="sel" id="au-filtro-sit" onchange="renderAudiencias()">
+        <option value="">Todas as situações</option>
+        <option value="Agendada">Agendada</option>
+        <option value="Realizada">Realizada</option>
+        <option value="Cancelada">Cancelada</option>
+        <option value="Adiada">Adiada</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-o" onclick="exportAudCSV()">⬇ CSV</button>
+      <button class="btn-v" onclick="abrirModalAud(null)">+ Nova Audiência</button>
+    </div>
+  </div>
+  <div class="tbl-box">
+    <div class="tbl-bar"><div class="tbl-tit">🏛️ Agenda de Audiências</div><div class="tbl-cnt" id="au-cnt">0 registros</div></div>
+    <div class="tbl-sc"><table>
+      <thead><tr>
+        <th>Cliente</th><th>Data / Hora</th><th>Tipo</th>
+        <th>Nº Processo</th><th>Local / Vara</th><th>Situação</th>
+        <th>Agenda</th><th>Obs.</th><th>Ações</th>
+      </tr></thead>
+      <tbody id="au-tbody"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- MODAL AUDIÊNCIA -->
+<div id="ov-aud" style="position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;display:none;overflow-y:auto;padding:20px;" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal" style="max-width:680px;">
+    <div class="mo-head">
+      <div><div class="mo-tit" id="au-mo-tit">Nova Audiência</div><div class="mo-sub">Cadastre e sincronize com o Google Agenda</div></div>
+      <button class="mo-cls" onclick="document.getElementById('ov-aud').style.display='none'">✕</button>
+    </div>
+    <div style="padding:20px 26px;">
+      <div class="sec">Identificação do Cliente</div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Nome do Cliente *</label><input class="fi" id="au-nome" placeholder="Nome completo"></div>
+        <div class="fg"><label class="fl">WhatsApp do Cliente</label><input class="fi" id="au-whats" placeholder="(12) 99999-9999" oninput="fmtTel(this)"></div>
+      </div>
+      <div class="gr" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">E-mail do Cliente</label><input type="email" class="fi" id="au-email-cliente" placeholder="cliente@email.com"></div>
+      </div>
+      <div class="sec">Dados da Audiência</div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Tipo de Processo *</label>
+          <select class="fi" id="au-tipo">
+            <option value="Judicial">Judicial</option>
+            <option value="Administrativo">Administrativo</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Tipo de Audiência</label>
+          <select class="fi" id="au-tipo-aud">
+            <option value="Audiência de Conciliação">Audiência de Conciliação</option>
+            <option value="Audiência de Instrução">Audiência de Instrução</option>
+            <option value="Audiência de Julgamento">Audiência de Julgamento</option>
+            <option value="Audiência Administrativa">Audiência Administrativa</option>
+            <option value="Sessão de Julgamento">Sessão de Julgamento</option>
+            <option value="Outro">Outro</option>
+          </select>
+        </div>
+      </div>
+      <div class="gr gr3" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Data *</label><input type="date" class="fi" id="au-data"></div>
+        <div class="fg"><label class="fl">Hora *</label><input type="time" class="fi" id="au-hora"></div>
+        <div class="fg"><label class="fl">Duração Estimada</label>
+          <select class="fi" id="au-duracao">
+            <option value="30">30 minutos</option>
+            <option value="60" selected>1 hora</option>
+            <option value="90">1h30</option>
+            <option value="120">2 horas</option>
+            <option value="180">3 horas</option>
+          </select>
+        </div>
+      </div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Nº do Processo</label><input class="fi" id="au-numproc" placeholder="0000000-00.0000.0.00.0000"></div>
+        <div class="fg"><label class="fl">Situação</label>
+          <select class="fi" id="au-situacao">
+            <option value="Agendada">Agendada</option>
+            <option value="Realizada">Realizada</option>
+            <option value="Cancelada">Cancelada</option>
+            <option value="Adiada">Adiada</option>
+          </select>
+        </div>
+      </div>
+      <div class="gr" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Local / Vara / Órgão *</label><input class="fi" id="au-local" placeholder="Ex.: 3a Vara da Fazenda Publica de SJC, SEDUC SP..."></div>
+      </div>
+      <div class="gr" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Assunto / Pauta</label><input class="fi" id="au-assunto" placeholder="Ex.: Oitiva de testemunhas, depoimento do cliente..."></div>
+      </div>
+      <div class="gr" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Observações</label><input class="fi" id="au-obs" placeholder="Notas adicionais, orientacoes ao cliente..."></div>
+      </div>
+      <div style="background:rgba(63,103,73,.08);border:1px solid rgba(63,103,73,.25);border-radius:8px;padding:14px 16px;margin-top:6px;">
+        <div style="font-size:11px;color:var(--ch);font-weight:600;text-transform:uppercase;letter-spacing:.9px;margin-bottom:10px;">📅 Google Agenda + E-mail</div>
+        <div style="font-size:12px;color:var(--ts);margin-bottom:10px;line-height:1.6;">
+          Salve a audiência e use os botões abaixo para abrir o Google Agenda com os dados preenchidos automaticamente. O convite sera enviado para <strong style="color:var(--ch)">deboraewenne@gmail.com</strong> e <strong style="color:var(--ch)">documentoprocessoadvocacia@gmail.com</strong>.
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button type="button" class="btn-v" id="btn-google-agenda" onclick="abrirGoogleAgenda()" style="background:linear-gradient(135deg,#1a73e8,#1557b0);opacity:.5;cursor:not-allowed;" disabled>
+            📅 Abrir no Google Agenda
+          </button>
+          <button type="button" class="btn-o" id="btn-enviar-email" onclick="enviarEmailAudiencia()" style="opacity:.5;cursor:not-allowed;" disabled>
+            ✉️ Enviar e-mail de convite
+          </button>
+        </div>
+        <div style="font-size:10px;color:var(--tw);margin-top:8px;" id="au-agenda-hint">Preencha os dados e salve para ativar os botões de agenda.</div>
+      </div>
+    </div>
+    <div class="mo-foot">
+      <button class="btn-o" onclick="document.getElementById('ov-aud').style.display='none'">Cancelar</button>
+      <button class="btn-v" onclick="salvarAud()">✓ Salvar + Ativar Agenda</button>
     </div>
   </div>
 </div>
 
 <!-- ===== PÁGINA: ADVOGADOS PARCEIROS ===== -->
 <div class="pg" id="pg-parceiros">
-
   <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
     <div class="card"><div class="card-l">Parceiros Ativos</div><div class="card-v" id="pc-tot">0</div><div class="card-s">advogados cadastrados</div></div>
     <div class="card"><div class="card-l">Indicações</div><div class="card-v" id="pc-ind">0</div><div class="card-s">clientes indicados</div></div>
@@ -1353,6 +1451,7 @@ var PARCEIROS = [];
 var INDICACOES = [];
 var PAD = [];
 var ATENDIMENTOS = [];
+var AUDIENCIAS = [];
 var editId = null;
 var delId = null;
 var editPrazoId = null;
@@ -1360,6 +1459,9 @@ var editParceiroId = null;
 var editIndicacaoId = null;
 var editPADId = null;
 var editAtendId = null;
+var editAudId = null;
+var audSalva = null;
+var atendSalvo = null;
 var sCol = 'data', sDir = 'desc';
 
 function loadDB() { }
@@ -1372,13 +1474,13 @@ function mudarAba(id, btn) {
   document.getElementById('pg-'+id).classList.add('on');
   btn.classList.add('on');
   if (id === 'recebimentos') renderRecebimentos();
-  if (id === 'recebidos') iniciarRecebidos();
   if (id === 'alertas') renderAlertasFull();
   if (id === 'relatorios') iniciarRelatorios();
   if (id === 'prazos') renderPrazos();
   if (id === 'parceiros') renderParceiros();
   if (id === 'pad') renderPAD();
   if (id === 'atendimentos') renderAtendimentos();
+  if (id === 'audiencias') renderAudiencias();
 }
 
 // ========== MODAL ==========
@@ -1545,10 +1647,13 @@ function calcComissao() {
       if (sit === 'sim') base += valTaxa;
     } else {
       var np = parseInt(document.getElementById('f-taxa-np').value) || 0;
-      var vUnit = np > 0 ? valTaxa / np : 0;
       for (var i = 0; i < np; i++) {
         var ck = document.getElementById('taxa-pg-'+i);
-        if (ck && ck.checked) base += vUnit;
+        var vlEl = document.getElementById('taxa-vl-'+i);
+        if (ck && ck.checked) {
+          var vParc = vlEl ? parseMoeda(vlEl.value) : (np > 0 ? valTaxa / np : 0);
+          base += vParc;
+        }
       }
     }
   }
@@ -1567,12 +1672,14 @@ function gerarParc(tipo) {
   box.innerHTML = '';
   for (var i = 0; i < n; i++) {
     var ex = existentes[i] || {};
+    var vParcela = ex.valorParcela !== undefined ? ex.valorParcela : fmtVal(vUnit);
     var row = document.createElement('div');
     row.className = 'parc-row';
+    row.style.gridTemplateColumns = '28px 1fr 1fr auto';
     row.innerHTML =
       '<span class="parc-n">'+(i+1)+'ª</span>' +
       '<input type="date" class="parc-d" id="'+tipo+'-d-'+i+'" value="'+(ex.data||'')+'">' +
-      '<span class="parc-vl">R$ '+fmtVal(vUnit)+'</span>' +
+      '<input type="text" class="parc-d" id="'+tipo+'-vl-'+i+'" value="'+vParcela+'" oninput="fmtMoeda(this)" style="background:rgba(180,138,74,.06);border:1px solid rgba(180,138,74,.2);border-radius:4px;padding:4px 7px;color:var(--ch);font-size:12px;font-weight:600;text-align:right;width:100%;" placeholder="0,00" title="Clique para editar o valor desta parcela">' +
       '<div class="parc-pg'+(ex.pago?' pago':'')+'" id="'+tipo+'-pg-wrap-'+i+'">' +
         '<input type="checkbox" id="'+tipo+'-pg-'+i+'" '+(ex.pago?'checked':'')+' onchange="document.getElementById(\''+tipo+'-pg-wrap-'+i+'\').className=\'parc-pg\'+(this.checked?\' pago\':\'\')">' +
         '<label for="'+tipo+'-pg-'+i+'">Pago</label>' +
@@ -1588,12 +1695,14 @@ function carregarParc(tipo, parcelas, valorTotal) {
   box.innerHTML = '';
   for (var i = 0; i < n; i++) {
     var p = parcelas[i];
+    var vParcela = p.valorParcela !== undefined ? p.valorParcela : fmtVal(vUnit);
     var row = document.createElement('div');
     row.className = 'parc-row';
+    row.style.gridTemplateColumns = '28px 1fr 1fr auto';
     row.innerHTML =
       '<span class="parc-n">'+(i+1)+'ª</span>' +
       '<input type="date" class="parc-d" id="'+tipo+'-d-'+i+'" value="'+(p.data||'')+'">' +
-      '<span class="parc-vl">R$ '+fmtVal(vUnit)+'</span>' +
+      '<input type="text" class="parc-d" id="'+tipo+'-vl-'+i+'" value="'+vParcela+'" oninput="fmtMoeda(this)" style="background:rgba(180,138,74,.06);border:1px solid rgba(180,138,74,.2);border-radius:4px;padding:4px 7px;color:var(--ch);font-size:12px;font-weight:600;text-align:right;width:100%;" placeholder="0,00" title="Clique para editar o valor desta parcela">' +
       '<div class="parc-pg'+(p.pago?' pago':'')+'" id="'+tipo+'-pg-wrap-'+i+'">' +
         '<input type="checkbox" id="'+tipo+'-pg-'+i+'" '+(p.pago?'checked':'')+' onchange="document.getElementById(\''+tipo+'-pg-wrap-'+i+'\').className=\'parc-pg\'+(this.checked?\' pago\':\'\')">' +
         '<label for="'+tipo+'-pg-'+i+'">Pago</label>' +
@@ -1608,8 +1717,9 @@ function coletarParc(tipo) {
   while (true) {
     var d = document.getElementById(tipo+'-d-'+i);
     var p = document.getElementById(tipo+'-pg-'+i);
+    var vl = document.getElementById(tipo+'-vl-'+i);
     if (!d) break;
-    resultado.push({ data: d.value, pago: p ? p.checked : false });
+    resultado.push({ data: d.value, pago: p ? p.checked : false, valorParcela: vl ? vl.value : '' });
     i++;
   }
   return resultado;
@@ -1682,20 +1792,12 @@ function renderTabela() {
   var busca = (document.getElementById('busca').value || '').toLowerCase();
   var fSt = document.getElementById('fSt').value;
   var fTp = document.getElementById('fTp').value;
-  var fMes = document.getElementById('fMes') ? document.getElementById('fMes').value : '';
-  var fAno = document.getElementById('fAno') ? document.getElementById('fAno').value : '';
 
   var lista = DB.filter(function(c) {
     var okB = !busca || (c.nome||'').toLowerCase().includes(busca) || (c.tipo||'').toLowerCase().includes(busca) || (c.numproc||'').toLowerCase().includes(busca);
     var okS = !fSt || c.status === fSt;
     var okT = !fTp || c.tipo === fTp;
-    var okM = true, okA = true;
-    if ((fMes || fAno) && c.data) {
-      var partes = c.data.split('-');
-      if (fMes) okM = parseInt(partes[1]) === parseInt(fMes);
-      if (fAno) okA = parseInt(partes[0]) === parseInt(fAno);
-    }
-    return okB && okS && okT && okM && okA;
+    return okB && okS && okT;
   });
 
   lista.sort(function(a, b) {
@@ -1960,27 +2062,10 @@ function atualizarStats() {
     });
   });
   var fmt = function(v){ return v>=1000?'R$'+(v/1000).toFixed(0)+'k':'R$'+v.toFixed(0); };
-  // Calcular total recebido (confirmado)
-  var recebido = 0;
-  DB.forEach(function(c) {
-    ['taxa','hon'].forEach(function(tp) {
-      if (!c[tp]) return;
-      if (c[tp].mod==='parcelado') {
-        var ps = c[tp].parcelas||[];
-        var vU = ps.length>0 ? parseMoeda(c[tp].valor)/ps.length : 0;
-        ps.forEach(function(p){ if(p.pago) recebido+=vU; });
-      } else if (c[tp].pago) {
-        recebido += parseMoeda(c[tp].valor);
-      }
-    });
-  });
-
   setTxt('h-tot',tot); setTxt('h-pro',pro); setTxt('h-pen',tot-pro); setTxt('h-vol',fmt(vol));
   setTxt('c-tot',tot); setTxt('c-pro',pro); setTxt('c-pen',tot-pro);
   setTxt('c-vol','R$ '+vol.toLocaleString('pt-BR',{minimumFractionDigits:2}));
   setTxt('c-rec','R$ '+recAberto.toLocaleString('pt-BR',{minimumFractionDigits:2}));
-  var elRcb = document.getElementById('c-recebido');
-  if (elRcb) elRcb.textContent = 'R$ '+recebido.toLocaleString('pt-BR',{minimumFractionDigits:2});
 }
 
 function atualizarFiltroTipo() {
@@ -1996,21 +2081,6 @@ function atualizarFiltroTipo() {
     if(t===cur) o.selected=true;
     sel.appendChild(o);
   });
-  // Popular filtro de anos
-  var anos = [];
-  DB.forEach(function(c){ if(c.data){ var a=parseInt(c.data.split('-')[0]); if(a && anos.indexOf(a)<0) anos.push(a); } });
-  anos.sort(function(a,b){ return b-a; });
-  var selAno = document.getElementById('fAno');
-  if (selAno) {
-    var curAno = selAno.value;
-    selAno.innerHTML = '<option value="">Todos os anos</option>';
-    anos.forEach(function(a){
-      var o = document.createElement('option');
-      o.value = a; o.textContent = a;
-      if(a.toString()===curAno) o.selected=true;
-      selAno.appendChild(o);
-    });
-  }
 }
 
 // ========== AÇÕES ==========
@@ -2528,7 +2598,6 @@ function renderPrazos() {
         '<div class="prazo-info"><div class="lbl">Prazo</div><div class="val">'+(p.dias?p.dias+' dias':'—')+'</div></div>' +
         '<div class="prazo-info"><div class="lbl">Data Final</div><div class="val">'+(p.datafinal?fmtData(p.datafinal):'—')+'</div></div>' +
         '<div style="display:flex;gap:6px;align-items:center;">' +
-          '<button class="btn-ic" title="Adicionar ao Google Agenda" onclick="adicionarPrazoAgenda(\'' + p.id + '\')" style="font-size:12px;">📅</button>' +
           '<button class="btn-check '+(p.cumprido?'feito':'')+'" onclick="toggleCumprido(\''+p.id+'\')">'+(p.cumprido?'✓ Cumprido':'✓ Marcar cumprido')+'</button>' +
           '<button class="btn-ic" title="Editar" onclick="abrirModalPrazo(\''+p.id+'\')">✏️</button>' +
           '<button class="btn-ic x" title="Excluir" onclick="excluirPrazo(\''+p.id+'\')">🗑️</button>' +
@@ -2888,8 +2957,10 @@ function exportPADcsv() {
 // ========== ATENDIMENTOS ==========
 function abrirModalAtend(id) {
   editAtendId = id;
-  ['at-nome','at-data','at-assunto','at-doc-det','at-whats','at-email','at-obs','at-prazo-dev'].forEach(function(f){ setVal(f,''); });
+  atendSalvo = null;
+  ['at-nome','at-data','at-assunto','at-doc-det','at-whats','at-email','at-obs'].forEach(function(f){ setVal(f,''); });
   setVal('at-tipo','Parecer'); setVal('at-situacao','Pendente'); setVal('at-doc-local','');
+  desativarBotoesAtend();
   if (id) {
     var a=(ATENDIMENTOS||[]).find(function(x){ return x.id===id; });
     if (!a) return;
@@ -2899,7 +2970,8 @@ function abrirModalAtend(id) {
     setVal('at-assunto',a.assunto||''); setVal('at-doc-local',a.docLocal||'');
     setVal('at-doc-det',a.docDet||''); setVal('at-whats',a.whats||'');
     setVal('at-email',a.email||''); setVal('at-obs',a.obs||'');
-    setVal('at-prazo-dev',a.prazoDev||'');
+    atendSalvo = a;
+    ativarBotoesAtend();
   } else {
     document.getElementById('at-mo-tit').textContent='Novo Atendimento';
     setVal('at-data',new Date().toISOString().split('T')[0]);
@@ -2916,12 +2988,12 @@ function salvarAtend() {
     nome:nome, data:getVal('at-data'), tipo:getVal('at-tipo'),
     situacao:getVal('at-situacao'), assunto:getVal('at-assunto'),
     docLocal:getVal('at-doc-local'), docDet:getVal('at-doc-det'),
-    whats:getVal('at-whats'), email:getVal('at-email'), obs:getVal('at-obs'),
-    prazoDev:getVal('at-prazo-dev')
+    whats:getVal('at-whats'), email:getVal('at-email'), obs:getVal('at-obs')
   };
-  if (editAtendId) { obj.id=editAtendId; window._fbSaveAtend(obj); toast('✓ Atendimento atualizado'); }
-  else { window._fbSaveAtend(obj); toast('✓ Atendimento cadastrado'); }
-  document.getElementById('ov-atend').style.display='none'; editAtendId=null;
+  if (editAtendId) { obj.id=editAtendId; window._fbSaveAtend(obj); toast('Atendimento atualizado'); }
+  else { window._fbSaveAtend(obj); toast('Atendimento cadastrado'); }
+  atendSalvo = obj;
+  ativarBotoesAtend();
 }
 
 function renderAtendimentos() {
@@ -2960,7 +3032,6 @@ function renderAtendimentos() {
         (a.email?'<a href="mailto:'+esc(a.email)+'" style="font-size:10px;color:var(--tw)">✉️ '+esc(a.email)+'</a>':'')+
       '</td>'+
       '<td style="font-size:11px;color:var(--tw);white-space:nowrap">'+fmtData(a.data)+'</td>'+
-      '<td style="font-size:11px;">'+(a.prazoDev?'<span style="color:'+(new Date(a.prazoDev+'T00:00:00')<new Date()?'#e89090':'#D4B84A')+'">📅 '+fmtData(a.prazoDev)+(new Date(a.prazoDev+'T00:00:00')<new Date()?' ⚠ VENC.':'')+'</span>':'<span style="color:var(--tw)">—</span>')+'</td>'+
       '<td><span class="bgt">'+esc(a.tipo||'')+'</span></td>'+
       '<td><span style="font-size:11px;font-weight:600;color:'+(sitCores[a.situacao]||'var(--tw)')+'">'+esc(a.situacao||'')+'</span></td>'+
       '<td>'+docHtml+'</td>'+
@@ -2979,6 +3050,79 @@ function excluirAtend(id) {
   window._fbDeleteAtend(id); toast('Atendimento removido');
 }
 
+function desativarBotoesAtend() {
+  var b1 = document.getElementById('btn-at-agenda');
+  var b2 = document.getElementById('btn-at-email');
+  var h  = document.getElementById('at-agenda-hint');
+  if (b1) { b1.disabled=true; b1.style.opacity='.5'; b1.style.cursor='not-allowed'; }
+  if (b2) { b2.disabled=true; b2.style.opacity='.5'; b2.style.cursor='not-allowed'; }
+  if (h)  h.textContent='Preencha os dados e salve para ativar os botoes.';
+}
+
+function ativarBotoesAtend() {
+  var b1 = document.getElementById('btn-at-agenda');
+  var b2 = document.getElementById('btn-at-email');
+  var h  = document.getElementById('at-agenda-hint');
+  if (b1) { b1.disabled=false; b1.style.opacity='1'; b1.style.cursor='pointer'; }
+  if (b2) { b2.disabled=false; b2.style.opacity='1'; b2.style.cursor='pointer'; }
+  if (h)  h.textContent='Atendimento salvo! Clique nos botoes acima para abrir o Google Agenda ou enviar o e-mail.';
+}
+
+function abrirAgendaAtend() {
+  var a = atendSalvo;
+  if (!a) { toast('Salve o atendimento primeiro', true); return; }
+
+  var dataBase = a.data || new Date().toISOString().split('T')[0];
+  var dtStr = dataBase.replace(/-/g,'') + 'T090000';
+  var dtFimStr = dataBase.replace(/-/g,'') + 'T100000';
+
+  var titulo = encodeURIComponent('[ATENDIMENTO] ' + (a.tipo||'Atendimento') + ' — ' + (a.nome||''));
+  var detalhes = encodeURIComponent(
+    'TIPO: ' + (a.tipo||'') + '\n' +
+    'CLIENTE: ' + (a.nome||'') + '\n' +
+    'ASSUNTO: ' + (a.assunto||'não informado') + '\n' +
+    'SITUAÇÃO: ' + (a.situacao||'') + '\n' +
+    (a.docLocal ? 'DOCS: ' + a.docLocal + (a.docDet ? ' — ' + a.docDet : '') + '\n' : '') +
+    (a.obs ? 'OBS: ' + a.obs + '\n' : '') + '\n' +
+    'Escritório Débora Constantino — OAB/SP 378.037'
+  );
+  var convidados = encodeURIComponent('deboraewenne@gmail.com,documentoprocessoadvocacia@gmail.com');
+
+  var url = 'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+    '&text=' + titulo +
+    '&dates=' + dtStr + '/' + dtFimStr +
+    '&details=' + detalhes +
+    '&add=' + convidados;
+
+  window.open(url, '_blank');
+  toast('Google Agenda aberto — ajuste o horario e salve!');
+}
+
+function enviarEmailAtend() {
+  var a = atendSalvo;
+  if (!a) { toast('Salve o atendimento primeiro', true); return; }
+
+  var assunto = encodeURIComponent('[ATENDIMENTO] ' + (a.tipo||'Atendimento') + ' — ' + (a.nome||'') + ' — ' + fmtData(a.data||''));
+  var corpo = encodeURIComponent(
+    'Bom dia,\n\n' +
+    'Segue o registro de atendimento cadastrado no sistema:\n\n' +
+    '▸ Cliente: ' + (a.nome||'') + '\n' +
+    '▸ Tipo: ' + (a.tipo||'') + '\n' +
+    '▸ Data: ' + fmtData(a.data||'') + '\n' +
+    '▸ Assunto: ' + (a.assunto||'não informado') + '\n' +
+    '▸ Situação: ' + (a.situacao||'') + '\n' +
+    (a.docLocal ? '▸ Localização dos docs: ' + a.docLocal + (a.docDet ? ' — ' + a.docDet : '') + '\n' : '') +
+    (a.whats ? '▸ WhatsApp: ' + a.whats + '\n' : '') +
+    (a.email ? '▸ E-mail cliente: ' + a.email + '\n' : '') +
+    (a.obs ? '▸ Obs: ' + a.obs + '\n' : '') +
+    '\nEscritório Débora Constantino — OAB/SP 378.037'
+  );
+
+  var destinatarios = 'deboraewenne@gmail.com,documentoprocessoadvocacia@gmail.com';
+  window.location.href = 'mailto:' + destinatarios + '?subject=' + assunto + '&body=' + corpo;
+  toast('Cliente de e-mail aberto com o aviso!');
+}
+
 function exportAtendCSV() {
   var h=['Cliente','Data','Tipo','Situação','Assunto','Local Docs','Detalhe Docs','Contato','Obs'];
   var rows=(ATENDIMENTOS||[]).map(function(a){ return [a.nome,fmtData(a.data),a.tipo,a.situacao,a.assunto,a.docLocal,a.docDet,a.contato,a.obs]; });
@@ -2988,267 +3132,279 @@ function exportAtendCSV() {
   toast('✓ CSV exportado');
 }
 
-// ========== RECEBIDOS ==========
-function iniciarRecebidos() {
-  var anos = [];
-  var anoAtual = new Date().getFullYear();
-  DB.forEach(function(c) {
-    ['taxa','hon'].forEach(function(tp) {
-      if (!c[tp]) return;
-      if (c[tp].mod === 'parcelado') {
-        (c[tp].parcelas||[]).forEach(function(p) {
-          if (p.pago && p.data) { var a=parseInt(p.data.split('-')[0]); if(a&&anos.indexOf(a)<0) anos.push(a); }
-        });
-      } else if (c[tp].pago && c.data) {
-        var a=parseInt(c.data.split('-')[0]); if(a&&anos.indexOf(a)<0) anos.push(a);
-      }
-    });
-  });
-  if (anos.indexOf(anoAtual)<0) anos.push(anoAtual);
-  anos.sort(function(a,b){ return b-a; });
-  var selAno = document.getElementById('rcb-ano');
-  if (selAno) {
-    selAno.innerHTML = '';
-    anos.forEach(function(a) {
-      var o = document.createElement('option');
-      o.value = a; o.textContent = a;
-      if (a === anoAtual) o.selected = true;
-      selAno.appendChild(o);
-    });
+// ========== AUDIÊNCIAS ==========
+function abrirModalAud(id) {
+  editAudId = id;
+  audSalva = null;
+  ['au-nome','au-whats','au-email-cliente','au-numproc','au-local','au-assunto','au-obs'].forEach(function(f){ setVal(f,''); });
+  setVal('au-tipo','Judicial');
+  setVal('au-tipo-aud','Audiência de Conciliação');
+  setVal('au-duracao','60');
+  setVal('au-situacao','Agendada');
+  desativarBotoesAgenda();
+  if (id) {
+    var a = (AUDIENCIAS||[]).find(function(x){ return x.id===id; });
+    if (!a) return;
+    document.getElementById('au-mo-tit').textContent = 'Editar Audiência';
+    setVal('au-nome', a.nome||''); setVal('au-whats', a.whats||'');
+    setVal('au-email-cliente', a.emailCliente||'');
+    setVal('au-tipo', a.tipo||'Judicial');
+    setVal('au-tipo-aud', a.tipoAud||'Audiência de Conciliação');
+    setVal('au-data', a.data||''); setVal('au-hora', a.hora||'');
+    setVal('au-duracao', a.duracao||'60');
+    setVal('au-numproc', a.numproc||'');
+    setVal('au-situacao', a.situacao||'Agendada');
+    setVal('au-local', a.local||'');
+    setVal('au-assunto', a.assunto||'');
+    setVal('au-obs', a.obs||'');
+    audSalva = a;
+    ativarBotoesAgenda();
+  } else {
+    document.getElementById('au-mo-tit').textContent = 'Nova Audiência';
+    setVal('au-data', new Date().toISOString().split('T')[0]);
   }
-  var selMes = document.getElementById('rcb-mes');
-  if (selMes) selMes.value = new Date().getMonth() + 1;
-  renderRecebidos();
+  document.getElementById('ov-aud').style.display = 'block';
 }
 
-function toggleRcbModo() {
-  var modo = document.getElementById('rcb-modo').value;
-  document.getElementById('rcb-grp-mes').style.display = modo === 'mes' ? 'flex' : 'none';
-  document.getElementById('rcb-grp-ano').style.display = modo === 'todos' ? 'none' : 'flex';
+function desativarBotoesAgenda() {
+  var b1 = document.getElementById('btn-google-agenda');
+  var b2 = document.getElementById('btn-enviar-email');
+  var h = document.getElementById('au-agenda-hint');
+  if (b1) { b1.disabled = true; b1.style.opacity = '.5'; b1.style.cursor = 'not-allowed'; }
+  if (b2) { b2.disabled = true; b2.style.opacity = '.5'; b2.style.cursor = 'not-allowed'; }
+  if (h) h.textContent = 'Preencha os dados e salve para ativar os botoes de agenda.';
 }
 
-function renderRecebidos() {
-  var modo = document.getElementById('rcb-modo') ? document.getElementById('rcb-modo').value : 'mes';
-  var mes = document.getElementById('rcb-mes') ? parseInt(document.getElementById('rcb-mes').value) : new Date().getMonth()+1;
-  var ano = document.getElementById('rcb-ano') ? parseInt(document.getElementById('rcb-ano').value) : new Date().getFullYear();
+function ativarBotoesAgenda() {
+  var b1 = document.getElementById('btn-google-agenda');
+  var b2 = document.getElementById('btn-enviar-email');
+  var h = document.getElementById('au-agenda-hint');
+  if (b1) { b1.disabled = false; b1.style.opacity = '1'; b1.style.cursor = 'pointer'; }
+  if (b2) { b2.disabled = false; b2.style.opacity = '1'; b2.style.cursor = 'pointer'; }
+  if (h) h.textContent = 'Audiencia salva! Clique nos botoes acima para abrir o Google Agenda ou enviar o e-mail de convite.';
+}
 
-  var registros = [];
-  var totTaxas = 0, totHon = 0, totCom = 0;
+function salvarAud() {
+  var nome = getVal('au-nome');
+  var data = getVal('au-data');
+  var hora = getVal('au-hora');
+  var local = getVal('au-local');
+  if (!nome) { toast('Informe o nome do cliente', true); return; }
+  if (!data) { toast('Informe a data da audiencia', true); return; }
+  if (!hora) { toast('Informe o horario da audiencia', true); return; }
+  if (!local) { toast('Informe o local/vara', true); return; }
 
-  DB.forEach(function(c) {
-    var comPct = parseInt(c.comissaoPct) || 0;
+  var obj = {
+    nome: nome,
+    whats: getVal('au-whats'),
+    emailCliente: getVal('au-email-cliente'),
+    tipo: getVal('au-tipo'),
+    tipoAud: getVal('au-tipo-aud'),
+    data: data, hora: hora,
+    duracao: getVal('au-duracao'),
+    numproc: getVal('au-numproc'),
+    situacao: getVal('au-situacao'),
+    local: local,
+    assunto: getVal('au-assunto'),
+    obs: getVal('au-obs')
+  };
 
-    // TAXA
-    if (c.taxa) {
-      if (c.taxa.mod === 'avista') {
-        if (c.taxa.pago) {
-          var dataRef = c.data;
-          if (modo === 'todos' || pertencePeriodo(dataRef, mes, ano, modo)) {
-            var val = parseMoeda(c.taxa.valor);
-            var com = val * comPct / 100;
-            totTaxas += val; totCom += com;
-            registros.push({ nome:c.nome, tipo:c.tipo, nat:'Taxa Adm.', parcela:'À vista', data:dataRef, val:val, com:com, comPct:comPct });
-          }
-        }
-      } else {
-        var ps = c.taxa.parcelas || [];
-        var vUnit = ps.length > 0 ? parseMoeda(c.taxa.valor) / ps.length : 0;
-        ps.forEach(function(p, i) {
-          if (p.pago) {
-            var dataRef = p.data;
-            if (modo === 'todos' || pertencePeriodo(dataRef, mes, ano, modo)) {
-              var com = vUnit * comPct / 100;
-              totTaxas += vUnit; totCom += com;
-              registros.push({ nome:c.nome, tipo:c.tipo, nat:'Taxa Adm.', parcela:(i+1)+'ª parcela', data:dataRef, val:vUnit, com:com, comPct:comPct });
-            }
-          }
-        });
-      }
-    }
+  if (editAudId) {
+    obj.id = editAudId;
+    window._fbSaveAud(obj);
+    toast('Audiencia atualizada');
+  } else {
+    window._fbSaveAud(obj).then(function(newId) {
+      obj.id = newId;
+    });
+    toast('Audiencia cadastrada');
+  }
+  audSalva = obj;
+  ativarBotoesAgenda();
+}
 
-    // HONORÁRIOS
-    if (c.hon) {
-      if (c.hon.mod === 'avista') {
-        if (c.hon.pago) {
-          var dataRef = c.data;
-          if (modo === 'todos' || pertencePeriodo(dataRef, mes, ano, modo)) {
-            var val = parseMoeda(c.hon.valor);
-            totHon += val;
-            registros.push({ nome:c.nome, tipo:c.tipo, nat:'Honorários', parcela:'À vista', data:dataRef, val:val, com:0, comPct:0 });
-          }
-        }
-      } else {
-        var ps = c.hon.parcelas || [];
-        var vUnit = ps.length > 0 ? parseMoeda(c.hon.valor) / ps.length : 0;
-        ps.forEach(function(p, i) {
-          if (p.pago) {
-            var dataRef = p.data;
-            if (modo === 'todos' || pertencePeriodo(dataRef, mes, ano, modo)) {
-              totHon += vUnit;
-              registros.push({ nome:c.nome, tipo:c.tipo, nat:'Honorários', parcela:(i+1)+'ª parcela', data:dataRef, val:vUnit, com:0, comPct:0 });
-            }
-          }
-        });
-      }
-    }
+function abrirGoogleAgenda() {
+  var a = audSalva;
+  if (!a || !a.data || !a.hora) { toast('Salve a audiencia primeiro', true); return; }
+
+  // Formatar data/hora para Google Agenda (formato: YYYYMMDDTHHMMSS)
+  var dataHora = a.data.replace(/-/g,'') + 'T' + a.hora.replace(':','') + '00';
+  var dur = parseInt(a.duracao||60);
+  var dtFim = new Date(a.data+'T'+a.hora+':00');
+  dtFim.setMinutes(dtFim.getMinutes() + dur);
+  var dtFimStr = dtFim.getFullYear().toString() +
+    String(dtFim.getMonth()+1).padStart(2,'0') +
+    String(dtFim.getDate()).padStart(2,'0') + 'T' +
+    String(dtFim.getHours()).padStart(2,'0') +
+    String(dtFim.getMinutes()).padStart(2,'0') + '00';
+
+  var titulo = encodeURIComponent('[AUDIÊNCIA] ' + a.tipoAud + ' — ' + a.nome);
+  var detalhes = encodeURIComponent(
+    'TIPO: ' + (a.tipo||'') + '\n' +
+    'CLIENTE: ' + (a.nome||'') + '\n' +
+    'PROCESSO: ' + (a.numproc||'não informado') + '\n' +
+    'ASSUNTO: ' + (a.assunto||'não informado') + '\n' +
+    'OBSERVAÇÕES: ' + (a.obs||'não informado') + '\n\n' +
+    'Escritório Débora Constantino — OAB/SP 378.037'
+  );
+  var local = encodeURIComponent(a.local||'');
+
+  // Adicionar convidados fixos
+  var convidados = encodeURIComponent('deboraewenne@gmail.com,documentoprocessoadvocacia@gmail.com');
+
+  var url = 'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+    '&text=' + titulo +
+    '&dates=' + dataHora + '/' + dtFimStr +
+    '&details=' + detalhes +
+    '&location=' + local +
+    '&add=' + convidados;
+
+  window.open(url, '_blank');
+  toast('Google Agenda aberto — confirme e salve o evento!');
+}
+
+function enviarEmailAudiencia() {
+  var a = audSalva;
+  if (!a) { toast('Salve a audiencia primeiro', true); return; }
+
+  var assunto = encodeURIComponent('[AUDIÊNCIA] ' + (a.tipoAud||'Audiência') + ' — ' + (a.nome||'') + ' — ' + fmtData(a.data||''));
+  var corpo = encodeURIComponent(
+    'Bom dia,\n\n' +
+    'Segue a confirmação de audiência cadastrada no sistema:\n\n' +
+    '▸ Cliente: ' + (a.nome||'') + '\n' +
+    '▸ Tipo: ' + (a.tipo||'') + ' — ' + (a.tipoAud||'') + '\n' +
+    '▸ Data: ' + fmtData(a.data||'') + '\n' +
+    '▸ Horário: ' + (a.hora||'') + '\n' +
+    '▸ Local/Vara: ' + (a.local||'') + '\n' +
+    '▸ Processo: ' + (a.numproc||'não informado') + '\n' +
+    '▸ Assunto: ' + (a.assunto||'não informado') + '\n' +
+    '▸ Situação: ' + (a.situacao||'Agendada') + '\n' +
+    (a.obs ? '▸ Obs: ' + a.obs + '\n' : '') +
+    '\nEscritorório Débora Constantino — OAB/SP 378.037'
+  );
+
+  var destinatarios = 'deboraewenne@gmail.com,documentoprocessoadvocacia@gmail.com';
+  var mailtoUrl = 'mailto:' + destinatarios + '?subject=' + assunto + '&body=' + corpo;
+  window.location.href = mailtoUrl;
+  toast('Cliente de e-mail aberto com o convite!');
+}
+
+function renderAudiencias() {
+  var busca = (getVal('au-busca')||'').toLowerCase();
+  var fTipo = getVal('au-filtro-tipo');
+  var fSit = getVal('au-filtro-sit');
+
+  var lista = (AUDIENCIAS||[]).filter(function(a) {
+    var okB = !busca || (a.nome||'').toLowerCase().includes(busca) || (a.local||'').toLowerCase().includes(busca) || (a.numproc||'').toLowerCase().includes(busca);
+    return okB && (!fTipo || a.tipo === fTipo) && (!fSit || a.situacao === fSit);
   });
 
-  registros.sort(function(a,b){ return (b.data||'') > (a.data||'') ? 1 : -1; });
+  lista.sort(function(a,b) {
+    var da = (a.data||'')+(a.hora||'');
+    var db = (b.data||'')+(b.hora||'');
+    return da < db ? -1 : 1;
+  });
 
-  var total = totTaxas + totHon;
-  setTxt('rcb-total', 'R$ ' + fmtVal(total));
-  setTxt('rcb-taxas', 'R$ ' + fmtVal(totTaxas));
-  setTxt('rcb-hon', 'R$ ' + fmtVal(totHon));
-  setTxt('rcb-com', 'R$ ' + fmtVal(totCom));
+  // Cards
+  var hoje = new Date(); hoje.setHours(0,0,0,0);
+  var proximas = 0, adm = 0, jud = 0, realizadas = 0;
+  (AUDIENCIAS||[]).forEach(function(a) {
+    if (a.tipo === 'Administrativo') adm++;
+    else jud++;
+    if (a.situacao === 'Realizada') realizadas++;
+    if (a.situacao === 'Agendada' && a.data) {
+      var d = new Date(a.data+'T00:00:00');
+      var diff = Math.round((d-hoje)/86400000);
+      if (diff >= 0 && diff <= 7) proximas++;
+    }
+  });
+  setTxt('au-tot', (AUDIENCIAS||[]).length);
+  setTxt('au-prox', proximas);
+  setTxt('au-adm', adm);
+  setTxt('au-jud', jud);
+  setTxt('au-real', realizadas);
+  document.getElementById('au-cnt').textContent = lista.length + ' registro' + (lista.length !== 1 ? 's' : '');
 
-  var tbody = document.getElementById('rcb-tbody');
-  if (!registros.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--tw);font-size:12px;">Nenhum pagamento registrado no período selecionado</td></tr>';
+  var sitCores = {'Agendada':'#D4B84A','Realizada':'#7ec492','Cancelada':'var(--rc)','Adiada':'var(--tw)'};
+  var tipoCores = {'Judicial':'var(--vi)','Administrativo':'var(--ch)'};
+  var tbody = document.getElementById('au-tbody');
+
+  if (!lista.length) {
+    tbody.innerHTML = '<tr><td colspan="9"><div class="vazio"><div class="vazio-ic">🏛️</div><div class="vazio-t">Nenhuma audiência cadastrada</div><div class="vazio-s">Clique em "+ Nova Audiência" para cadastrar</div></div></td></tr>';
     return;
   }
 
-  tbody.innerHTML = registros.map(function(r) {
+  tbody.innerHTML = lista.map(function(a) {
+    var d = a.data ? new Date(a.data+'T00:00:00') : null;
+    var diff = d ? Math.round((d-hoje)/86400000) : null;
+    var urgHtml = '';
+    if (a.situacao === 'Agendada' && diff !== null) {
+      if (diff < 0) urgHtml = '<div style="font-size:10px;color:var(--rc);margin-top:2px;">PASSOU</div>';
+      else if (diff === 0) urgHtml = '<div style="font-size:10px;color:#D4B84A;font-weight:700;margin-top:2px;">HOJE</div>';
+      else if (diff <= 3) urgHtml = '<div style="font-size:10px;color:#D4B84A;margin-top:2px;">em '+diff+' dia(s)</div>';
+    }
+    var agendaUrl = '';
+    if (a.data && a.hora) {
+      var dtStr = a.data.replace(/-/g,'')+'T'+a.hora.replace(':','')+'00';
+      var dtFimO = new Date(a.data+'T'+a.hora+':00');
+      dtFimO.setMinutes(dtFimO.getMinutes() + parseInt(a.duracao||60));
+      var dtFimStr2 = dtFimO.getFullYear().toString()+String(dtFimO.getMonth()+1).padStart(2,'0')+String(dtFimO.getDate()).padStart(2,'0')+'T'+String(dtFimO.getHours()).padStart(2,'0')+String(dtFimO.getMinutes()).padStart(2,'0')+'00';
+      var tit2 = encodeURIComponent('[AUDIÊNCIA] '+(a.tipoAud||'')+'—'+a.nome);
+      var loc2 = encodeURIComponent(a.local||'');
+      var conv2 = encodeURIComponent('deboraewenne@gmail.com,documentoprocessoadvocacia@gmail.com');
+      agendaUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE&text='+tit2+'&dates='+dtStr+'/'+dtFimStr2+'&location='+loc2+'&add='+conv2;
+    }
     return '<tr>' +
-      '<td style="font-weight:600;color:var(--tp)">'+esc(r.nome)+'</td>' +
-      '<td><span class="bgt">'+esc(r.tipo||'')+'</span></td>' +
-      '<td style="color:'+(r.nat==='Taxa Adm.'?'var(--do)':'var(--ch)')+'">'+esc(r.nat)+'</td>' +
-      '<td style="color:var(--tw);font-size:11px">'+esc(r.parcela)+'</td>' +
-      '<td style="font-size:11px;color:var(--tw);white-space:nowrap">'+fmtData(r.data)+'</td>' +
-      '<td style="font-weight:600;color:#7ec492;white-space:nowrap">R$ '+fmtVal(r.val)+'</td>' +
-      '<td style="color:'+(r.com>0?'#e89090':'var(--tw)')+'">'+( r.comPct ? r.comPct+'% = R$ '+fmtVal(r.com) : '—')+'</td>' +
-      '<td><button class="btn-ic" title="Exportar para Google Agenda" onclick="exportarPagamentoAgendaId(\''+r.nome+'\',\''+r.nat+'\',\''+r.parcela+'\',\''+r.data+'\','+r.val+','+r.com+','+r.comPct+')">📅</button></td>' +
+      '<td style="font-weight:600;color:var(--tp)">' + esc(a.nome||'') + '<br>' +
+        (a.whats ? '<a href="https://wa.me/55'+a.whats.replace(/\D/g,'')+'" target="_blank" style="font-size:10px;color:var(--ch)">📱 '+esc(a.whats)+'</a> ' : '') +
+        (a.emailCliente ? '<a href="mailto:'+esc(a.emailCliente)+'" style="font-size:10px;color:var(--tw)">✉️ '+esc(a.emailCliente)+'</a>' : '') +
+      '</td>' +
+      '<td style="white-space:nowrap;font-size:11px;"><strong>'+fmtData(a.data||'')+'</strong><br><span style="color:var(--ch)">'+(a.hora||'')+'</span>'+urgHtml+'</td>' +
+      '<td><span style="font-size:11px;font-weight:600;color:'+(tipoCores[a.tipo]||'var(--tw)')+'">'+esc(a.tipo||'')+'</span><br><span style="font-size:10px;color:var(--tw)">'+esc(a.tipoAud||'')+'</span></td>' +
+      '<td style="font-size:11px;color:var(--ch)">'+esc(a.numproc||'—')+'</td>' +
+      '<td style="font-size:11px;color:var(--ts);max-width:180px;overflow:hidden;text-overflow:ellipsis">'+esc(a.local||'')+'</td>' +
+      '<td><span style="font-size:11px;font-weight:600;color:'+(sitCores[a.situacao]||'var(--tw)')+'">'+esc(a.situacao||'')+'</span></td>' +
+      '<td>' +
+        (agendaUrl ? '<a href="'+agendaUrl+'" target="_blank" style="font-size:10px;color:#1a73e8;text-decoration:none;white-space:nowrap;">📅 Google Agenda</a>' : '—') +
+      '</td>' +
+      '<td style="font-size:11px;color:var(--tw);max-width:140px;overflow:hidden;text-overflow:ellipsis">'+esc(a.obs||'')+'</td>' +
+      '<td><div class="acoes">' +
+        '<button class="btn-ic" title="Editar" onclick="abrirModalAud(\''+a.id+'\')">✏️</button>' +
+        '<button class="btn-ic x" title="Excluir" onclick="excluirAud(\''+a.id+'\')">🗑️</button>' +
+      '</div></td>' +
     '</tr>';
-  }).join('') +
-  '<tr style="background:rgba(63,103,73,.1)"><td colspan="5" style="text-align:right;font-size:10px;color:var(--ch);letter-spacing:.5px;">TOTAL RECEBIDO</td><td style="font-weight:600;color:#7ec492">R$ '+fmtVal(total)+'</td><td style="color:#e89090;font-weight:600">R$ '+fmtVal(totCom)+'</td><td></td></tr>';
+  }).join('');
 }
 
-function exportRecebidosCSV() {
-  if (!document.getElementById('rcb-tbody')) return;
-  var h = ['Cliente','Tipo de Ação','Natureza','Parcela','Data Pgto','Valor Recebido','Comissão %','Comissão R$'];
-  var rows = [];
-  var tbody = document.getElementById('rcb-tbody');
-  // Reprocessar dados para CSV
-  var modo = document.getElementById('rcb-modo').value;
-  var mes = parseInt(document.getElementById('rcb-mes').value);
-  var ano = parseInt(document.getElementById('rcb-ano').value);
-  DB.forEach(function(c) {
-    var comPct = parseInt(c.comissaoPct)||0;
-    if (c.taxa) {
-      if (c.taxa.mod==='avista' && c.taxa.pago) {
-        if (modo==='todos'||pertencePeriodo(c.data,mes,ano,modo)) { var v=parseMoeda(c.taxa.valor); rows.push([c.nome,c.tipo||'','Taxa Adm.','À vista',fmtData(c.data),fmtVal(v),comPct+'%',fmtVal(v*comPct/100)]); }
-      } else {
-        var ps=c.taxa.parcelas||[]; var vU=ps.length>0?parseMoeda(c.taxa.valor)/ps.length:0;
-        ps.forEach(function(p,i){ if(p.pago&&(modo==='todos'||pertencePeriodo(p.data,mes,ano,modo))) rows.push([c.nome,c.tipo||'','Taxa Adm.',(i+1)+'ª',fmtData(p.data),fmtVal(vU),comPct+'%',fmtVal(vU*comPct/100)]); });
-      }
-    }
-    if (c.hon) {
-      if (c.hon.mod==='avista' && c.hon.pago) {
-        if (modo==='todos'||pertencePeriodo(c.data,mes,ano,modo)) { var v=parseMoeda(c.hon.valor); rows.push([c.nome,c.tipo||'','Honorários','À vista',fmtData(c.data),fmtVal(v),'0%','0']); }
-      } else {
-        var ps=c.hon.parcelas||[]; var vU=ps.length>0?parseMoeda(c.hon.valor)/ps.length:0;
-        ps.forEach(function(p,i){ if(p.pago&&(modo==='todos'||pertencePeriodo(p.data,mes,ano,modo))) rows.push([c.nome,c.tipo||'','Honorários',(i+1)+'ª',fmtData(p.data),fmtVal(vU),'0%','0']); });
-      }
-    }
+function excluirAud(id) {
+  if (!confirm('Excluir esta audiência?')) return;
+  window._fbDeleteAud(id);
+  toast('Audiência removida');
+}
+
+function atualizarBadgeAudiencias() {
+  var hoje = new Date(); hoje.setHours(0,0,0,0);
+  var proximas = (AUDIENCIAS||[]).filter(function(a) {
+    if (a.situacao !== 'Agendada' || !a.data) return false;
+    var d = new Date(a.data+'T00:00:00');
+    var diff = Math.round((d-hoje)/86400000);
+    return diff >= 0 && diff <= 7;
   });
-  var csv=[h].concat(rows).map(function(r){ return r.map(function(v){ return '"'+(v||'').toString().replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
-  var blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
-  var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download='recebidos.csv'; a.click(); URL.revokeObjectURL(url);
-  toast('✓ CSV exportado');
+  var badge = document.getElementById('badge-aud');
+  if (badge) badge.textContent = proximas.length;
+  if (document.getElementById('pg-audiencias').classList.contains('on')) renderAudiencias();
 }
 
-// ========== GOOGLE AGENDA ==========
-function gerarLinkAgenda(titulo, dataStr, descricao, duracaoMinutos) {
-  // dataStr: YYYY-MM-DD
-  if (!dataStr) return null;
-  var d = new Date(dataStr + 'T09:00:00');
-  var fim = new Date(dataStr + 'T09:00:00');
-  fim.setMinutes(fim.getMinutes() + (duracaoMinutos || 60));
-  function fmt(dt) {
-    return dt.getUTCFullYear() +
-      String(dt.getUTCMonth()+1).padStart(2,'0') +
-      String(dt.getUTCDate()).padStart(2,'0') + 'T' +
-      String(dt.getUTCHours()).padStart(2,'0') +
-      String(dt.getUTCMinutes()).padStart(2,'0') + '00Z';
-  }
-  var params = new URLSearchParams({
-    action: 'TEMPLATE',
-    text: titulo,
-    dates: fmt(d) + '/' + fmt(fim),
-    details: descricao || '',
-    sf: 'true',
-    output: 'xml'
+function exportAudCSV() {
+  var h = ['Cliente','WhatsApp','E-mail','Tipo Processo','Tipo Audiência','Data','Hora','Duração','Processo','Local','Situação','Assunto','Obs'];
+  var rows = (AUDIENCIAS||[]).map(function(a) {
+    return [a.nome, a.whats, a.emailCliente, a.tipo, a.tipoAud, fmtData(a.data), a.hora, a.duracao+'min', a.numproc, a.local, a.situacao, a.assunto, a.obs];
   });
-  return 'https://calendar.google.com/calendar/render?' + params.toString();
-}
-
-function adicionarPrazoAgenda(id) {
-  var p = (PRAZOS||[]).find(function(x){ return x.id===id; });
-  if (!p) return;
-  var data = p.datafinal || p.pubdata;
-  var titulo = '⏱️ PRAZO: ' + (p.cliente||'') + ' — ' + (p.descr||'');
-  var desc = 'Cliente: '+(p.cliente||'')+
-    '\nProcesso: '+(p.proc||'')+'\nTipo: '+(p.tipoprazo||'')+
-    '\nPublicação: '+fmtData(p.pubdata)+'\nPrazo: '+fmtData(p.datafinal)+
-    '\nObs: '+(p.obs||'')+'\n\nGerado pelo Sistema Débora Constantino';
-  var link = gerarLinkAgenda(titulo, data, desc, 60);
-  if (link) window.open(link, '_blank');
-  else toast('Prazo sem data definida', true);
-}
-
-function adicionarAtendAgenda() {
-  var nome = getVal('at-nome');
-  var dataAtend = getVal('at-data');
-  var prazoDev = getVal('at-prazo-dev');
-  var assunto = getVal('at-assunto');
-  var tipo = getVal('at-tipo');
-
-  if (!nome) { toast('Informe o nome do cliente antes de exportar', true); return; }
-
-  // Evento de atendimento
-  if (dataAtend) {
-    var tituloAtend = '📝 ' + tipo + ': ' + nome;
-    var descAtend = 'Cliente: '+nome+'\nTipo: '+tipo+'\nAssunto: '+(assunto||'')+'\n\nGerado pelo Sistema Débora Constantino';
-    var linkAtend = gerarLinkAgenda(tituloAtend, dataAtend, descAtend, 60);
-    if (linkAtend) window.open(linkAtend, '_blank');
-  }
-
-  // Evento de devolutiva (se preenchido)
-  if (prazoDev) {
-    var tituloDev = '📬 DEVOLUTIVA: ' + nome + ' — ' + (assunto||tipo);
-    var descDev = 'Cliente: '+nome+'\nDevolução referente a: '+(assunto||tipo)+'\nData do atendimento: '+fmtData(dataAtend)+'\n\nGerado pelo Sistema Débora Constantino';
-    var linkDev = gerarLinkAgenda(tituloDev, prazoDev, descDev, 30);
-    if (linkDev) window.open(linkDev, '_blank');
-    toast('✓ Eventos exportados para o Google Agenda');
-  } else if (dataAtend) {
-    toast('✓ Atendimento exportado para o Google Agenda');
-  } else {
-    toast('Informe ao menos a data do atendimento', true);
-  }
-}
-
-function exportarPagamentoAgendaId(nome, nat, parcela, data, val, com, comPct) {
-  var r = { nome:nome, nat:nat, parcela:parcela, data:data, val:val, com:com, comPct:comPct };
-  exportarPagamentoAgenda(r);
-}
-
-function exportarPagamentoAgenda(r) {
-  if (!r || !r.data) { toast('Pagamento sem data', true); return; }
-  var titulo = '💰 RECEBIDO: ' + (r.nome||'') + ' — ' + (r.nat||'') + ' ' + (r.parcela||'');
-  var desc = 'Cliente: '+(r.nome||'')+'\nNatureza: '+(r.nat||'')+'\nParcela: '+(r.parcela||'')+'\nValor: R$ '+fmtVal(r.val||0)+(r.com>0?'\nComissão devida: R$ '+fmtVal(r.com):'')+'\n\nGerado pelo Sistema Débora Constantino';
-  var link = gerarLinkAgenda(titulo, r.data, desc, 30);
-  if (link) window.open(link, '_blank');
-}
-
-// ========== FILTRO COMISSÃO POR MÊS (na aba Relatórios - já usa filtro existente) ==========
-// A aba de Relatórios Financeiros já possui filtro mensal que inclui comissões.
-// Função auxiliar para acesso rápido via card de comissão:
-function filtrarComissoesMes(mes, ano) {
-  document.getElementById('rel-modo').value = 'mes';
-  document.getElementById('rel-mes').value = mes;
-  document.getElementById('rel-ano').value = ano;
-  toggleRelModo();
-  renderRelatorios();
-  mudarAba('relatorios', document.querySelector('.aba[onclick*="relatorios"]'));
+  var csv = [h].concat(rows).map(function(r){ return r.map(function(v){ return '"'+(v||'').toString().replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
+  var blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a'); a.href=url; a.download='audiencias.csv'; a.click(); URL.revokeObjectURL(url);
+  toast('CSV exportado');
 }
 
 // ========== INIT ==========
