@@ -3116,7 +3116,7 @@ function renderRecebidos() {
       '<td style="font-size:11px;color:var(--tw);white-space:nowrap">'+fmtData(r.data)+'</td>' +
       '<td style="font-weight:600;color:#7ec492;white-space:nowrap">R$ '+fmtVal(r.val)+'</td>' +
       '<td style="color:'+(r.com>0?'#e89090':'var(--tw)')+'">'+( r.comPct ? r.comPct+'% = R$ '+fmtVal(r.com) : '—')+'</td>' +
-      '<td><button class="btn-ic" title="Exportar para Google Agenda" onclick="exportarPagamentoAgenda('+JSON.stringify(r).replace(/'/g,\'\\'\')+')">📅</button></td>' +
+      '<td><button class="btn-ic" title="Exportar para Google Agenda" onclick="exportarPagamentoAgendaId(\''+r.nome+'\',\''+r.nat+'\',\''+r.parcela+'\',\''+r.data+'\','+r.val+','+r.com+','+r.comPct+')">📅</button></td>' +
     '</tr>';
   }).join('') +
   '<tr style="background:rgba(63,103,73,.1)"><td colspan="5" style="text-align:right;font-size:10px;color:var(--ch);letter-spacing:.5px;">TOTAL RECEBIDO</td><td style="font-weight:600;color:#7ec492">R$ '+fmtVal(total)+'</td><td style="color:#e89090;font-weight:600">R$ '+fmtVal(totCom)+'</td><td></td></tr>';
@@ -3224,6 +3224,11 @@ function adicionarAtendAgenda() {
   } else {
     toast('Informe ao menos a data do atendimento', true);
   }
+}
+
+function exportarPagamentoAgendaId(nome, nat, parcela, data, val, com, comPct) {
+  var r = { nome:nome, nat:nat, parcela:parcela, data:data, val:val, com:com, comPct:comPct };
+  exportarPagamentoAgenda(r);
 }
 
 function exportarPagamentoAgenda(r) {
