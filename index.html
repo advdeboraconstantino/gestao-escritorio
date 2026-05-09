@@ -1622,7 +1622,7 @@ function buildProcessoCard(p, idx) {
     '<div class="chk-row"><input type="checkbox" id="'+pref+'ck-taxa" '+(p.taxa?'checked':'')+' onchange="toggleProcTaxa('+idx+')"><label for="'+pref+'ck-taxa">Taxa administrativa foi cobrada</label></div>' +
     '<div id="'+pref+'grp-taxa" style="display:'+(p.taxa?'block':'none')+';">' +
       '<div class="gr gr3" style="margin-bottom:8px;">' +
-        '<div class="fg"><label class="fl">Valor (R$)</label><input class="fi" id="'+pref+'taxa-val" value="'+esc((p.taxa&&p.taxa.valor)||'')+'" placeholder="0,00" oninput="fmtMoeda(this)"></div>' +
+        '<div class="fg"><label class="fl">Valor (R$)</label><input class="fi" id="'+pref+'taxa-val" value="'+esc((p.taxa&&p.taxa.valor)||'')+'" placeholder="0,00" oninput="fmtMoeda(this);calcComissaoP('+idx+')"></div>' +
         '<div class="fg"><label class="fl">Modalidade</label>' +
           '<select class="fi" id="'+pref+'taxa-mod" onchange="toggleProcTaxaParc('+idx+')">' +
             '<option value="avista"'+((!p.taxa||p.taxa.mod==='avista')?' selected':'')+'>À vista</option>' +
@@ -1630,7 +1630,7 @@ function buildProcessoCard(p, idx) {
           '</select>' +
         '</div>' +
         '<div class="fg"><label class="fl">Situação</label>' +
-          '<select class="fi" id="'+pref+'taxa-sit">' +
+          '<select class="fi" id="'+pref+'taxa-sit" onchange="calcComissaoP('+idx+')">' +
             '<option value="nao"'+((p.taxa&&p.taxa.pago)?'':' selected')+'>Não paga</option>' +
             '<option value="sim"'+((p.taxa&&p.taxa.pago)?' selected':'')+'>Paga</option>' +
           '</select>' +
@@ -1702,12 +1702,16 @@ function buildProcessoCard(p, idx) {
     '</div>' +
     '<div class="gr gr2" style="margin-bottom:8px;">' +
       '<div class="fg"><label class="fl">Comissão Setor Comercial</label>' +
-        '<select class="fi" id="'+pref+'comissao-pct">' +
+        '<select class="fi" id="'+pref+'comissao-pct" onchange="calcComissaoP('+idx+')">' +
           '<option value=""'+(p.comissaoPct===''?' selected':'')+'>Sem comissão</option>' +
           ['20','30','40','50'].map(function(v){
             return '<option value="'+v+'"'+(p.comissaoPct===v?' selected':'')+'>'+v+'%</option>';
           }).join('') +
         '</select>' +
+      '</div>' +
+      '<div class="fg">' +
+        '<label class="fl">Comissão Calculada</label>' +
+        '<div class="fi" id="'+pref+'comissao-calc" style="background:rgba(0,0,0,.2);color:var(--ch);cursor:default;display:flex;align-items:center;font-weight:600;">R$ 0,00</div>' +
       '</div>' +
     '</div>' +
     '</div>'; // fim proc-item-body
@@ -1720,7 +1724,9 @@ function buildProcessoCard(p, idx) {
     if (p.hon && p.hon.mod === 'parcelado' && p.hon.parcelas && p.hon.parcelas.length) {
       carregarParcP(pref+'hon', p.hon.parcelas, p.hon.valor);
     }
-  }, 50);
+    // Recalcular comissão ao abrir o modal com dados já salvos
+    calcComissaoP(idx);
+  }, 80);
 
   return wrap;
 }
@@ -1738,6 +1744,7 @@ function toggleProcTaxa(idx) {
   var pref = 'p'+idx+'-';
   var ck = document.getElementById(pref+'ck-taxa');
   document.getElementById(pref+'grp-taxa').style.display = ck.checked ? 'block' : 'none';
+  calcComissaoP(idx);
 }
 function toggleProcHon(idx) {
   var pref = 'p'+idx+'-';
@@ -1784,6 +1791,11 @@ function gerarParcP(prefTipo, n, valTotal) {
         '<input type="checkbox" id="'+prefTipo+'-pg-'+i+'" '+(ex.pago?'checked':'')+' onchange="document.getElementById(\''+prefTipo+'-pg-wrap-'+i+'\').className=\'parc-pg\'+(this.checked?\' pago\':\'\')">' +
         '<label for="'+prefTipo+'-pg-'+i+'">Pago</label>' +
       '</div>';
+    // Trigger de recálculo de comissão ao marcar parcela como paga
+    (function(r, pt) {
+      var cb = r.querySelector('input[type=checkbox]');
+      if (cb) cb.addEventListener('change', function() { calcComissaoPorPref(pt); });
+    })(row, prefTipo);
     box.appendChild(row);
   }
 }
@@ -1808,6 +1820,11 @@ function carregarParcP(prefTipo, parcelas, valorTotal) {
         '<input type="checkbox" id="'+prefTipo+'-pg-'+i+'" '+(p.pago?'checked':'')+' onchange="document.getElementById(\''+prefTipo+'-pg-wrap-'+i+'\').className=\'parc-pg\'+(this.checked?\' pago\':\'\')">' +
         '<label for="'+prefTipo+'-pg-'+i+'">Pago</label>' +
       '</div>';
+    // Trigger de recálculo de comissão ao marcar parcela como paga
+    (function(r, pt) {
+      var cb = r.querySelector('input[type=checkbox]');
+      if (cb) cb.addEventListener('change', function() { calcComissaoPorPref(pt); });
+    })(row, prefTipo);
     box.appendChild(row);
   }
 }
@@ -1893,7 +1910,52 @@ function toggleHon(){}
 function toggleTaxaParc(){}
 function toggleHonParc(){}
 function toggleExito(){}
-function calcComissao(){}
+function calcComissao(){} // stub legado
+function calcComissaoPorPref(prefTipo) {
+  // prefTipo é algo como "p0-taxa" — extrair o idx
+  var m = prefTipo.match(/^p(\d+)-/);
+  if (m) calcComissaoP(parseInt(m[1]));
+} — use calcComissaoP(idx) para novos cards
+function calcComissaoP(idx) {
+  var pref = 'p' + idx + '-';
+  var pctEl = document.getElementById(pref + 'comissao-pct');
+  var calcEl = document.getElementById(pref + 'comissao-calc');
+  if (!pctEl || !calcEl) return;
+  var pct = parseInt(pctEl.value) || 0;
+  if (!pct) { calcEl.textContent = 'R$ 0,00'; return; }
+  // Base de cálculo: soma das taxas efetivamente pagas neste processo
+  var base = 0;
+  var ckTaxa = document.getElementById(pref + 'ck-taxa');
+  if (ckTaxa && ckTaxa.checked) {
+    var mod = document.getElementById(pref + 'taxa-mod');
+    var sit = document.getElementById(pref + 'taxa-sit');
+    var valEl = document.getElementById(pref + 'taxa-val');
+    if (mod && sit && valEl) {
+      var valTotal = parseMoeda(valEl.value);
+      if (mod.value === 'avista') {
+        if (sit.value === 'sim') base += valTotal;
+      } else {
+        // Parcelado: somar parcelas marcadas como pagas
+        var i = 0;
+        while (true) {
+          var pg = document.getElementById(pref + 'taxa-pg-' + i);
+          var vl = document.getElementById(pref + 'taxa-vl-' + i);
+          if (!pg) break;
+          if (pg.checked) {
+            // Usar valor individual da parcela se existir, senão rateio
+            var npEl = document.getElementById(pref + 'taxa-np');
+            var np = npEl ? (parseInt(npEl.value) || 0) : 0;
+            var vUnit = vl ? parseMoeda(vl.value) : (np > 0 ? valTotal / np : 0);
+            base += vUnit;
+          }
+          i++;
+        }
+      }
+    }
+  }
+  var comissao = base * pct / 100;
+  calcEl.textContent = 'R$ ' + fmtVal(comissao);
+}
 function gerarParc(){}
 function carregarParc(){}
 function coletarParc(){ return []; }
