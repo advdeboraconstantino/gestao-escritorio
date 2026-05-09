@@ -1583,7 +1583,7 @@ function buildProcessoCard(p, idx) {
         '<span style="font-size:16px;color:var(--tw)" id="proc-arrow-'+idx+'">▾</span>' +
       '</div>' +
     '</div>' +
-    '<div class="proc-item-body" id="proc-body-'+idx+'">' +
+    '<div class="proc-item-body" id="proc-body-'+idx+'" style="display:block;">' +
 
     // DADOS GERAIS
     '<div class="sec" style="margin-top:0;">Dados do Processo</div>' +
@@ -2103,10 +2103,35 @@ function abrirDetalhe(id) {
         '<div class="pc-it"><div class="lbl">Valor</div><div class="val">R$ '+(p.valor||'0,00')+'</div></div>' +
         (p.numproc?'<div class="pc-it"><div class="lbl">Nº Processo</div><div class="val">'+esc(p.numproc)+(esajUrl?' <a href="'+esajUrl+'" target="_blank" style="color:#1a73e8;font-size:10px;">🔍 ESAJ</a>':'')+'</div></div>':'') +
         (p.fase?'<div class="pc-it"><div class="lbl">Fase</div><div class="val">'+esc(p.fase)+'</div></div>':'') +
-        (p.pagamento?'<div class="pc-it"><div class="lbl">Honorários</div><div class="val">'+esc(p.pagamento)+(p.exitoPct?' — '+p.exitoPct+'%':'')+'</div></div>':'') +
+        (p.pagamento?'<div class="pc-it"><div class="lbl">Honorários do Processo</div><div class="val">'+esc(p.pagamento)+(p.exitoPct?' — '+p.exitoPct+'%':'')+'</div></div>':'') +
         (p.protocolador?'<div class="pc-it"><div class="lbl">📋 Protocolado por</div><div class="val" style="color:var(--ch);font-weight:600;">'+esc(p.protocolador)+(p.dataProtocolo?' em '+fmtData(p.dataProtocolo):'')+'</div></div>':'') +
-        (p.taxa?'<div class="pc-it"><div class="lbl">Taxa Adm.</div><div class="val">R$ '+esc(p.taxa.valor||'0')+' — '+(p.taxa.pago?'<span style="color:#7ec492">Paga</span>':'<span style="color:var(--ch)">Pendente</span>')+'</div></div>':'') +
-        (p.hon?'<div class="pc-it"><div class="lbl">Honorários Iniciais</div><div class="val">R$ '+esc(p.hon.valor||'0')+' — '+(p.hon.pago?'<span style="color:#7ec492">Pago</span>':'<span style="color:var(--ch)">Pendente</span>')+'</div></div>':'') +
+        (function() {
+          if (!p.taxa) return '';
+          var html = '<div class="pc-it" style="grid-column:1/-1"><div class="lbl">💳 Taxa Administrativa</div><div class="val">';
+          html += 'R$ '+esc(p.taxa.valor||'0')+' — '+(p.taxa.mod==='parcelado'?'Parcelado':'À vista')+' — ';
+          if (p.taxa.mod==='parcelado') {
+            var ps=p.taxa.parcelas||[]; var pagas=ps.filter(function(x){return x.pago;}).length;
+            html += '<span style="color:'+(pagas===ps.length?'#7ec492':'var(--ch)')+'">'+pagas+'/'+ps.length+' parcelas pagas</span>';
+            html += '<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;">';
+            ps.forEach(function(pa,i){ html += '<span style="font-size:9px;padding:2px 6px;border-radius:4px;background:'+(pa.pago?'rgba(126,196,146,.2)':'rgba(212,184,74,.15)')+';color:'+(pa.pago?'#7ec492':'#D4B84A')+'">'+(i+1)+'ª '+(pa.valorParcela||'')+(pa.data?' '+fmtData(pa.data):'')+(pa.pago?' ✓':'')+'</span>'; });
+            html += '</div>';
+          } else { html += (p.taxa.pago?'<span style="color:#7ec492">Paga ✓</span>':'<span style="color:var(--ch)">Pendente</span>'); }
+          return html + '</div></div>';
+        })() +
+        (function() {
+          if (!p.hon) return '';
+          var html = '<div class="pc-it" style="grid-column:1/-1"><div class="lbl">⚖️ Honorários Iniciais</div><div class="val">';
+          html += 'R$ '+esc(p.hon.valor||'0')+' — '+(p.hon.mod==='parcelado'?'Parcelado':'À vista')+' — ';
+          if (p.hon.mod==='parcelado') {
+            var ps=p.hon.parcelas||[]; var pagas=ps.filter(function(x){return x.pago;}).length;
+            html += '<span style="color:'+(pagas===ps.length?'#7ec492':'var(--ch)')+'">'+pagas+'/'+ps.length+' parcelas pagas</span>';
+            html += '<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;">';
+            ps.forEach(function(pa,i){ html += '<span style="font-size:9px;padding:2px 6px;border-radius:4px;background:'+(pa.pago?'rgba(126,196,146,.2)':'rgba(212,184,74,.15)')+';color:'+(pa.pago?'#7ec492':'#D4B84A')+'">'+(i+1)+'ª '+(pa.valorParcela||'')+(pa.data?' '+fmtData(pa.data):'')+(pa.pago?' ✓':'')+'</span>'; });
+            html += '</div>';
+          } else { html += (p.hon.pago?'<span style="color:#7ec492">Pago ✓</span>':'<span style="color:var(--ch)">Pendente</span>'); }
+          return html + '</div></div>';
+        })() +
+        (p.comissaoPct?'<div class="pc-it"><div class="lbl">🏷️ Comissão Comercial</div><div class="val" style="color:var(--rc)">'+p.comissaoPct+'% sobre taxas pagas</div></div>':'') +
         (p.obs?'<div class="pc-it" style="grid-column:1/-1"><div class="lbl">Obs.</div><div class="val">'+esc(p.obs)+'</div></div>':'') +
       '</div></div>';
   });
