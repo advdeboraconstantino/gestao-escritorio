@@ -1915,7 +1915,7 @@ function calcComissaoPorPref(prefTipo) {
   // prefTipo é algo como "p0-taxa" — extrair o idx
   var m = prefTipo.match(/^p(\d+)-/);
   if (m) calcComissaoP(parseInt(m[1]));
-} — use calcComissaoP(idx) para novos cards
+}
 function calcComissaoP(idx) {
   var pref = 'p' + idx + '-';
   var pctEl = document.getElementById(pref + 'comissao-pct');
