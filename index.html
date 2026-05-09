@@ -449,7 +449,8 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
 <!-- ABAS -->
 <nav class="abas">
   <button class="aba on" onclick="mudarAba('clientes',this)">⚖️ Clientes &amp; Processos</button>
-  <button class="aba" onclick="mudarAba('recebimentos',this)">💰 Previsão de Recebimentos</button>
+  <button class="aba" onclick="mudarAba('recebimentos',this)">💰 A Receber</button>
+  <button class="aba" onclick="mudarAba('recebidos',this)">✅ Recebidos</button>
   <button class="aba" onclick="mudarAba('prazos',this)">⏱️ Prazos &amp; Intimações <span class="abadge" id="badge-prazos">0</span></button>
   <button class="aba" onclick="mudarAba('pad',this)">📁 PAD</button>
   <button class="aba" onclick="mudarAba('atendimentos',this)">📝 Atendimentos</button>
@@ -508,8 +509,13 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
   </div>
 </div>
 
-<!-- ===== PÁGINA: RECEBIMENTOS ===== -->
+<!-- ===== PÁGINA: A RECEBER ===== -->
 <div class="pg" id="pg-recebimentos">
+  <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-bottom:18px;">
+    <div class="card"><div class="card-l">Vence em 7 dias</div><div class="card-v" id="rec-v7" style="color:#D4B84A">R$ 0</div><div class="card-s">a receber</div></div>
+    <div class="card"><div class="card-l">Vence em 30 dias</div><div class="card-v" id="rec-v30" style="color:var(--ch)">R$ 0</div><div class="card-s">a receber</div></div>
+    <div class="card"><div class="card-l">Total em Aberto</div><div class="card-v" id="rec-vtot" style="color:var(--rc)">R$ 0</div><div class="card-s">todas as parcelas</div></div>
+  </div>
   <div class="rec-sec">
     <div class="rec-tit">📅 Vencimentos nos próximos 7 dias</div>
     <div class="tbl-box"><div class="tbl-sc"><table>
@@ -529,6 +535,42 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
     <div class="tbl-box"><div class="tbl-sc"><table>
       <thead><tr><th>Cliente</th><th>Tipo</th><th>Natureza</th><th>Parcela</th><th>Vencimento</th><th>Valor</th><th>Situação</th></tr></thead>
       <tbody id="recAll"></tbody>
+    </table></div></div>
+  </div>
+</div>
+
+<!-- ===== PÁGINA: RECEBIDOS ===== -->
+<div class="pg" id="pg-recebidos">
+  <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-bottom:18px;">
+    <div class="card"><div class="card-l">Total Recebido</div><div class="card-v" id="rcb-total" style="color:#7ec492">R$ 0</div><div class="card-s">no período filtrado</div></div>
+    <div class="card"><div class="card-l">Taxas Recebidas</div><div class="card-v" id="rcb-taxa" style="color:var(--ch)">R$ 0</div><div class="card-s">administrativas</div></div>
+    <div class="card"><div class="card-l">Honorários Recebidos</div><div class="card-v" id="rcb-hon" style="color:var(--do)">R$ 0</div><div class="card-s">iniciais</div></div>
+    <div class="card"><div class="card-l">Comissões Geradas</div><div class="card-v" id="rcb-com" style="color:var(--rc)">R$ 0</div><div class="card-s">setor comercial</div></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--fs);border:1px solid var(--bd);border-radius:8px;padding:12px 16px;margin-bottom:18px;">
+    <label style="font-size:10px;color:var(--ch);text-transform:uppercase;letter-spacing:.8px;font-weight:600;">Período</label>
+    <select class="sel" id="rcb-modo" onchange="toggleRcbModo()">
+      <option value="mes">Mensal</option>
+      <option value="ano">Anual</option>
+      <option value="tudo">Tudo</option>
+    </select>
+    <div id="rcb-grp-mes" style="display:flex;gap:8px;align-items:center;">
+      <select class="sel" id="rcb-mes">
+        <option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option>
+        <option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option>
+        <option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option>
+        <option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option>
+      </select>
+    </div>
+    <select class="sel" id="rcb-ano"></select>
+    <button class="btn-v" onclick="renderRecebidos()" style="padding:7px 16px;font-size:12px;">🔍 Filtrar</button>
+    <button class="btn-o" onclick="exportRecebidosCSV()">⬇ CSV</button>
+  </div>
+  <div class="rec-sec">
+    <div class="rec-tit">✅ Pagamentos Confirmados</div>
+    <div class="tbl-box"><div class="tbl-sc"><table>
+      <thead><tr><th>Cliente</th><th>Tipo de Ação</th><th>Natureza</th><th>Parcela</th><th>Data do Pagto</th><th>Valor Recebido</th><th>Comissão Devida</th><th>Agenda</th></tr></thead>
+      <tbody id="rcb-tbody"></tbody>
     </table></div></div>
   </div>
 </div>
@@ -699,8 +741,8 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
     <div class="tbl-bar"><div class="tbl-tit">Atendimentos sem Processo</div><div class="tbl-cnt" id="at-cnt">0 registros</div></div>
     <div class="tbl-sc"><table>
       <thead><tr>
-        <th>Cliente</th><th>Data</th><th>Tipo</th><th>Situação</th>
-        <th>Localização dos Docs</th><th>Detalhe</th><th>Obs.</th><th>Ações</th>
+        <th>Cliente</th><th>Data</th><th>Devolutiva</th><th>Tipo</th><th>Situação</th>
+        <th>Comercial</th><th>Localização dos Docs</th><th>Obs.</th><th>Ações</th>
       </tr></thead>
       <tbody id="at-tbody"></tbody>
     </table></div>
@@ -719,6 +761,12 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
       <div class="gr gr2" style="margin-bottom:13px;">
         <div class="fg"><label class="fl">Nome do Cliente *</label><input class="fi" id="at-nome" placeholder="Nome completo"></div>
         <div class="fg"><label class="fl">Data do Atendimento *</label><input type="date" class="fi" id="at-data"></div>
+      </div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Prazo para Devolutiva ao Cliente</label><input type="date" class="fi" id="at-devolutiva"></div>
+        <div class="fg" style="display:flex;align-items:flex-end;gap:6px;">
+          <button type="button" class="btn-o" onclick="agendarDevolutiva()" id="btn-at-devolutiva-agenda" style="font-size:11px;padding:9px 12px;white-space:nowrap;">📅 Adicionar ao Google Agenda</button>
+        </div>
       </div>
       <div class="gr gr2" style="margin-bottom:13px;">
         <div class="fg"><label class="fl">Tipo *</label>
@@ -759,7 +807,11 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
         <div class="fg"><label class="fl">WhatsApp do Cliente</label><input class="fi" id="at-whats" placeholder="(12) 99999-9999" oninput="fmtTel(this)"></div>
         <div class="fg"><label class="fl">E-mail do Cliente</label><input type="email" class="fi" id="at-email" placeholder="cliente@email.com"></div>
       </div>
-      <div class="gr" style="margin-bottom:13px;">
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg">
+          <label class="fl">🤝 Responsável Comercial (quem fechou)</label>
+          <input class="fi" id="at-comercial" list="comercial-list" placeholder="Nome de quem captou / fechou">
+        </div>
         <div class="fg"><label class="fl">Observações</label><input class="fi" id="at-obs" placeholder="Notas adicionais"></div>
       </div>
       <div style="background:rgba(63,103,73,.08);border:1px solid rgba(63,103,73,.25);border-radius:8px;padding:14px 16px;margin-top:6px;">
@@ -1199,6 +1251,17 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
         <div class="fg"><label class="fl">Órgão / Repartição</label><input class="fi" id="f-orgao" placeholder="Ex.: SEDUC SP, PMESP, Prefeitura..."></div>
         <div class="fg"><label class="fl">Observações Gerais</label><input class="fi" id="f-obs-geral" placeholder="Notas sobre o cliente"></div>
       </div>
+      <div class="gr gr2">
+        <div class="fg">
+          <label class="fl">🤝 Responsável Comercial (quem fechou o contrato)</label>
+          <input class="fi" id="f-comercial" list="comercial-list" placeholder="Nome de quem captou o cliente">
+          <datalist id="comercial-list">
+            <option value="Débora Constantino">
+            <option value="Equipe Comercial">
+          </datalist>
+        </div>
+        <div class="fg"><label class="fl">Data do Fechamento Comercial</label><input type="date" class="fi" id="f-data-comercial"></div>
+      </div>
       <div style="margin-top:14px;padding:12px 14px;background:rgba(63,103,73,.07);border:1px solid rgba(63,103,73,.2);border-radius:7px;font-size:12px;color:var(--ts);line-height:1.6;">
         💡 <strong style="color:var(--ch)">Cliente com múltiplos processos?</strong> Cadastre os dados pessoais aqui e adicione quantos processos quiser na aba <strong>⚖️ Processos</strong>. Cada processo tem seus próprios dados financeiros, contrato e número.
       </div>
@@ -1350,6 +1413,7 @@ function mudarAba(id, btn) {
   document.getElementById('pg-'+id).classList.add('on');
   btn.classList.add('on');
   if (id === 'recebimentos') renderRecebimentos();
+  if (id === 'recebidos') iniciarRecebidos();
   if (id === 'alertas') renderAlertasFull();
   if (id === 'relatorios') iniciarRelatorios();
   if (id === 'prazos') renderPrazos();
@@ -1366,6 +1430,8 @@ function abrirModal(id) {
   editId = id;
   moAba(0);
   processosEdicao = [];
+  // Popular datalist de comerciais com nomes já usados
+  popularListaComercial();
 
   if (id !== null) {
     var c = DB.find(function(x){ return x.id === id; });
@@ -1378,6 +1444,8 @@ function abrirModal(id) {
     setVal('f-whats', c.whats||'');
     setVal('f-orgao', c.orgao||'');
     setVal('f-obs-geral', c.obsGeral||c.obs||'');
+    setVal('f-comercial', c.comercial||'');
+    setVal('f-data-comercial', c.dataComercial||'');
     // Carregar processos: novo formato (array) ou legado (campo único)
     if (c.processos && c.processos.length) {
       processosEdicao = JSON.parse(JSON.stringify(c.processos));
@@ -1435,14 +1503,16 @@ function coletarProcessosDoDOM() {
   // Sincroniza processosEdicao com os valores atuais dos campos
   processosEdicao.forEach(function(p, idx) {
     var pref = 'p'+idx+'-';
-    p.tipo      = getVal(pref+'tipo');
-    p.data      = getVal(pref+'data');
-    p.status    = getVal(pref+'status');
-    p.valor     = getVal(pref+'valor');
-    p.numproc   = getVal(pref+'numproc');
-    p.fase      = getVal(pref+'fase');
-    p.pagamento = getVal(pref+'pagamento');
-    p.obs       = getVal(pref+'obs');
+    p.tipo          = getVal(pref+'tipo');
+    p.data          = getVal(pref+'data');
+    p.status        = getVal(pref+'status');
+    p.valor         = getVal(pref+'valor');
+    p.numproc       = getVal(pref+'numproc');
+    p.fase          = getVal(pref+'fase');
+    p.protocolador  = getVal(pref+'protocolador');
+    p.dataProtocolo = getVal(pref+'dataProtocolo');
+    p.pagamento     = getVal(pref+'pagamento');
+    p.obs           = getVal(pref+'obs');
     var exitoEl = document.getElementById(pref+'exito-pct');
     var customEl = document.getElementById(pref+'exito-custom');
     p.exitoPct  = (exitoEl && exitoEl.value === 'outro') ? (customEl ? customEl.value : '') : (exitoEl ? exitoEl.value : '');
@@ -1539,7 +1609,11 @@ function buildProcessoCard(p, idx) {
         '<input class="fi" id="'+pref+'fase" list="fases-list" value="'+esc(p.fase||'')+'" placeholder="Ex.: Petição Inicial">' +
       '</div>' +
     '</div>' +
-    '<div class="gr" style="margin-bottom:10px;">' +
+    '<div class="gr gr3" style="margin-bottom:10px;">' +
+      '<div class="fg"><label class="fl">📋 Quem protocolou</label>' +
+        '<input class="fi" id="'+pref+'protocolador" list="comercial-list" value="'+esc(p.protocolador||'')+'" placeholder="Nome de quem protocolou">' +
+      '</div>' +
+      '<div class="fg"><label class="fl">📅 Data de Protocolo</label><input type="date" class="fi" id="'+pref+'dataProtocolo" value="'+(p.dataProtocolo||'')+'"></div>' +
       '<div class="fg"><label class="fl">Observações deste processo</label><input class="fi" id="'+pref+'obs" value="'+esc(p.obs||'')+'" placeholder="Notas adicionais"></div>' +
     '</div>' +
 
@@ -1751,6 +1825,7 @@ function limparForm() {
   setVal('f-nome',''); setVal('f-cpf','');
   setVal('f-email',''); setVal('f-whats','');
   setVal('f-orgao',''); setVal('f-obs-geral','');
+  setVal('f-comercial',''); setVal('f-data-comercial','');
   processosEdicao = [];
   renderProcessosLista();
 }
@@ -1782,6 +1857,8 @@ function salvar() {
     whats: getVal('f-whats'),
     orgao: getVal('f-orgao'),
     obsGeral: getVal('f-obs-geral'),
+    comercial: getVal('f-comercial'),
+    dataComercial: getVal('f-data-comercial'),
     processos: processosEdicao,
     // Campos legado para compatibilidade com relatórios e alertas
     tipo: processosEdicao[0].tipo,
@@ -1889,6 +1966,7 @@ function renderTabela() {
           (proc.fase ? '<div style="font-size:9px;color:var(--tw);">'+esc(proc.fase)+'</div>' : '') +
           '<span class="bgs '+(proc.status==='Protocolado'?'sp':'sn')+'" style="font-size:9px;padding:1px 5px;">'+esc(proc.status||'—')+'</span>' +
           (esajUrl ? ' <a href="'+esajUrl+'" target="_blank" style="font-size:9px;color:#1a73e8;text-decoration:none;">🔍 ESAJ</a>' : '') +
+          (proc.protocolador ? '<div style="font-size:9px;color:var(--ch);margin-top:2px;">📋 Prot.: '+esc(proc.protocolador)+(proc.dataProtocolo?' em '+fmtData(proc.dataProtocolo):'')+'</div>' : '') +
         '</div>';
       });
 
@@ -1929,6 +2007,7 @@ function renderTabela() {
         '<td class="td-nm">' +
           '<span style="cursor:pointer;text-decoration:underline dotted;color:var(--ch)" onclick="abrirDetalhe(\''+c.id+'\')">'+esc(c.nome)+'</span>' +
           (c.orgao ? '<span class="sub">'+esc(c.orgao)+'</span>' : '') +
+          (c.comercial ? '<span class="sub" style="color:var(--do);">🤝 '+esc(c.comercial)+'</span>' : '') +
           (nProcs > 1 ? '<span class="sub" style="color:var(--do);font-weight:600;">'+nProcs+' processos</span>' : '') +
           alertaHtml +
         '</td>' +
@@ -2001,6 +2080,7 @@ function abrirDetalhe(id) {
   var cont = '';
   if (c.email) cont += '<div class="det-lk">📧 <a href="mailto:'+esc(c.email)+'">'+esc(c.email)+'</a></div>';
   if (c.whats) cont += '<div class="det-lk">📱 <a href="https://wa.me/55'+c.whats.replace(/\D/g,'')+'" target="_blank">'+esc(c.whats)+'</a></div>';
+  if (c.comercial) cont += '<div class="det-lk" style="color:var(--do)">🤝 Comercial: <strong>'+esc(c.comercial)+'</strong>'+(c.dataComercial?' em '+fmtData(c.dataComercial):'')+'</div>';
   if (c.obsGeral) cont += '<div class="det-lk" style="color:var(--tw)">📝 '+esc(c.obsGeral)+'</div>';
   document.getElementById('det-cont').innerHTML = cont || '<span style="color:var(--tw);font-size:12px;">Sem dados de contato cadastrados</span>';
 
@@ -2024,6 +2104,7 @@ function abrirDetalhe(id) {
         (p.numproc?'<div class="pc-it"><div class="lbl">Nº Processo</div><div class="val">'+esc(p.numproc)+(esajUrl?' <a href="'+esajUrl+'" target="_blank" style="color:#1a73e8;font-size:10px;">🔍 ESAJ</a>':'')+'</div></div>':'') +
         (p.fase?'<div class="pc-it"><div class="lbl">Fase</div><div class="val">'+esc(p.fase)+'</div></div>':'') +
         (p.pagamento?'<div class="pc-it"><div class="lbl">Honorários</div><div class="val">'+esc(p.pagamento)+(p.exitoPct?' — '+p.exitoPct+'%':'')+'</div></div>':'') +
+        (p.protocolador?'<div class="pc-it"><div class="lbl">📋 Protocolado por</div><div class="val" style="color:var(--ch);font-weight:600;">'+esc(p.protocolador)+(p.dataProtocolo?' em '+fmtData(p.dataProtocolo):'')+'</div></div>':'') +
         (p.taxa?'<div class="pc-it"><div class="lbl">Taxa Adm.</div><div class="val">R$ '+esc(p.taxa.valor||'0')+' — '+(p.taxa.pago?'<span style="color:#7ec492">Paga</span>':'<span style="color:var(--ch)">Pendente</span>')+'</div></div>':'') +
         (p.hon?'<div class="pc-it"><div class="lbl">Honorários Iniciais</div><div class="val">R$ '+esc(p.hon.valor||'0')+' — '+(p.hon.pago?'<span style="color:#7ec492">Pago</span>':'<span style="color:var(--ch)">Pendente</span>')+'</div></div>':'') +
         (p.obs?'<div class="pc-it" style="grid-column:1/-1"><div class="lbl">Obs.</div><div class="val">'+esc(p.obs)+'</div></div>':'') +
@@ -2058,12 +2139,21 @@ function renderRecebimentos() {
 
   parcelas.sort(function(a,b){ return a.data - b.data; });
   var aberto = parcelas.filter(function(p){ return !p.pago; });
-  var p7 = aberto.filter(function(p){ var d=Math.round((p.data-hoje)/86400000); return d>=0&&d<=7; });
+  var p7  = aberto.filter(function(p){ var d=Math.round((p.data-hoje)/86400000); return d>=0&&d<=7; });
   var p30 = aberto.filter(function(p){ var d=Math.round((p.data-hoje)/86400000); return d>=0&&d<=30; });
 
-  document.getElementById('rec7').innerHTML = p7.length ? p7.map(linhaPrc).join('') : vazioRec('Nenhuma parcela vence nos próximos 7 dias');
-  document.getElementById('rec30').innerHTML = p30.length ? p30.map(linhaPrc).join('') : vazioRec('Nenhuma parcela nos próximos 30 dias');
-  document.getElementById('recAll').innerHTML = aberto.length ? aberto.map(linhaPrc).join('') + totalRec(aberto) : vazioRec('Todas as parcelas estão pagas ✓');
+  // Cards de totais
+  var soma = function(arr){ return arr.reduce(function(s,p){return s+p.val;},0); };
+  var el7  = document.getElementById('rec-v7');
+  var el30 = document.getElementById('rec-v30');
+  var elT  = document.getElementById('rec-vtot');
+  if(el7)  el7.textContent  = 'R$ '+fmtVal(soma(p7));
+  if(el30) el30.textContent = 'R$ '+fmtVal(soma(p30));
+  if(elT)  elT.textContent  = 'R$ '+fmtVal(soma(aberto));
+
+  document.getElementById('rec7').innerHTML   = p7.length    ? p7.map(linhaPrc).join('')    : vazioRec('Nenhuma parcela vence nos próximos 7 dias');
+  document.getElementById('rec30').innerHTML  = p30.length   ? p30.map(linhaPrc).join('')   : vazioRec('Nenhuma parcela nos próximos 30 dias');
+  document.getElementById('recAll').innerHTML = aberto.length ? aberto.map(linhaPrc).join('')+totalRec(aberto) : vazioRec('Todas as parcelas estão pagas ✓');
 }
 
 function linhaPrc(p) {
@@ -3046,7 +3136,8 @@ function exportPADcsv() {
 function abrirModalAtend(id) {
   editAtendId = id;
   atendSalvo = null;
-  ['at-nome','at-data','at-assunto','at-doc-det','at-whats','at-email','at-obs'].forEach(function(f){ setVal(f,''); });
+  popularListaComercial();
+  ['at-nome','at-data','at-devolutiva','at-assunto','at-doc-det','at-whats','at-email','at-obs','at-comercial'].forEach(function(f){ setVal(f,''); });
   setVal('at-tipo','Parecer'); setVal('at-situacao','Pendente'); setVal('at-doc-local','');
   desativarBotoesAtend();
   if (id) {
@@ -3054,10 +3145,12 @@ function abrirModalAtend(id) {
     if (!a) return;
     document.getElementById('at-mo-tit').textContent='Editar Atendimento';
     setVal('at-nome',a.nome||''); setVal('at-data',a.data||'');
+    setVal('at-devolutiva',a.devolutiva||'');
     setVal('at-tipo',a.tipo||'Parecer'); setVal('at-situacao',a.situacao||'Pendente');
     setVal('at-assunto',a.assunto||''); setVal('at-doc-local',a.docLocal||'');
     setVal('at-doc-det',a.docDet||''); setVal('at-whats',a.whats||'');
     setVal('at-email',a.email||''); setVal('at-obs',a.obs||'');
+    setVal('at-comercial',a.comercial||'');
     atendSalvo = a;
     ativarBotoesAtend();
   } else {
@@ -3073,10 +3166,11 @@ function salvarAtend() {
   var nome=getVal('at-nome');
   if (!nome) { toast('Informe o nome do cliente',true); return; }
   var obj={
-    nome:nome, data:getVal('at-data'), tipo:getVal('at-tipo'),
-    situacao:getVal('at-situacao'), assunto:getVal('at-assunto'),
+    nome:nome, data:getVal('at-data'), devolutiva:getVal('at-devolutiva'),
+    tipo:getVal('at-tipo'), situacao:getVal('at-situacao'), assunto:getVal('at-assunto'),
     docLocal:getVal('at-doc-local'), docDet:getVal('at-doc-det'),
-    whats:getVal('at-whats'), email:getVal('at-email'), obs:getVal('at-obs')
+    whats:getVal('at-whats'), email:getVal('at-email'), obs:getVal('at-obs'),
+    comercial:getVal('at-comercial')
   };
   if (editAtendId) { obj.id=editAtendId; window._fbSaveAtend(obj); toast('Atendimento atualizado'); }
   else { window._fbSaveAtend(obj); toast('Atendimento cadastrado'); }
@@ -3105,8 +3199,9 @@ function renderAtendimentos() {
 
   var docIcons={'Pasta no Drive':'📂','E-mail Dra. Débora':'📧','WhatsApp':'📱','Físico no escritório':'🗂️','Outro':'📎'};
   var sitCores={'Pendente':'#D4B84A','Em andamento':'var(--ch)','Concluído':'#7ec492'};
+  var hoje = new Date(); hoje.setHours(0,0,0,0);
   var tbody=document.getElementById('at-tbody');
-  if (!lista.length) { tbody.innerHTML='<tr><td colspan="8"><div class="vazio"><div class="vazio-ic">📝</div><div class="vazio-t">Nenhum atendimento cadastrado</div><div class="vazio-s">Clique em "+ Novo Atendimento"</div></div></td></tr>'; return; }
+  if (!lista.length) { tbody.innerHTML='<tr><td colspan="9"><div class="vazio"><div class="vazio-ic">📝</div><div class="vazio-t">Nenhum atendimento cadastrado</div><div class="vazio-s">Clique em "+ Novo Atendimento"</div></div></td></tr>'; return; }
   tbody.innerHTML=lista.map(function(a){
     var docHtml='—';
     if (a.docLocal) {
@@ -3114,16 +3209,26 @@ function renderAtendimentos() {
       docHtml='<div style="font-size:11px;">'+(ic)+' '+esc(a.docLocal)+'</div>';
       if (a.docDet) docHtml+='<div style="font-size:10px;color:var(--tw)">'+esc(a.docDet)+'</div>';
     }
+    // Devolutiva com alerta de prazo
+    var devHtml = '—';
+    if (a.devolutiva) {
+      var dDev = new Date(a.devolutiva+'T00:00:00');
+      var diffDev = Math.round((dDev - hoje) / 86400000);
+      var corDev = diffDev < 0 ? 'var(--rc)' : diffDev <= 3 ? '#D4B84A' : '#7ec492';
+      var labelDev = diffDev < 0 ? ' 🚨 VENCIDA' : diffDev === 0 ? ' ⚠️ HOJE' : diffDev <= 3 ? ' ⚠️ '+diffDev+'d' : '';
+      devHtml = '<span style="font-size:11px;color:'+corDev+';font-weight:600;">'+fmtData(a.devolutiva)+labelDev+'</span>';
+    }
     return '<tr>'+
       '<td style="font-weight:600;color:var(--tp)">'+esc(a.nome||'')+'<br>'+
         (a.whats?'<a href="https://wa.me/55'+a.whats.replace(/\D/g,'')+'" target="_blank" style="font-size:10px;color:var(--ch)">📱 '+esc(a.whats)+'</a> ':'')+
         (a.email?'<a href="mailto:'+esc(a.email)+'" style="font-size:10px;color:var(--tw)">✉️ '+esc(a.email)+'</a>':'')+
       '</td>'+
       '<td style="font-size:11px;color:var(--tw);white-space:nowrap">'+fmtData(a.data)+'</td>'+
+      '<td>'+devHtml+'</td>'+
       '<td><span class="bgt">'+esc(a.tipo||'')+'</span></td>'+
       '<td><span style="font-size:11px;font-weight:600;color:'+(sitCores[a.situacao]||'var(--tw)')+'">'+esc(a.situacao||'')+'</span></td>'+
+      '<td style="font-size:11px;color:var(--do);">'+(a.comercial?'🤝 '+esc(a.comercial):'—')+'</td>'+
       '<td>'+docHtml+'</td>'+
-      '<td style="font-size:11px;color:var(--ts);max-width:160px;overflow:hidden;text-overflow:ellipsis">'+esc(a.assunto||'')+'</td>'+
       '<td style="font-size:11px;color:var(--tw)">'+esc(a.obs||'')+'</td>'+
       '<td><div class="acoes">'+
         '<button class="btn-ic" title="Editar" onclick="abrirModalAtend(\''+a.id+'\')">✏️</button>'+
@@ -3493,6 +3598,191 @@ function exportAudCSV() {
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a'); a.href=url; a.download='audiencias.csv'; a.click(); URL.revokeObjectURL(url);
   toast('CSV exportado');
+}
+
+function agendarDevolutiva() {
+  var nome = getVal('at-nome');
+  var data = getVal('at-devolutiva');
+  var assunto = getVal('at-assunto');
+  var tipo = getVal('at-tipo');
+  if (!data) { toast('Informe primeiro o prazo para devolutiva', true); return; }
+  var dtStr = data.replace(/-/g,'') + 'T090000';
+  var dtFimStr = data.replace(/-/g,'') + 'T100000';
+  var titulo = encodeURIComponent('[DEVOLUTIVA] ' + tipo + ' — ' + (nome||'Cliente'));
+  var detalhes = encodeURIComponent(
+    'Prazo de devolutiva ao cliente\n' +
+    'Cliente: ' + (nome||'') + '\n' +
+    'Assunto: ' + (assunto||'não informado') + '\n\n' +
+    'Escritório Débora Constantino — OAB/SP 378.037'
+  );
+  var convidados = encodeURIComponent('deboraewenne@gmail.com,documentoprocessoadvocacia@gmail.com');
+  var url = 'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+    '&text=' + titulo + '&dates=' + dtStr + '/' + dtFimStr +
+    '&details=' + detalhes + '&add=' + convidados;
+  window.open(url, '_blank');
+  toast('Google Agenda aberto para a devolutiva!');
+}
+
+// ========== RECEBIDOS ==========
+function toggleRcbModo() {
+  var modo = document.getElementById('rcb-modo').value;
+  document.getElementById('rcb-grp-mes').style.display = modo === 'mes' ? 'flex' : 'none';
+}
+
+function iniciarRecebidos() {
+  var anos = [];
+  var anoAtual = new Date().getFullYear();
+  DB.forEach(function(c) {
+    var procs = c.processos && c.processos.length ? c.processos : [c];
+    procs.forEach(function(proc) {
+      ['taxa','hon'].forEach(function(tp) {
+        if (!proc[tp]) return;
+        if (proc[tp].mod === 'parcelado') {
+          (proc[tp].parcelas||[]).forEach(function(p) {
+            if (p.data && p.pago) { var a=parseInt(p.data.split('-')[0]); if(a&&anos.indexOf(a)<0) anos.push(a); }
+          });
+        } else if (proc[tp].pago && proc.data) {
+          var a=parseInt(proc.data.split('-')[0]); if(a&&anos.indexOf(a)<0) anos.push(a);
+        }
+      });
+    });
+  });
+  if (anos.indexOf(anoAtual)<0) anos.push(anoAtual);
+  anos.sort(function(a,b){return b-a;});
+  var sel = document.getElementById('rcb-ano');
+  sel.innerHTML = '';
+  anos.forEach(function(a){ var o=document.createElement('option'); o.value=a; o.textContent=a; if(a===anoAtual)o.selected=true; sel.appendChild(o); });
+  document.getElementById('rcb-mes').value = new Date().getMonth()+1;
+  renderRecebidos();
+}
+
+function renderRecebidos() {
+  var modo = document.getElementById('rcb-modo').value;
+  var mes = parseInt(document.getElementById('rcb-mes').value);
+  var ano = parseInt(document.getElementById('rcb-ano').value);
+  var meses = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+  var registros = [];
+  DB.forEach(function(c) {
+    var procs = c.processos && c.processos.length ? c.processos : [c];
+    procs.forEach(function(proc) {
+      var comPct = parseInt(proc.comissaoPct||c.comissaoPct) || 0;
+      ['taxa','hon'].forEach(function(tp) {
+        if (!proc[tp]) return;
+        var nat = tp==='taxa' ? 'Taxa Adm.' : 'Honorários';
+        if (proc[tp].mod === 'parcelado') {
+          var ps = proc[tp].parcelas||[];
+          ps.forEach(function(p,i) {
+            if (!p.pago || !p.data) return;
+            var pA=parseInt(p.data.split('-')[0]), pM=parseInt(p.data.split('-')[1]);
+            var ok = modo==='tudo' || (modo==='ano'&&pA===ano) || (modo==='mes'&&pA===ano&&pM===mes);
+            if (!ok) return;
+            var vP = p.valorParcela ? parseMoeda(p.valorParcela) : (ps.length>0?parseMoeda(proc[tp].valor)/ps.length:0);
+            var com = (tp==='taxa') ? vP*comPct/100 : 0;
+            registros.push({nome:c.nome,tipo:proc.tipo||c.tipo||'',nat:nat,parc:(i+1)+'ª/'+ps.length,data:p.data,val:vP,com:com,comPct:comPct});
+          });
+        } else if (proc[tp].pago) {
+          var refData = proc.data||c.data||'';
+          var pA=parseInt((refData||'').split('-')[0]), pM=parseInt((refData||'').split('-')[1]);
+          var ok = modo==='tudo' || (modo==='ano'&&pA===ano) || (modo==='mes'&&pA===ano&&pM===mes);
+          if (!ok) return;
+          var vP = parseMoeda(proc[tp].valor);
+          var com = (tp==='taxa') ? vP*comPct/100 : 0;
+          registros.push({nome:c.nome,tipo:proc.tipo||c.tipo||'',nat:nat,parc:'À vista',data:refData,val:vP,com:com,comPct:comPct});
+        }
+      });
+    });
+  });
+
+  registros.sort(function(a,b){ return (b.data||'')>(a.data||'')?1:-1; });
+
+  var totGeral=0,totTaxa=0,totHon=0,totCom=0;
+  registros.forEach(function(r){
+    totGeral+=r.val;
+    if(r.nat==='Taxa Adm.')totTaxa+=r.val; else totHon+=r.val;
+    totCom+=r.com;
+  });
+  setTxt('rcb-total','R$ '+fmtVal(totGeral));
+  setTxt('rcb-taxa','R$ '+fmtVal(totTaxa));
+  setTxt('rcb-hon','R$ '+fmtVal(totHon));
+  setTxt('rcb-com','R$ '+fmtVal(totCom));
+
+  var tbody = document.getElementById('rcb-tbody');
+  if (!registros.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="rel-vazio">Nenhum pagamento confirmado no período</td></tr>';
+    return;
+  }
+  tbody.innerHTML = registros.map(function(r) {
+    var agendaUrl = '';
+    if (r.data) {
+      var dtS = r.data.replace(/-/g,'')+'T090000';
+      var dtF = r.data.replace(/-/g,'')+'T100000';
+      var tit = encodeURIComponent('[RECEBIDO] '+r.nat+' — '+r.nome);
+      var det = encodeURIComponent('Pagamento confirmado\nCliente: '+r.nome+'\nNatureza: '+r.nat+'\nValor: R$ '+fmtVal(r.val));
+      agendaUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE&text='+tit+'&dates='+dtS+'/'+dtF+'&details='+det;
+    }
+    return '<tr>'+
+      '<td style="font-weight:600;color:var(--tp)">'+esc(r.nome)+'</td>'+
+      '<td><span class="bgt">'+esc(r.tipo)+'</span></td>'+
+      '<td style="font-size:11px;color:var(--ch)">'+esc(r.nat)+'</td>'+
+      '<td style="font-size:11px;color:var(--tw)">'+esc(r.parc)+'</td>'+
+      '<td style="font-size:11px;color:var(--tw);white-space:nowrap">'+fmtData(r.data)+'</td>'+
+      '<td style="font-weight:600;color:#7ec492">R$ '+fmtVal(r.val)+'</td>'+
+      '<td style="font-size:11px;color:'+(r.com>0?'var(--rc)':'var(--tw)')+'">'+
+        (r.com>0?r.comPct+'% = R$ '+fmtVal(r.com):'—')+'</td>'+
+      '<td>'+(agendaUrl?'<a href="'+agendaUrl+'" target="_blank" style="font-size:10px;color:#1a73e8;text-decoration:none;">📅 Anotar</a>':'—')+'</td>'+
+    '</tr>';
+  }).join('');
+}
+
+function exportRecebidosCSV() {
+  var h = ['Cliente','Tipo','Natureza','Parcela','Data Pagto','Valor','Comissão %','Comissão R$'];
+  var modo=document.getElementById('rcb-modo').value;
+  var mes=parseInt(document.getElementById('rcb-mes').value);
+  var ano=parseInt(document.getElementById('rcb-ano').value);
+  var rows = [];
+  DB.forEach(function(c) {
+    var procs = c.processos && c.processos.length ? c.processos : [c];
+    procs.forEach(function(proc) {
+      var comPct = parseInt(proc.comissaoPct||c.comissaoPct)||0;
+      ['taxa','hon'].forEach(function(tp) {
+        if (!proc[tp]) return;
+        var nat = tp==='taxa'?'Taxa Adm.':'Honorários';
+        if (proc[tp].mod==='parcelado') {
+          (proc[tp].parcelas||[]).forEach(function(p,i) {
+            if (!p.pago||!p.data) return;
+            var pA=parseInt(p.data.split('-')[0]),pM=parseInt(p.data.split('-')[1]);
+            var ok=modo==='tudo'||(modo==='ano'&&pA===ano)||(modo==='mes'&&pA===ano&&pM===mes);
+            if (!ok) return;
+            var vP=p.valorParcela?parseMoeda(p.valorParcela):(parseMoeda(proc[tp].valor)/((proc[tp].parcelas||[]).length||1));
+            rows.push([c.nome,proc.tipo||c.tipo||'',nat,(i+1)+'ª',fmtData(p.data),fmtVal(vP),comPct&&tp==='taxa'?comPct+'%':'',comPct&&tp==='taxa'?fmtVal(vP*comPct/100):'']);
+          });
+        } else if (proc[tp].pago) {
+          var refData=proc.data||c.data||'';
+          var pA=parseInt(refData.split('-')[0]),pM=parseInt(refData.split('-')[1]);
+          var ok=modo==='tudo'||(modo==='ano'&&pA===ano)||(modo==='mes'&&pA===ano&&pM===mes);
+          if (!ok) return;
+          var vP=parseMoeda(proc[tp].valor);
+          rows.push([c.nome,proc.tipo||c.tipo||'',nat,'À vista',fmtData(refData),fmtVal(vP),comPct&&tp==='taxa'?comPct+'%':'',comPct&&tp==='taxa'?fmtVal(vP*comPct/100):'']);
+        }
+      });
+    });
+  });
+  var csv=[h].concat(rows).map(function(r){return r.map(function(v){return '"'+(v||'').toString().replace(/"/g,'""')+'"';}).join(',');}).join('\n');
+  var blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='recebidos.csv';a.click();URL.revokeObjectURL(url);
+  toast('CSV exportado');
+}
+
+// Popula o datalist de responsáveis comerciais com todos os nomes já usados
+function popularListaComercial() {
+  var nomes = ['Débora Constantino','Equipe Comercial'];
+  DB.forEach(function(c) { if (c.comercial && nomes.indexOf(c.comercial) < 0) nomes.push(c.comercial); });
+  (ATENDIMENTOS||[]).forEach(function(a) { if (a.comercial && nomes.indexOf(a.comercial) < 0) nomes.push(a.comercial); });
+  var dl = document.getElementById('comercial-list');
+  if (!dl) return;
+  dl.innerHTML = '';
+  nomes.sort().forEach(function(n) { var o = document.createElement('option'); o.value = n; dl.appendChild(o); });
 }
 
 // ========== INIT ==========
