@@ -27,7 +27,6 @@
   const indicacoesRef = collection(db, "indicacoes");
   const padRef = collection(db, "pad");
   const atendRef = collection(db, "atendimentos");
-  const audRef = collection(db, "audiencias");
 
   // Expor funções globais para o código legado
   window._fbSave = async function(obj) {
@@ -96,15 +95,6 @@
   window._fbDeleteAtend = async function(id) {
     try { await deleteDoc(doc(db, "atendimentos", id)); } catch(e) { console.error(e); }
   };
-  window._fbSaveAud = async function(obj) {
-    try {
-      if (obj.id && typeof obj.id === 'string') { await setDoc(doc(db, "audiencias", obj.id), obj); }
-      else { const ref = await addDoc(audRef, obj); return ref.id; }
-    } catch(e) { console.error(e); }
-  };
-  window._fbDeleteAud = async function(id) {
-    try { await deleteDoc(doc(db, "audiencias", id)); } catch(e) { console.error(e); }
-  };
 
   window._fbListen = function(callback) {
     return onSnapshot(colRef, function(snapshot) {
@@ -153,12 +143,6 @@
       window.ATENDIMENTOS = [];
       snap.forEach(function(d){ window.ATENDIMENTOS.push(Object.assign({id:d.id}, d.data())); });
       if (document.getElementById('pg-atendimentos').classList.contains('on')) renderAtendimentos();
-    });
-    onSnapshot(audRef, function(snap) {
-      window.AUDIENCIAS = [];
-      snap.forEach(function(d){ window.AUDIENCIAS.push(Object.assign({id:d.id}, d.data())); });
-      if (document.getElementById('pg-audiencias').classList.contains('on')) renderAudiencias();
-      atualizarBadgeAudiencias();
     });
   });
 </script>
@@ -410,17 +394,6 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
 ::-webkit-scrollbar-track{background:var(--fp);}
 ::-webkit-scrollbar-thumb{background:var(--bd);border-radius:3px;}
 
-/* AUDIÊNCIAS — destaque urgente */
-.aud-hoje{background:rgba(212,184,74,.08);border-left:3px solid #D4B84A;}
-.aud-passada{opacity:.65;}
-
-/* PROCESSO CARD (múltiplos processos por cliente) */
-.proc-item{background:var(--fp);border:1px solid var(--bd);border-radius:8px;margin-bottom:14px;overflow:hidden;}
-.proc-item-head{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(180,138,74,.06);border-bottom:1px solid var(--bd);cursor:pointer;}
-.proc-item-num{font-size:12px;font-weight:600;color:var(--ch);}
-.proc-item-tipo{font-size:11px;color:var(--tw);margin-top:2px;}
-.proc-item-body{padding:14px 16px;}
-
 @media(max-width:860px){.hdr-stats{display:none;}.pg{padding:14px;}.gr2,.gr3{grid-template-columns:1fr;}.parc-row{grid-template-columns:28px 1fr 1fr auto;}}
 @media(max-width:580px){.cards{grid-template-columns:1fr 1fr;}.modal{margin:10px auto;}.mo-panel{padding:16px;}}
 </style>
@@ -449,15 +422,14 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
 <!-- ABAS -->
 <nav class="abas">
   <button class="aba on" onclick="mudarAba('clientes',this)">⚖️ Clientes &amp; Processos</button>
-  <button class="aba" onclick="mudarAba('recebimentos',this)">💰 A Receber</button>
-  <button class="aba" onclick="mudarAba('recebidos',this)">✅ Recebidos</button>
+  <button class="aba" onclick="mudarAba('recebimentos',this)">💰 Previsão de Recebimentos</button>
   <button class="aba" onclick="mudarAba('prazos',this)">⏱️ Prazos &amp; Intimações <span class="abadge" id="badge-prazos">0</span></button>
   <button class="aba" onclick="mudarAba('pad',this)">📁 PAD</button>
   <button class="aba" onclick="mudarAba('atendimentos',this)">📝 Atendimentos</button>
-  <button class="aba" onclick="mudarAba('audiencias',this)">🏛️ Audiências <span class="abadge" id="badge-aud">0</span></button>
   <button class="aba" onclick="mudarAba('parceiros',this)">🤝 Advogados Parceiros</button>
   <button class="aba" onclick="mudarAba('relatorios',this)">📊 Relatórios Financeiros</button>
   <button class="aba" onclick="mudarAba('alertas',this)">🔔 Alertas <span class="abadge" id="badge-n">0</span></button>
+  <button class="aba" onclick="mudarAba('dejen',this)">📡 DEJEN <span class="abadge" id="badge-dejen" style="display:none">!</span></button>
 </nav>
 
 <!-- ===== PÁGINA: CLIENTES ===== -->
@@ -495,10 +467,14 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
         <thead>
           <tr>
             <th onclick="sortBy('nome')">Cliente ▾</th>
-            <th>Processos / Tipo / Status</th>
-            <th onclick="sortBy('valor')">Valor Total ▾</th>
+            <th onclick="sortBy('data')">Contrato ▾</th>
+            <th onclick="sortBy('tipo')">Tipo de Ação ▾</th>
+            <th>Processo / Fase</th>
+            <th onclick="sortBy('valor')">Valor ▾</th>
             <th>Taxa Adm.</th>
             <th>Honorários</th>
+            <th onclick="sortBy('status')">Status ▾</th>
+            <th>Último Andamento</th>
             <th>Êxito / Comissão</th>
             <th>Ações</th>
           </tr>
@@ -509,13 +485,8 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
   </div>
 </div>
 
-<!-- ===== PÁGINA: A RECEBER ===== -->
+<!-- ===== PÁGINA: RECEBIMENTOS ===== -->
 <div class="pg" id="pg-recebimentos">
-  <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-bottom:18px;">
-    <div class="card"><div class="card-l">Vence em 7 dias</div><div class="card-v" id="rec-v7" style="color:#D4B84A">R$ 0</div><div class="card-s">a receber</div></div>
-    <div class="card"><div class="card-l">Vence em 30 dias</div><div class="card-v" id="rec-v30" style="color:var(--ch)">R$ 0</div><div class="card-s">a receber</div></div>
-    <div class="card"><div class="card-l">Total em Aberto</div><div class="card-v" id="rec-vtot" style="color:var(--rc)">R$ 0</div><div class="card-s">todas as parcelas</div></div>
-  </div>
   <div class="rec-sec">
     <div class="rec-tit">📅 Vencimentos nos próximos 7 dias</div>
     <div class="tbl-box"><div class="tbl-sc"><table>
@@ -535,42 +506,6 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
     <div class="tbl-box"><div class="tbl-sc"><table>
       <thead><tr><th>Cliente</th><th>Tipo</th><th>Natureza</th><th>Parcela</th><th>Vencimento</th><th>Valor</th><th>Situação</th></tr></thead>
       <tbody id="recAll"></tbody>
-    </table></div></div>
-  </div>
-</div>
-
-<!-- ===== PÁGINA: RECEBIDOS ===== -->
-<div class="pg" id="pg-recebidos">
-  <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-bottom:18px;">
-    <div class="card"><div class="card-l">Total Recebido</div><div class="card-v" id="rcb-total" style="color:#7ec492">R$ 0</div><div class="card-s">no período filtrado</div></div>
-    <div class="card"><div class="card-l">Taxas Recebidas</div><div class="card-v" id="rcb-taxa" style="color:var(--ch)">R$ 0</div><div class="card-s">administrativas</div></div>
-    <div class="card"><div class="card-l">Honorários Recebidos</div><div class="card-v" id="rcb-hon" style="color:var(--do)">R$ 0</div><div class="card-s">iniciais</div></div>
-    <div class="card"><div class="card-l">Comissões Geradas</div><div class="card-v" id="rcb-com" style="color:var(--rc)">R$ 0</div><div class="card-s">setor comercial</div></div>
-  </div>
-  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--fs);border:1px solid var(--bd);border-radius:8px;padding:12px 16px;margin-bottom:18px;">
-    <label style="font-size:10px;color:var(--ch);text-transform:uppercase;letter-spacing:.8px;font-weight:600;">Período</label>
-    <select class="sel" id="rcb-modo" onchange="toggleRcbModo()">
-      <option value="mes">Mensal</option>
-      <option value="ano">Anual</option>
-      <option value="tudo">Tudo</option>
-    </select>
-    <div id="rcb-grp-mes" style="display:flex;gap:8px;align-items:center;">
-      <select class="sel" id="rcb-mes">
-        <option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option>
-        <option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option>
-        <option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option>
-        <option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option>
-      </select>
-    </div>
-    <select class="sel" id="rcb-ano"></select>
-    <button class="btn-v" onclick="renderRecebidos()" style="padding:7px 16px;font-size:12px;">🔍 Filtrar</button>
-    <button class="btn-o" onclick="exportRecebidosCSV()">⬇ CSV</button>
-  </div>
-  <div class="rec-sec">
-    <div class="rec-tit">✅ Pagamentos Confirmados</div>
-    <div class="tbl-box"><div class="tbl-sc"><table>
-      <thead><tr><th>Cliente</th><th>Tipo de Ação</th><th>Natureza</th><th>Parcela</th><th>Data do Pagto</th><th>Valor Recebido</th><th>Comissão Devida</th><th>Agenda</th></tr></thead>
-      <tbody id="rcb-tbody"></tbody>
     </table></div></div>
   </div>
 </div>
@@ -741,8 +676,8 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
     <div class="tbl-bar"><div class="tbl-tit">Atendimentos sem Processo</div><div class="tbl-cnt" id="at-cnt">0 registros</div></div>
     <div class="tbl-sc"><table>
       <thead><tr>
-        <th>Cliente</th><th>Data</th><th>Devolutiva</th><th>Tipo</th><th>Situação</th>
-        <th>Comercial</th><th>Localização dos Docs</th><th>Obs.</th><th>Ações</th>
+        <th>Cliente</th><th>Data</th><th>Tipo</th><th>Situação</th>
+        <th>Localização dos Docs</th><th>Detalhe</th><th>Obs.</th><th>Ações</th>
       </tr></thead>
       <tbody id="at-tbody"></tbody>
     </table></div>
@@ -761,12 +696,6 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
       <div class="gr gr2" style="margin-bottom:13px;">
         <div class="fg"><label class="fl">Nome do Cliente *</label><input class="fi" id="at-nome" placeholder="Nome completo"></div>
         <div class="fg"><label class="fl">Data do Atendimento *</label><input type="date" class="fi" id="at-data"></div>
-      </div>
-      <div class="gr gr2" style="margin-bottom:13px;">
-        <div class="fg"><label class="fl">Prazo para Devolutiva ao Cliente</label><input type="date" class="fi" id="at-devolutiva"></div>
-        <div class="fg" style="display:flex;align-items:flex-end;gap:6px;">
-          <button type="button" class="btn-o" onclick="agendarDevolutiva()" id="btn-at-devolutiva-agenda" style="font-size:11px;padding:9px 12px;white-space:nowrap;">📅 Adicionar ao Google Agenda</button>
-        </div>
       </div>
       <div class="gr gr2" style="margin-bottom:13px;">
         <div class="fg"><label class="fl">Tipo *</label>
@@ -807,172 +736,20 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
         <div class="fg"><label class="fl">WhatsApp do Cliente</label><input class="fi" id="at-whats" placeholder="(12) 99999-9999" oninput="fmtTel(this)"></div>
         <div class="fg"><label class="fl">E-mail do Cliente</label><input type="email" class="fi" id="at-email" placeholder="cliente@email.com"></div>
       </div>
-      <div class="gr gr2" style="margin-bottom:13px;">
-        <div class="fg">
-          <label class="fl">🤝 Responsável Comercial (quem fechou)</label>
-          <input class="fi" id="at-comercial" list="comercial-list" placeholder="Nome de quem captou / fechou">
-        </div>
+      <div class="gr" style="margin-bottom:13px;">
         <div class="fg"><label class="fl">Observações</label><input class="fi" id="at-obs" placeholder="Notas adicionais"></div>
-      </div>
-      <div style="background:rgba(63,103,73,.08);border:1px solid rgba(63,103,73,.25);border-radius:8px;padding:14px 16px;margin-top:6px;">
-        <div style="font-size:11px;color:var(--ch);font-weight:600;text-transform:uppercase;letter-spacing:.9px;margin-bottom:10px;">📅 Google Agenda + E-mail</div>
-        <div style="font-size:12px;color:var(--ts);margin-bottom:10px;line-height:1.6;">
-          Salve o atendimento e use os botoes abaixo para agendar no Google Agenda com os dados preenchidos automaticamente. O convite sera enviado para <strong style="color:var(--ch)">deboraewenne@gmail.com</strong> e <strong style="color:var(--ch)">documentoprocessoadvocacia@gmail.com</strong>.
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button type="button" class="btn-v" id="btn-at-agenda" onclick="abrirAgendaAtend()" style="background:linear-gradient(135deg,#1a73e8,#1557b0);opacity:.5;cursor:not-allowed;" disabled>
-            📅 Abrir no Google Agenda
-          </button>
-          <button type="button" class="btn-o" id="btn-at-email" onclick="enviarEmailAtend()" style="opacity:.5;cursor:not-allowed;" disabled>
-            ✉️ Enviar e-mail de aviso
-          </button>
-        </div>
-        <div style="font-size:10px;color:var(--tw);margin-top:8px;" id="at-agenda-hint">Preencha os dados e salve para ativar os botoes.</div>
       </div>
     </div>
     <div class="mo-foot">
       <button class="btn-o" onclick="document.getElementById('ov-atend').style.display='none'">Cancelar</button>
-      <button class="btn-v" onclick="salvarAtend()">✓ Salvar + Ativar Agenda</button>
-    </div>
-  </div>
-</div>
-
-<!-- ===== PÁGINA: AUDIÊNCIAS ===== -->
-<div class="pg" id="pg-audiencias">
-  <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
-    <div class="card"><div class="card-l">Total</div><div class="card-v" id="au-tot">0</div><div class="card-s">audiências cadastradas</div></div>
-    <div class="card"><div class="card-l">Próximas (7 dias)</div><div class="card-v" id="au-prox" style="color:#D4B84A">0</div><div class="card-s">agendadas</div></div>
-    <div class="card"><div class="card-l">Administrativas</div><div class="card-v" id="au-adm" style="color:var(--ch)">0</div><div class="card-s">proc. administrativo</div></div>
-    <div class="card"><div class="card-l">Judiciais</div><div class="card-v" id="au-jud" style="color:var(--vi)">0</div><div class="card-s">proc. judicial</div></div>
-    <div class="card"><div class="card-l">Realizadas</div><div class="card-v" id="au-real" style="color:#7ec492">0</div><div class="card-s">concluídas</div></div>
-  </div>
-  <div class="toolbar">
-    <div class="tb-l">
-      <div class="sw"><span class="sw-ic">🔍</span><input type="text" id="au-busca" placeholder="Buscar cliente ou local..." oninput="renderAudiencias()"></div>
-      <select class="sel" id="au-filtro-tipo" onchange="renderAudiencias()">
-        <option value="">Todos os tipos</option>
-        <option value="Administrativo">Administrativo</option>
-        <option value="Judicial">Judicial</option>
-      </select>
-      <select class="sel" id="au-filtro-sit" onchange="renderAudiencias()">
-        <option value="">Todas as situações</option>
-        <option value="Agendada">Agendada</option>
-        <option value="Realizada">Realizada</option>
-        <option value="Cancelada">Cancelada</option>
-        <option value="Adiada">Adiada</option>
-      </select>
-    </div>
-    <div style="display:flex;gap:8px;">
-      <button class="btn-o" onclick="exportAudCSV()">⬇ CSV</button>
-      <button class="btn-v" onclick="abrirModalAud(null)">+ Nova Audiência</button>
-    </div>
-  </div>
-  <div class="tbl-box">
-    <div class="tbl-bar"><div class="tbl-tit">🏛️ Agenda de Audiências</div><div class="tbl-cnt" id="au-cnt">0 registros</div></div>
-    <div class="tbl-sc"><table>
-      <thead><tr>
-        <th>Cliente</th><th>Data / Hora</th><th>Tipo</th>
-        <th>Nº Processo</th><th>Local / Vara</th><th>Situação</th>
-        <th>Agenda</th><th>Obs.</th><th>Ações</th>
-      </tr></thead>
-      <tbody id="au-tbody"></tbody>
-    </table></div>
-  </div>
-</div>
-
-<!-- MODAL AUDIÊNCIA -->
-<div id="ov-aud" style="position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;display:none;overflow-y:auto;padding:20px;" onclick="if(event.target===this)this.style.display='none'">
-  <div class="modal" style="max-width:680px;">
-    <div class="mo-head">
-      <div><div class="mo-tit" id="au-mo-tit">Nova Audiência</div><div class="mo-sub">Cadastre e sincronize com o Google Agenda</div></div>
-      <button class="mo-cls" onclick="document.getElementById('ov-aud').style.display='none'">✕</button>
-    </div>
-    <div style="padding:20px 26px;">
-      <div class="sec">Identificação do Cliente</div>
-      <div class="gr gr2" style="margin-bottom:13px;">
-        <div class="fg"><label class="fl">Nome do Cliente *</label><input class="fi" id="au-nome" placeholder="Nome completo"></div>
-        <div class="fg"><label class="fl">WhatsApp do Cliente</label><input class="fi" id="au-whats" placeholder="(12) 99999-9999" oninput="fmtTel(this)"></div>
-      </div>
-      <div class="gr" style="margin-bottom:13px;">
-        <div class="fg"><label class="fl">E-mail do Cliente</label><input type="email" class="fi" id="au-email-cliente" placeholder="cliente@email.com"></div>
-      </div>
-      <div class="sec">Dados da Audiência</div>
-      <div class="gr gr2" style="margin-bottom:13px;">
-        <div class="fg"><label class="fl">Tipo de Processo *</label>
-          <select class="fi" id="au-tipo">
-            <option value="Judicial">Judicial</option>
-            <option value="Administrativo">Administrativo</option>
-          </select>
-        </div>
-        <div class="fg"><label class="fl">Tipo de Audiência</label>
-          <select class="fi" id="au-tipo-aud">
-            <option value="Audiência de Conciliação">Audiência de Conciliação</option>
-            <option value="Audiência de Instrução">Audiência de Instrução</option>
-            <option value="Audiência de Julgamento">Audiência de Julgamento</option>
-            <option value="Audiência Administrativa">Audiência Administrativa</option>
-            <option value="Sessão de Julgamento">Sessão de Julgamento</option>
-            <option value="Outro">Outro</option>
-          </select>
-        </div>
-      </div>
-      <div class="gr gr3" style="margin-bottom:13px;">
-        <div class="fg"><label class="fl">Data *</label><input type="date" class="fi" id="au-data"></div>
-        <div class="fg"><label class="fl">Hora *</label><input type="time" class="fi" id="au-hora"></div>
-        <div class="fg"><label class="fl">Duração Estimada</label>
-          <select class="fi" id="au-duracao">
-            <option value="30">30 minutos</option>
-            <option value="60" selected>1 hora</option>
-            <option value="90">1h30</option>
-            <option value="120">2 horas</option>
-            <option value="180">3 horas</option>
-          </select>
-        </div>
-      </div>
-      <div class="gr gr2" style="margin-bottom:13px;">
-        <div class="fg"><label class="fl">Nº do Processo</label><input class="fi" id="au-numproc" placeholder="0000000-00.0000.0.00.0000"></div>
-        <div class="fg"><label class="fl">Situação</label>
-          <select class="fi" id="au-situacao">
-            <option value="Agendada">Agendada</option>
-            <option value="Realizada">Realizada</option>
-            <option value="Cancelada">Cancelada</option>
-            <option value="Adiada">Adiada</option>
-          </select>
-        </div>
-      </div>
-      <div class="gr" style="margin-bottom:13px;">
-        <div class="fg"><label class="fl">Local / Vara / Órgão *</label><input class="fi" id="au-local" placeholder="Ex.: 3a Vara da Fazenda Publica de SJC, SEDUC SP..."></div>
-      </div>
-      <div class="gr" style="margin-bottom:13px;">
-        <div class="fg"><label class="fl">Assunto / Pauta</label><input class="fi" id="au-assunto" placeholder="Ex.: Oitiva de testemunhas, depoimento do cliente..."></div>
-      </div>
-      <div class="gr" style="margin-bottom:13px;">
-        <div class="fg"><label class="fl">Observações</label><input class="fi" id="au-obs" placeholder="Notas adicionais, orientacoes ao cliente..."></div>
-      </div>
-      <div style="background:rgba(63,103,73,.08);border:1px solid rgba(63,103,73,.25);border-radius:8px;padding:14px 16px;margin-top:6px;">
-        <div style="font-size:11px;color:var(--ch);font-weight:600;text-transform:uppercase;letter-spacing:.9px;margin-bottom:10px;">📅 Google Agenda + E-mail</div>
-        <div style="font-size:12px;color:var(--ts);margin-bottom:10px;line-height:1.6;">
-          Salve a audiência e use os botões abaixo para abrir o Google Agenda com os dados preenchidos automaticamente. O convite sera enviado para <strong style="color:var(--ch)">deboraewenne@gmail.com</strong> e <strong style="color:var(--ch)">documentoprocessoadvocacia@gmail.com</strong>.
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button type="button" class="btn-v" id="btn-google-agenda" onclick="abrirGoogleAgenda()" style="background:linear-gradient(135deg,#1a73e8,#1557b0);opacity:.5;cursor:not-allowed;" disabled>
-            📅 Abrir no Google Agenda
-          </button>
-          <button type="button" class="btn-o" id="btn-enviar-email" onclick="enviarEmailAudiencia()" style="opacity:.5;cursor:not-allowed;" disabled>
-            ✉️ Enviar e-mail de convite
-          </button>
-        </div>
-        <div style="font-size:10px;color:var(--tw);margin-top:8px;" id="au-agenda-hint">Preencha os dados e salve para ativar os botões de agenda.</div>
-      </div>
-    </div>
-    <div class="mo-foot">
-      <button class="btn-o" onclick="document.getElementById('ov-aud').style.display='none'">Cancelar</button>
-      <button class="btn-v" onclick="salvarAud()">✓ Salvar + Ativar Agenda</button>
+      <button class="btn-v" onclick="salvarAtend()">✓ Salvar Atendimento</button>
     </div>
   </div>
 </div>
 
 <!-- ===== PÁGINA: ADVOGADOS PARCEIROS ===== -->
 <div class="pg" id="pg-parceiros">
+
   <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
     <div class="card"><div class="card-l">Parceiros Ativos</div><div class="card-v" id="pc-tot">0</div><div class="card-s">advogados cadastrados</div></div>
     <div class="card"><div class="card-l">Indicações</div><div class="card-v" id="pc-ind">0</div><div class="card-s">clientes indicados</div></div>
@@ -1190,90 +967,313 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
   <div id="alertas-full"></div>
 </div>
 
-<datalist id="tipos-list">
-  <option value="PAD / Processo Administrativo Disciplinar">
-  <option value="Reintegração ao Cargo">
-  <option value="Progressão e Promoção">
-  <option value="Licença Médica / Assiduidade">
-  <option value="Abono de Permanência">
-  <option value="Insalubridade">
-  <option value="Desvio de Função">
-  <option value="Bonificação por Resultados">
-  <option value="Estágio Probatório">
-  <option value="Revisão Remuneratória">
-  <option value="Aposentadoria / Pensão">
-  <option value="Descongelamento de Tempo (LC 226/2026)">
-  <option value="Piso do Magistério (Lei 15.326/2026)">
-  <option value="Adicionais Temporais">
-  <option value="Nomeação / Concurso Público">
-</datalist>
-<datalist id="fases-list">
-  <option value="Petição Inicial protocolada">
-  <option value="Aguardando citação">
-  <option value="Contestação apresentada">
-  <option value="Fase de instrução">
-  <option value="Audiência designada">
-  <option value="Aguardando sentença">
-  <option value="Sentença proferida">
-  <option value="Recurso em andamento">
-  <option value="Trânsito em julgado">
-  <option value="Fase de execução">
-  <option value="Cumprimento de sentença">
-</datalist>
+<!-- ===== PÁGINA: DEJEN ===== -->
+<div class="pg" id="pg-dejen">
+
+  <!-- HEADER INFO + GOOGLE CALENDAR AUTH -->
+  <div style="background:var(--fs);border:1px solid var(--bd);border-radius:10px;padding:18px 22px;margin-bottom:20px;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:14px;">
+    <div>
+      <div style="font-family:'Playfair Display',serif;font-size:16px;color:var(--tp);margin-bottom:4px;">📡 Monitoramento DEJEN + 📅 Google Agenda</div>
+      <div style="font-size:11px;color:var(--tw);line-height:1.6;">
+        Consulta publicações/intimações e agenda prazos automaticamente — 2 dias antes do vencimento.<br>
+        <span style="color:var(--ch);">Advogada:</span> Débora Ewenne Santos da Silva &nbsp;|&nbsp;
+        <span style="color:var(--ch);">OAB/SP:</span> 378.037
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <div id="dejen-status" style="font-size:11px;color:var(--tw);padding:6px 12px;background:var(--fp);border:1px solid var(--bd);border-radius:6px;">🔵 Aguardando consulta</div>
+      <div id="gcal-status" style="font-size:11px;padding:6px 12px;background:var(--fp);border:1px solid var(--bd);border-radius:6px;color:var(--tw);">📅 Agenda: desconectada</div>
+      <button class="btn-o" onclick="autorizarGoogleCalendar()" id="btn-gcal-auth" style="font-size:12px;">🔐 Conectar Agenda</button>
+      <button class="btn-v" onclick="consultarDEJEN()" id="btn-dejen-consultar">🔍 Consultar DEJEN</button>
+    </div>
+  </div>
+
+  <!-- CARDS RESUMO -->
+  <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(148px,1fr));margin-bottom:20px;">
+    <div class="card">
+      <div class="card-l">Última Consulta</div>
+      <div class="card-v" id="dj-ultima" style="font-size:13px;color:var(--ch);">—</div>
+      <div class="card-s">data/hora</div>
+    </div>
+    <div class="card">
+      <div class="card-l">Comunicações</div>
+      <div class="card-v" id="dj-total">0</div>
+      <div class="card-s">encontradas</div>
+    </div>
+    <div class="card">
+      <div class="card-l">Novidades</div>
+      <div class="card-v" id="dj-novas" style="color:#7ec492;">0</div>
+      <div class="card-s">não reportadas</div>
+    </div>
+    <div class="card">
+      <div class="card-l">Certidões</div>
+      <div class="card-v" id="dj-certidoes" style="color:var(--do);">0</div>
+      <div class="card-s">obtidas</div>
+    </div>
+    <div class="card">
+      <div class="card-l">Eventos Agendados</div>
+      <div class="card-v" id="dj-agendados" style="color:#7ec492;">0</div>
+      <div class="card-s">no Google Agenda</div>
+    </div>
+    <div class="card">
+      <div class="card-l">Tribunais</div>
+      <div class="card-v" id="dj-tribunais">0</div>
+      <div class="card-s">carregados</div>
+    </div>
+  </div>
+
+  <!-- BARRA DE AÇÕES -->
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">
+    <select class="sel" id="dj-filtro-status" onchange="filtrarDEJEN()">
+      <option value="">Todas as comunicações</option>
+      <option value="novo">Somente novidades</option>
+      <option value="reportado">Já reportadas</option>
+    </select>
+    <select class="sel" id="dj-filtro-tribunal" onchange="filtrarDEJEN()">
+      <option value="">Todos os tribunais</option>
+    </select>
+    <button class="btn-v" onclick="agendarTodasNovidades()" id="btn-agendar-todas" style="background:linear-gradient(135deg,#1a73e8,#1557b0);">📅 Agendar Todas as Novidades</button>
+    <button class="btn-o" onclick="exportDejenCSV()">⬇ Exportar CSV</button>
+    <button class="btn-o" onclick="limparHistoricoDejen()" style="color:var(--rc);border-color:rgba(192,80,74,.3);">🗑 Limpar Histórico</button>
+  </div>
+
+  <!-- LEGENDA PEÇAS -->
+  <div style="background:var(--fs);border:1px solid var(--bd);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:11px;color:var(--tw);">
+    <span style="color:var(--ch);font-weight:600;">Sugestão automática de peça jurídica:</span>
+    o sistema analisa o tipo de comunicação e sugere a peça adequada — Contestação, Contrarrazões, Recurso, Manifestação, Petição ou Memorial — com base na jurisprudência do TJSP e na prática forense de servidores públicos.
+    O evento é criado <strong style="color:var(--tp);">2 dias antes do vencimento do prazo</strong>, com alerta no Google Agenda.
+  </div>
+
+  <!-- LISTA DE COMUNICAÇÕES -->
+  <div class="tbl-box" id="dj-container">
+    <div class="tbl-bar">
+      <div class="tbl-tit">Comunicações, Intimações e Prazos</div>
+      <div class="tbl-cnt" id="dj-cnt">0 registros</div>
+    </div>
+    <div id="dj-lista" style="padding:0;">
+      <div class="vazio" style="padding:60px 40px;">
+        <div class="vazio-ic">📡</div>
+        <div style="font-family:'Playfair Display',serif;font-size:15px;opacity:.55;margin-bottom:5px;">Nenhuma consulta realizada</div>
+        <div class="vazio-s">Clique em "Consultar DEJEN" para buscar publicações e intimações.<br>Em seguida, conecte o Google Agenda para agendar os prazos automaticamente.</div>
+        <div style="margin-top:16px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+          <button class="btn-v" onclick="consultarDEJEN()">🔍 Consultar DEJEN</button>
+          <button class="btn-o" onclick="autorizarGoogleCalendar()">📅 Conectar Google Agenda</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOG -->
+  <div style="margin-top:20px;">
+    <div style="font-family:'Playfair Display',serif;font-size:13px;margin-bottom:10px;padding-bottom:7px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;">
+      <span>📋 Log da Última Consulta</span>
+      <button class="btn-o" style="font-size:10px;padding:4px 10px;" onclick="var l=document.getElementById('dj-log');l.style.display=l.style.display==='none'?'block':'none'">Mostrar/Ocultar</button>
+    </div>
+    <div id="dj-log" style="display:none;background:var(--fi);border:1px solid var(--bd);border-radius:8px;padding:16px;font-family:monospace;font-size:11px;color:var(--tw);line-height:1.8;max-height:350px;overflow-y:auto;white-space:pre-wrap;">Nenhuma consulta registrada ainda.</div>
+  </div>
+
+</div>
 
 <!-- ===== OVERLAY / MODAL CADASTRO ===== -->
 <div id="overlay" onclick="overlayClick(event)">
-  <div class="modal" id="modal" style="max-width:820px;">
+  <div class="modal" id="modal">
     <div class="mo-head">
       <div>
         <div class="mo-tit" id="mo-tit">Novo Cliente</div>
-        <div class="mo-sub" id="mo-sub">Dados pessoais + processos vinculados</div>
+        <div class="mo-sub" id="mo-sub">Preencha os dados do contrato</div>
       </div>
       <button class="mo-cls" onclick="fecharModal()">✕</button>
     </div>
     <div class="mo-abas">
-      <button class="mo-aba on" id="tab-btn-0" onclick="moAba(0)">👤 Dados Pessoais</button>
-      <button class="mo-aba" id="tab-btn-1" onclick="moAba(1)">⚖️ Processos</button>
+      <button class="mo-aba on" id="tab-btn-0" onclick="moAba(0)">📋 Dados Gerais</button>
+      <button class="mo-aba" id="tab-btn-1" onclick="moAba(1)">💳 Financeiro</button>
+      <button class="mo-aba" id="tab-btn-2" onclick="moAba(2)">📬 Contato</button>
     </div>
 
-    <!-- PAINEL 0: DADOS PESSOAIS -->
+    <!-- PAINEL 0: DADOS GERAIS -->
     <div class="mo-panel on" id="tab-0">
       <div class="sec">Identificação</div>
       <div class="gr gr2">
         <div class="fg"><label class="fl">Nome Completo *</label><input class="fi" id="f-nome" placeholder="Nome completo do cliente"></div>
-        <div class="fg"><label class="fl">CPF / Matrícula</label><input class="fi" id="f-cpf" placeholder="000.000.000-00"></div>
+        <div class="fg"><label class="fl">Data do Contrato *</label><input type="date" class="fi" id="f-data"></div>
       </div>
+      <div class="gr">
+        <div class="fg"><label class="fl">Tipo de Ação *</label>
+          <input class="fi" id="f-tipo" list="tipos-list" placeholder="Ex.: Reintegração ao Cargo">
+          <datalist id="tipos-list">
+            <option value="PAD / Processo Administrativo Disciplinar">
+            <option value="Reintegração ao Cargo">
+            <option value="Progressão e Promoção">
+            <option value="Licença Médica / Assiduidade">
+            <option value="Abono de Permanência">
+            <option value="Insalubridade">
+            <option value="Desvio de Função">
+            <option value="Bonificação por Resultados">
+            <option value="Estágio Probatório">
+            <option value="Revisão Remuneratória">
+            <option value="Aposentadoria / Pensão">
+            <option value="Descongelamento de Tempo (LC 226/2026)">
+            <option value="Piso do Magistério (Lei 15.326/2026)">
+            <option value="Adicionais Temporais">
+            <option value="Nomeação / Concurso Público">
+          </datalist>
+        </div>
+      </div>
+      <div class="sec">Processo Judicial</div>
+      <div class="gr gr2">
+        <div class="fg"><label class="fl">Status *</label>
+          <select class="fi" id="f-status" onchange="toggleProtocolado()">
+            <option value="">Selecione...</option>
+            <option value="Ainda não protocolado">Ainda não protocolado</option>
+            <option value="Protocolado">Protocolado</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Valor do Processo (R$) *</label><input class="fi" id="f-valor" placeholder="0,00" oninput="fmtMoeda(this)"></div>
+      </div>
+      <div id="grp-proc" style="display:none;">
+        <div class="gr gr2">
+          <div class="fg"><label class="fl">Número do Processo</label><input class="fi" id="f-numproc" placeholder="0000000-00.0000.0.00.0000"></div>
+          <div class="fg"><label class="fl">Fase Processual</label>
+            <input class="fi" id="f-fase" list="fases-list" placeholder="Ex.: Petição Inicial">
+            <datalist id="fases-list">
+              <option value="Petição Inicial protocolada">
+              <option value="Aguardando citação">
+              <option value="Contestação apresentada">
+              <option value="Fase de instrução">
+              <option value="Audiência designada">
+              <option value="Aguardando sentença">
+              <option value="Sentença proferida">
+              <option value="Recurso em andamento">
+              <option value="Trânsito em julgado">
+              <option value="Fase de execução">
+              <option value="Cumprimento de sentença">
+            </datalist>
+          </div>
+        </div>
+      </div>
+      <div class="gr">
+        <div class="fg"><label class="fl">Observações</label><input class="fi" id="f-obs" placeholder="Notas adicionais (opcional)"></div>
+      </div>
+    </div>
+
+    <!-- PAINEL 1: FINANCEIRO -->
+    <div class="mo-panel" id="tab-1">
+
+      <div class="sec">Taxa Administrativa</div>
+      <div class="chk-row"><input type="checkbox" id="ck-taxa" onchange="toggleTaxa()"><label for="ck-taxa">Taxa administrativa foi cobrada</label></div>
+      <div id="grp-taxa" style="display:none;">
+        <div class="gr gr3">
+          <div class="fg"><label class="fl">Valor (R$)</label><input class="fi" id="f-taxa-val" placeholder="0,00" oninput="fmtMoeda(this);calcComissao()"></div>
+          <div class="fg"><label class="fl">Modalidade</label>
+            <select class="fi" id="f-taxa-mod" onchange="toggleTaxaParc()">
+              <option value="avista">À vista</option>
+              <option value="parcelado">Parcelado</option>
+            </select>
+          </div>
+          <div class="fg"><label class="fl">Situação</label>
+            <select class="fi" id="f-taxa-sit" onchange="calcComissao()">
+              <option value="nao">Não paga</option>
+              <option value="sim">Paga</option>
+            </select>
+          </div>
+        </div>
+        <div id="grp-taxa-parc" style="display:none;">
+          <div class="fg" style="margin-bottom:10px;"><label class="fl">Número de Parcelas</label>
+            <input type="number" class="fi" id="f-taxa-np" min="1" max="60" placeholder="Ex.: 3" oninput="gerarParc('taxa')">
+          </div>
+          <div class="parc-box" id="taxa-parc"></div>
+        </div>
+      </div>
+
+      <div class="sec">Honorários Iniciais</div>
+      <div class="chk-row"><input type="checkbox" id="ck-hon" onchange="toggleHon()"><label for="ck-hon">Honorários iniciais foram cobrados</label></div>
+      <div id="grp-hon" style="display:none;">
+        <div class="gr gr3">
+          <div class="fg"><label class="fl">Valor (R$)</label><input class="fi" id="f-hon-val" placeholder="0,00" oninput="fmtMoeda(this)"></div>
+          <div class="fg"><label class="fl">Modalidade</label>
+            <select class="fi" id="f-hon-mod" onchange="toggleHonParc()">
+              <option value="avista">À vista</option>
+              <option value="parcelado">Parcelado</option>
+            </select>
+          </div>
+          <div class="fg"><label class="fl">Situação</label>
+            <select class="fi" id="f-hon-sit">
+              <option value="nao">Não pago</option>
+              <option value="sim">Pago</option>
+            </select>
+          </div>
+        </div>
+        <div id="grp-hon-parc" style="display:none;">
+          <div class="fg" style="margin-bottom:10px;"><label class="fl">Número de Parcelas</label>
+            <input type="number" class="fi" id="f-hon-np" min="1" max="60" placeholder="Ex.: 6" oninput="gerarParc('hon')">
+          </div>
+          <div class="parc-box" id="hon-parc"></div>
+        </div>
+      </div>
+
+      <div class="sec">Honorários do Processo</div>
+      <div class="gr gr2">
+        <div class="fg"><label class="fl">Forma de Honorários</label>
+          <select class="fi" id="f-pagamento" onchange="toggleExito()">
+            <option value="">Selecione...</option>
+            <option value="Êxito (percentual)">Êxito (percentual)</option>
+            <option value="Honorários fixos">Honorários fixos</option>
+            <option value="Êxito + fixo">Êxito + fixo</option>
+            <option value="Parcelado">Parcelado</option>
+            <option value="À vista">À vista</option>
+          </select>
+        </div>
+        <div class="fg" id="grp-exito" style="display:none;">
+          <label class="fl">Percentual de Êxito (%)</label>
+          <select class="fi" id="f-exito-pct" onchange="document.getElementById('grp-exito-custom').style.display=(this.value==='outro'?'block':'none')">
+            <option value="">Selecione...</option>
+            <option value="10">10%</option>
+            <option value="15">15%</option>
+            <option value="20">20%</option>
+            <option value="25">25%</option>
+            <option value="30">30%</option>
+            <option value="33">33%</option>
+            <option value="35">35%</option>
+            <option value="40">40%</option>
+            <option value="outro">Outro %</option>
+          </select>
+        </div>
+      </div>
+      <div id="grp-exito-custom" style="display:none;">
+        <div class="fg"><label class="fl">Percentual personalizado (%)</label>
+          <input type="number" class="fi" id="f-exito-custom" min="1" max="100" placeholder="Ex.: 28">
+        </div>
+      </div>
+
+      <div class="sec">Comissão do Setor Comercial</div>
+      <div style="font-size:11px;color:var(--tw);margin-bottom:10px;">Calculada sobre o valor das taxas efetivamente pagas</div>
+      <div class="gr gr2">
+        <div class="fg"><label class="fl">Percentual de Comissão</label>
+          <select class="fi" id="f-comissao-pct" onchange="calcComissao()">
+            <option value="">Sem comissão</option>
+            <option value="20">20%</option>
+            <option value="30">30%</option>
+            <option value="40">40%</option>
+            <option value="50">50%</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Comissão Calculada</label>
+          <div class="fi" id="f-comissao-calc" style="background:rgba(0,0,0,.2);color:var(--ch);cursor:default;display:flex;align-items:center;">R$ 0,00</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAINEL 2: CONTATO -->
+    <div class="mo-panel" id="tab-2">
+      <div class="sec">Dados de Contato</div>
       <div class="gr gr2">
         <div class="fg"><label class="fl">E-mail</label><input type="email" class="fi" id="f-email" placeholder="cliente@email.com"></div>
         <div class="fg"><label class="fl">WhatsApp</label><input class="fi" id="f-whats" placeholder="(12) 99999-9999" oninput="fmtTel(this)"></div>
       </div>
       <div class="gr gr2">
-        <div class="fg"><label class="fl">Órgão / Repartição</label><input class="fi" id="f-orgao" placeholder="Ex.: SEDUC SP, PMESP, Prefeitura..."></div>
-        <div class="fg"><label class="fl">Observações Gerais</label><input class="fi" id="f-obs-geral" placeholder="Notas sobre o cliente"></div>
+        <div class="fg"><label class="fl">CPF / Matrícula</label><input class="fi" id="f-cpf" placeholder="000.000.000-00"></div>
+        <div class="fg"><label class="fl">Órgão / Repartição</label><input class="fi" id="f-orgao" placeholder="Ex.: SEDUC SP, PMESP..."></div>
       </div>
-      <div class="gr gr2">
-        <div class="fg">
-          <label class="fl">🤝 Responsável Comercial (quem fechou o contrato)</label>
-          <input class="fi" id="f-comercial" list="comercial-list" placeholder="Nome de quem captou o cliente">
-          <datalist id="comercial-list">
-            <option value="Débora Constantino">
-            <option value="Equipe Comercial">
-          </datalist>
-        </div>
-        <div class="fg"><label class="fl">Data do Fechamento Comercial</label><input type="date" class="fi" id="f-data-comercial"></div>
-      </div>
-      <div style="margin-top:14px;padding:12px 14px;background:rgba(63,103,73,.07);border:1px solid rgba(63,103,73,.2);border-radius:7px;font-size:12px;color:var(--ts);line-height:1.6;">
-        💡 <strong style="color:var(--ch)">Cliente com múltiplos processos?</strong> Cadastre os dados pessoais aqui e adicione quantos processos quiser na aba <strong>⚖️ Processos</strong>. Cada processo tem seus próprios dados financeiros, contrato e número.
-      </div>
-    </div>
-
-    <!-- PAINEL 1: PROCESSOS -->
-    <div class="mo-panel" id="tab-1">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-        <div style="font-size:12px;color:var(--ts);">Adicione um ou mais processos para este cliente.</div>
-        <button class="btn-v" onclick="adicionarProcesso()" style="font-size:12px;padding:7px 14px;">+ Adicionar Processo</button>
-      </div>
-      <div id="processos-lista"></div>
     </div>
 
     <div class="mo-foot">
@@ -1390,7 +1390,6 @@ var PARCEIROS = [];
 var INDICACOES = [];
 var PAD = [];
 var ATENDIMENTOS = [];
-var AUDIENCIAS = [];
 var editId = null;
 var delId = null;
 var editPrazoId = null;
@@ -1398,9 +1397,6 @@ var editParceiroId = null;
 var editIndicacaoId = null;
 var editPADId = null;
 var editAtendId = null;
-var editAudId = null;
-var audSalva = null;
-var atendSalvo = null;
 var sCol = 'data', sDir = 'desc';
 
 function loadDB() { }
@@ -1413,409 +1409,89 @@ function mudarAba(id, btn) {
   document.getElementById('pg-'+id).classList.add('on');
   btn.classList.add('on');
   if (id === 'recebimentos') renderRecebimentos();
-  if (id === 'recebidos') iniciarRecebidos();
   if (id === 'alertas') renderAlertasFull();
   if (id === 'relatorios') iniciarRelatorios();
   if (id === 'prazos') renderPrazos();
   if (id === 'parceiros') renderParceiros();
   if (id === 'pad') renderPAD();
   if (id === 'atendimentos') renderAtendimentos();
-  if (id === 'audiencias') renderAudiencias();
+  if (id === 'dejen') iniciarDEJEN();
 }
 
-// ========== MODAL — MÚLTIPLOS PROCESSOS ==========
-var processosEdicao = [];
-
+// ========== MODAL ==========
 function abrirModal(id) {
   editId = id;
   moAba(0);
-  processosEdicao = [];
-  // Popular datalist de comerciais com nomes já usados
-  popularListaComercial();
+  limparForm();
 
   if (id !== null) {
     var c = DB.find(function(x){ return x.id === id; });
     if (!c) return;
     document.getElementById('mo-tit').textContent = 'Editar Cliente';
     document.getElementById('mo-sub').textContent = c.nome || '';
-    setVal('f-nome', c.nome||'');
-    setVal('f-cpf', c.cpf||'');
-    setVal('f-email', c.email||'');
-    setVal('f-whats', c.whats||'');
-    setVal('f-orgao', c.orgao||'');
-    setVal('f-obs-geral', c.obsGeral||c.obs||'');
-    setVal('f-comercial', c.comercial||'');
-    setVal('f-data-comercial', c.dataComercial||'');
-    // Carregar processos: novo formato (array) ou legado (campo único)
-    if (c.processos && c.processos.length) {
-      processosEdicao = JSON.parse(JSON.stringify(c.processos));
+    setVal('f-nome', c.nome);
+    setVal('f-data', c.data);
+    setVal('f-tipo', c.tipo);
+    setVal('f-status', c.status);
+    setVal('f-numproc', c.numproc || '');
+    setVal('f-fase', c.fase || '');
+    setVal('f-valor', c.valor);
+    setVal('f-obs', c.obs || '');
+    setVal('f-email', c.email || '');
+    setVal('f-whats', c.whats || '');
+    setVal('f-cpf', c.cpf || '');
+    setVal('f-orgao', c.orgao || '');
+    setVal('f-pagamento', c.pagamento || '');
+    toggleExito();
+    // Êxito percentual
+    var exitoVal = c.exitoPct || '';
+    var exitoOpts = ['10','15','20','25','30','33','35','40'];
+    if (exitoVal && exitoOpts.indexOf(exitoVal) === -1 && exitoVal !== '') {
+      setVal('f-exito-pct','outro');
+      setVal('f-exito-custom', exitoVal);
+      document.getElementById('grp-exito-custom').style.display = 'block';
     } else {
-      // Migrar registro legado para o novo formato
-      processosEdicao = [{
-        tipo: c.tipo||'', data: c.data||'', status: c.status||'',
-        valor: c.valor||'', numproc: c.numproc||'', fase: c.fase||'',
-        pagamento: c.pagamento||'', exitoPct: c.exitoPct||'',
-        comissaoPct: c.comissaoPct||'', obs: c.obs||'',
-        taxa: c.taxa||null, hon: c.hon||null
-      }];
+      setVal('f-exito-pct', exitoVal);
+      document.getElementById('grp-exito-custom').style.display = 'none';
+    }
+    setVal('f-comissao-pct', c.comissaoPct || '');
+    toggleProtocolado();
+
+    // Taxa
+    if (c.taxa) {
+      document.getElementById('ck-taxa').checked = true;
+      toggleTaxa();
+      setVal('f-taxa-val', c.taxa.valor || '');
+      setVal('f-taxa-mod', c.taxa.mod || 'avista');
+      setVal('f-taxa-sit', c.taxa.pago ? 'sim' : 'nao');
+      if (c.taxa.mod === 'parcelado') {
+        toggleTaxaParc();
+        setVal('f-taxa-np', c.taxa.parcelas ? c.taxa.parcelas.length : '');
+        carregarParc('taxa', c.taxa.parcelas || [], c.taxa.valor);
+      }
+    }
+    // Hon
+    if (c.hon) {
+      document.getElementById('ck-hon').checked = true;
+      toggleHon();
+      setVal('f-hon-val', c.hon.valor || '');
+      setVal('f-hon-mod', c.hon.mod || 'avista');
+      setVal('f-hon-sit', c.hon.pago ? 'sim' : 'nao');
+      if (c.hon.mod === 'parcelado') {
+        toggleHonParc();
+        setVal('f-hon-np', c.hon.parcelas ? c.hon.parcelas.length : '');
+        carregarParc('hon', c.hon.parcelas || [], c.hon.valor);
+      }
     }
   } else {
     document.getElementById('mo-tit').textContent = 'Novo Cliente';
-    document.getElementById('mo-sub').textContent = 'Dados pessoais + processos';
-    setVal('f-nome',''); setVal('f-cpf','');
-    setVal('f-email',''); setVal('f-whats','');
-    setVal('f-orgao',''); setVal('f-obs-geral','');
-    processosEdicao = [novoProcessoObj()];
+    document.getElementById('mo-sub').textContent = 'Preencha os dados do contrato';
+    var hoje = new Date();
+    var iso = hoje.toISOString().split('T')[0];
+    setVal('f-data', iso);
   }
-  renderProcessosLista();
+
   document.getElementById('overlay').classList.add('on');
-}
-
-function novoProcessoObj() {
-  return {
-    tipo:'', data: new Date().toISOString().split('T')[0],
-    status:'', valor:'', numproc:'', fase:'',
-    pagamento:'', exitoPct:'', comissaoPct:'', obs:'',
-    taxa: null, hon: null
-  };
-}
-
-function adicionarProcesso() {
-  coletarProcessosDoDOM();
-  processosEdicao.push(novoProcessoObj());
-  renderProcessosLista();
-  // Rolar para o novo
-  setTimeout(function(){
-    var lista = document.getElementById('processos-lista');
-    lista.scrollTop = lista.scrollHeight;
-  }, 100);
-}
-
-function removerProcesso(idx) {
-  if (processosEdicao.length <= 1) { toast('O cliente precisa ter ao menos um processo', true); return; }
-  if (!confirm('Remover este processo do cliente?')) return;
-  coletarProcessosDoDOM();
-  processosEdicao.splice(idx, 1);
-  renderProcessosLista();
-}
-
-function coletarProcessosDoDOM() {
-  // Sincroniza processosEdicao com os valores atuais dos campos
-  processosEdicao.forEach(function(p, idx) {
-    var pref = 'p'+idx+'-';
-    p.tipo          = getVal(pref+'tipo');
-    p.data          = getVal(pref+'data');
-    p.status        = getVal(pref+'status');
-    p.valor         = getVal(pref+'valor');
-    p.numproc       = getVal(pref+'numproc');
-    p.fase          = getVal(pref+'fase');
-    p.protocolador  = getVal(pref+'protocolador');
-    p.dataProtocolo = getVal(pref+'dataProtocolo');
-    p.pagamento     = getVal(pref+'pagamento');
-    p.obs           = getVal(pref+'obs');
-    var exitoEl = document.getElementById(pref+'exito-pct');
-    var customEl = document.getElementById(pref+'exito-custom');
-    p.exitoPct  = (exitoEl && exitoEl.value === 'outro') ? (customEl ? customEl.value : '') : (exitoEl ? exitoEl.value : '');
-    p.comissaoPct = getVal(pref+'comissao-pct');
-    // Taxa
-    var ckTaxa = document.getElementById(pref+'ck-taxa');
-    if (ckTaxa && ckTaxa.checked) {
-      var tMod = getVal(pref+'taxa-mod');
-      p.taxa = {
-        valor: getVal(pref+'taxa-val'), mod: tMod,
-        pago: getVal(pref+'taxa-sit') === 'sim',
-        parcelas: tMod === 'parcelado' ? coletarParcP(pref+'taxa') : []
-      };
-    } else { p.taxa = null; }
-    // Hon
-    var ckHon = document.getElementById(pref+'ck-hon');
-    if (ckHon && ckHon.checked) {
-      var hMod = getVal(pref+'hon-mod');
-      p.hon = {
-        valor: getVal(pref+'hon-val'), mod: hMod,
-        pago: getVal(pref+'hon-sit') === 'sim',
-        parcelas: hMod === 'parcelado' ? coletarParcP(pref+'hon') : []
-      };
-    } else { p.hon = null; }
-  });
-}
-
-function coletarParcP(prefTipo) {
-  var resultado = [], i = 0;
-  while (true) {
-    var d = document.getElementById(prefTipo+'-d-'+i);
-    var pg = document.getElementById(prefTipo+'-pg-'+i);
-    var vl = document.getElementById(prefTipo+'-vl-'+i);
-    if (!d) break;
-    resultado.push({ data: d.value, pago: pg ? pg.checked : false, valorParcela: vl ? vl.value : '' });
-    i++;
-  }
-  return resultado;
-}
-
-function renderProcessosLista() {
-  var cont = document.getElementById('processos-lista');
-  if (!cont) return;
-  cont.innerHTML = '';
-  processosEdicao.forEach(function(p, idx) {
-    cont.appendChild(buildProcessoCard(p, idx));
-  });
-}
-
-function buildProcessoCard(p, idx) {
-  var pref = 'p'+idx+'-';
-  var wrap = document.createElement('div');
-  wrap.className = 'proc-item';
-  wrap.id = 'proc-card-'+idx;
-
-  var label = (p.tipo || 'Processo '+(idx+1)) + (p.numproc ? ' — '+p.numproc : '');
-  var isExito = (p.pagamento === 'Êxito (percentual)' || p.pagamento === 'Êxito + fixo');
-  var taxaTemParc = p.taxa && p.taxa.mod === 'parcelado';
-  var honTemParc  = p.hon  && p.hon.mod  === 'parcelado';
-
-  wrap.innerHTML =
-    '<div class="proc-item-head" onclick="toggleProcCard('+idx+')">' +
-      '<div><div class="proc-item-num">⚖️ '+(idx+1)+'º Processo — '+esc(p.tipo||'Novo processo')+'</div>' +
-        (p.numproc ? '<div class="proc-item-tipo">'+esc(p.numproc)+'</div>' : '') +
-      '</div>' +
-      '<div style="display:flex;gap:6px;align-items:center;">' +
-        '<button type="button" onclick="event.stopPropagation();removerProcesso('+idx+')" class="btn-ic x" title="Remover este processo">🗑️</button>' +
-        '<span style="font-size:16px;color:var(--tw)" id="proc-arrow-'+idx+'">▾</span>' +
-      '</div>' +
-    '</div>' +
-    '<div class="proc-item-body" id="proc-body-'+idx+'" style="display:block;">' +
-
-    // DADOS GERAIS
-    '<div class="sec" style="margin-top:0;">Dados do Processo</div>' +
-    '<div class="gr" style="margin-bottom:10px;">' +
-      '<div class="fg"><label class="fl">Tipo de Ação *</label>' +
-        '<input class="fi" id="'+pref+'tipo" list="tipos-list" value="'+esc(p.tipo||'')+'" placeholder="Ex.: Reintegração ao Cargo">' +
-      '</div>' +
-    '</div>' +
-    '<div class="gr gr3" style="margin-bottom:10px;">' +
-      '<div class="fg"><label class="fl">Data do Contrato</label><input type="date" class="fi" id="'+pref+'data" value="'+(p.data||'')+'"></div>' +
-      '<div class="fg"><label class="fl">Status</label>' +
-        '<select class="fi" id="'+pref+'status">' +
-          '<option value=""'+(p.status===''?' selected':'')+'>Selecione...</option>' +
-          '<option value="Ainda não protocolado"'+(p.status==='Ainda não protocolado'?' selected':'')+'>Ainda não protocolado</option>' +
-          '<option value="Protocolado"'+(p.status==='Protocolado'?' selected':'')+'>Protocolado</option>' +
-        '</select>' +
-      '</div>' +
-      '<div class="fg"><label class="fl">Valor do Processo (R$)</label><input class="fi" id="'+pref+'valor" value="'+esc(p.valor||'')+'" placeholder="0,00" oninput="fmtMoeda(this)"></div>' +
-    '</div>' +
-    '<div class="gr gr2" style="margin-bottom:10px;">' +
-      '<div class="fg"><label class="fl">Nº do Processo</label><input class="fi" id="'+pref+'numproc" value="'+esc(p.numproc||'')+'" placeholder="0000000-00.0000.0.00.0000"></div>' +
-      '<div class="fg"><label class="fl">Fase Processual</label>' +
-        '<input class="fi" id="'+pref+'fase" list="fases-list" value="'+esc(p.fase||'')+'" placeholder="Ex.: Petição Inicial">' +
-      '</div>' +
-    '</div>' +
-    '<div class="gr gr3" style="margin-bottom:10px;">' +
-      '<div class="fg"><label class="fl">📋 Quem protocolou</label>' +
-        '<input class="fi" id="'+pref+'protocolador" list="comercial-list" value="'+esc(p.protocolador||'')+'" placeholder="Nome de quem protocolou">' +
-      '</div>' +
-      '<div class="fg"><label class="fl">📅 Data de Protocolo</label><input type="date" class="fi" id="'+pref+'dataProtocolo" value="'+(p.dataProtocolo||'')+'"></div>' +
-      '<div class="fg"><label class="fl">Observações deste processo</label><input class="fi" id="'+pref+'obs" value="'+esc(p.obs||'')+'" placeholder="Notas adicionais"></div>' +
-    '</div>' +
-
-    // TAXA
-    '<div class="sec">Taxa Administrativa</div>' +
-    '<div class="chk-row"><input type="checkbox" id="'+pref+'ck-taxa" '+(p.taxa?'checked':'')+' onchange="toggleProcTaxa('+idx+')"><label for="'+pref+'ck-taxa">Taxa administrativa foi cobrada</label></div>' +
-    '<div id="'+pref+'grp-taxa" style="display:'+(p.taxa?'block':'none')+';">' +
-      '<div class="gr gr3" style="margin-bottom:8px;">' +
-        '<div class="fg"><label class="fl">Valor (R$)</label><input class="fi" id="'+pref+'taxa-val" value="'+esc((p.taxa&&p.taxa.valor)||'')+'" placeholder="0,00" oninput="fmtMoeda(this);calcComissaoP('+idx+')"></div>' +
-        '<div class="fg"><label class="fl">Modalidade</label>' +
-          '<select class="fi" id="'+pref+'taxa-mod" onchange="toggleProcTaxaParc('+idx+')">' +
-            '<option value="avista"'+((!p.taxa||p.taxa.mod==='avista')?' selected':'')+'>À vista</option>' +
-            '<option value="parcelado"'+((p.taxa&&p.taxa.mod==='parcelado')?' selected':'')+'>Parcelado</option>' +
-          '</select>' +
-        '</div>' +
-        '<div class="fg"><label class="fl">Situação</label>' +
-          '<select class="fi" id="'+pref+'taxa-sit" onchange="calcComissaoP('+idx+')">' +
-            '<option value="nao"'+((p.taxa&&p.taxa.pago)?'':' selected')+'>Não paga</option>' +
-            '<option value="sim"'+((p.taxa&&p.taxa.pago)?' selected':'')+'>Paga</option>' +
-          '</select>' +
-        '</div>' +
-      '</div>' +
-      '<div id="'+pref+'grp-taxa-parc" style="display:'+(taxaTemParc?'block':'none')+';">' +
-        '<div class="fg" style="margin-bottom:8px;"><label class="fl">Número de Parcelas</label>' +
-          '<input type="number" class="fi" id="'+pref+'taxa-np" value="'+(taxaTemParc?(p.taxa.parcelas||[]).length:'')+'" min="1" max="60" placeholder="Ex.: 3" oninput="gerarParcP(\''+pref+'taxa\',this.value,document.getElementById(\''+pref+'taxa-val\').value)">' +
-        '</div>' +
-        '<div class="parc-box" id="'+pref+'taxa-parc-box"></div>' +
-      '</div>' +
-    '</div>' +
-
-    // HONORÁRIOS
-    '<div class="sec">Honorários Iniciais</div>' +
-    '<div class="chk-row"><input type="checkbox" id="'+pref+'ck-hon" '+(p.hon?'checked':'')+' onchange="toggleProcHon('+idx+')"><label for="'+pref+'ck-hon">Honorários iniciais foram cobrados</label></div>' +
-    '<div id="'+pref+'grp-hon" style="display:'+(p.hon?'block':'none')+';">' +
-      '<div class="gr gr3" style="margin-bottom:8px;">' +
-        '<div class="fg"><label class="fl">Valor (R$)</label><input class="fi" id="'+pref+'hon-val" value="'+esc((p.hon&&p.hon.valor)||'')+'" placeholder="0,00" oninput="fmtMoeda(this)"></div>' +
-        '<div class="fg"><label class="fl">Modalidade</label>' +
-          '<select class="fi" id="'+pref+'hon-mod" onchange="toggleProcHonParc('+idx+')">' +
-            '<option value="avista"'+((!p.hon||p.hon.mod==='avista')?' selected':'')+'>À vista</option>' +
-            '<option value="parcelado"'+((p.hon&&p.hon.mod==='parcelado')?' selected':'')+'>Parcelado</option>' +
-          '</select>' +
-        '</div>' +
-        '<div class="fg"><label class="fl">Situação</label>' +
-          '<select class="fi" id="'+pref+'hon-sit">' +
-            '<option value="nao"'+((p.hon&&p.hon.pago)?'':' selected')+'>Não pago</option>' +
-            '<option value="sim"'+((p.hon&&p.hon.pago)?' selected':'')+'>Pago</option>' +
-          '</select>' +
-        '</div>' +
-      '</div>' +
-      '<div id="'+pref+'grp-hon-parc" style="display:'+(honTemParc?'block':'none')+';">' +
-        '<div class="fg" style="margin-bottom:8px;"><label class="fl">Número de Parcelas</label>' +
-          '<input type="number" class="fi" id="'+pref+'hon-np" value="'+(honTemParc?(p.hon.parcelas||[]).length:'')+'" min="1" max="60" placeholder="Ex.: 6" oninput="gerarParcP(\''+pref+'hon\',this.value,document.getElementById(\''+pref+'hon-val\').value)">' +
-        '</div>' +
-        '<div class="parc-box" id="'+pref+'hon-parc-box"></div>' +
-      '</div>' +
-    '</div>' +
-
-    // HONORÁRIOS DO PROCESSO
-    '<div class="sec">Honorários do Processo</div>' +
-    '<div class="gr gr2" style="margin-bottom:8px;">' +
-      '<div class="fg"><label class="fl">Forma</label>' +
-        '<select class="fi" id="'+pref+'pagamento" onchange="toggleProcExito('+idx+')">' +
-          '<option value=""'+(p.pagamento===''?' selected':'')+'>Selecione...</option>' +
-          '<option value="Êxito (percentual)"'+(p.pagamento==='Êxito (percentual)'?' selected':'')+'>Êxito (percentual)</option>' +
-          '<option value="Honorários fixos"'+(p.pagamento==='Honorários fixos'?' selected':'')+'>Honorários fixos</option>' +
-          '<option value="Êxito + fixo"'+(p.pagamento==='Êxito + fixo'?' selected':'')+'>Êxito + fixo</option>' +
-          '<option value="Parcelado"'+(p.pagamento==='Parcelado'?' selected':'')+'>Parcelado</option>' +
-          '<option value="À vista"'+(p.pagamento==='À vista'?' selected':'')+'>À vista</option>' +
-        '</select>' +
-      '</div>' +
-      '<div class="fg" id="'+pref+'grp-exito" style="display:'+(isExito?'block':'none')+';">' +
-        '<label class="fl">Percentual de Êxito (%)</label>' +
-        '<select class="fi" id="'+pref+'exito-pct" onchange="document.getElementById(\''+pref+'grp-exito-custom\').style.display=(this.value===\'outro\'?\'block\':\'none\')">' +
-          '<option value="">Selecione...</option>' +
-          ['10','15','20','25','30','33','35','40'].map(function(v){
-            return '<option value="'+v+'"'+(p.exitoPct===v?' selected':'')+'>'+v+'%</option>';
-          }).join('') +
-          '<option value="outro"'+(p.exitoPct&&['10','15','20','25','30','33','35','40'].indexOf(p.exitoPct)===-1?' selected':'')+'>Outro %</option>' +
-        '</select>' +
-      '</div>' +
-    '</div>' +
-    '<div id="'+pref+'grp-exito-custom" style="display:'+(p.exitoPct&&['10','15','20','25','30','33','35','40'].indexOf(p.exitoPct)===-1?'block':'none')+';">' +
-      '<div class="fg" style="margin-bottom:8px;"><label class="fl">Percentual personalizado (%)</label>' +
-        '<input type="number" class="fi" id="'+pref+'exito-custom" value="'+esc((['10','15','20','25','30','33','35','40'].indexOf(p.exitoPct)===-1&&p.exitoPct)?p.exitoPct:'')+'" min="1" max="100" placeholder="Ex.: 28">' +
-      '</div>' +
-    '</div>' +
-    '<div class="gr gr2" style="margin-bottom:8px;">' +
-      '<div class="fg"><label class="fl">Comissão Setor Comercial</label>' +
-        '<select class="fi" id="'+pref+'comissao-pct" onchange="calcComissaoP('+idx+')">' +
-          '<option value=""'+(p.comissaoPct===''?' selected':'')+'>Sem comissão</option>' +
-          ['20','30','40','50'].map(function(v){
-            return '<option value="'+v+'"'+(p.comissaoPct===v?' selected':'')+'>'+v+'%</option>';
-          }).join('') +
-        '</select>' +
-      '</div>' +
-      '<div class="fg">' +
-        '<label class="fl">Comissão Calculada</label>' +
-        '<div class="fi" id="'+pref+'comissao-calc" style="background:rgba(0,0,0,.2);color:var(--ch);cursor:default;display:flex;align-items:center;font-weight:600;">R$ 0,00</div>' +
-      '</div>' +
-    '</div>' +
-    '</div>'; // fim proc-item-body
-
-  // Carregar parcelas salvas após inserir no DOM
-  setTimeout(function() {
-    if (p.taxa && p.taxa.mod === 'parcelado' && p.taxa.parcelas && p.taxa.parcelas.length) {
-      carregarParcP(pref+'taxa', p.taxa.parcelas, p.taxa.valor);
-    }
-    if (p.hon && p.hon.mod === 'parcelado' && p.hon.parcelas && p.hon.parcelas.length) {
-      carregarParcP(pref+'hon', p.hon.parcelas, p.hon.valor);
-    }
-    calcComissaoP(idx);
-  }, 80);
-
-  return wrap;
-}
-
-function toggleProcCard(idx) {
-  var body = document.getElementById('proc-body-'+idx);
-  var arrow = document.getElementById('proc-arrow-'+idx);
-  if (!body) return;
-  var aberto = body.style.display !== 'none';
-  body.style.display = aberto ? 'none' : 'block';
-  if (arrow) arrow.textContent = aberto ? '▸' : '▾';
-}
-
-function toggleProcTaxa(idx) {
-  var pref = 'p'+idx+'-';
-  var ck = document.getElementById(pref+'ck-taxa');
-  document.getElementById(pref+'grp-taxa').style.display = ck.checked ? 'block' : 'none';
-  calcComissaoP(idx);
-}
-function toggleProcHon(idx) {
-  var pref = 'p'+idx+'-';
-  var ck = document.getElementById(pref+'ck-hon');
-  document.getElementById(pref+'grp-hon').style.display = ck.checked ? 'block' : 'none';
-}
-function toggleProcTaxaParc(idx) {
-  var pref = 'p'+idx+'-';
-  var v = document.getElementById(pref+'taxa-mod').value === 'parcelado';
-  document.getElementById(pref+'grp-taxa-parc').style.display = v ? 'block' : 'none';
-  if (!v) document.getElementById(pref+'taxa-parc-box').innerHTML = '';
-}
-function toggleProcHonParc(idx) {
-  var pref = 'p'+idx+'-';
-  var v = document.getElementById(pref+'hon-mod').value === 'parcelado';
-  document.getElementById(pref+'grp-hon-parc').style.display = v ? 'block' : 'none';
-  if (!v) document.getElementById(pref+'hon-parc-box').innerHTML = '';
-}
-function toggleProcExito(idx) {
-  var pref = 'p'+idx+'-';
-  var v = document.getElementById(pref+'pagamento').value;
-  var isExito = (v === 'Êxito (percentual)' || v === 'Êxito + fixo');
-  document.getElementById(pref+'grp-exito').style.display = isExito ? 'block' : 'none';
-}
-
-function gerarParcP(prefTipo, n, valTotal) {
-  n = parseInt(n) || 0;
-  var vUnit = n > 0 ? parseMoeda(valTotal) / n : 0;
-  var box = document.getElementById(prefTipo+'-parc-box');
-  if (!box) return;
-  var existentes = coletarParcP(prefTipo);
-  box.innerHTML = '';
-  for (var i = 0; i < n; i++) {
-    var ex = existentes[i] || {};
-    var vParcela = ex.valorParcela || fmtVal(vUnit);
-    var row = document.createElement('div');
-    row.className = 'parc-row';
-    row.style.gridTemplateColumns = '28px 1fr 1fr auto';
-    row.innerHTML =
-      '<span class="parc-n">'+(i+1)+'ª</span>' +
-      '<input type="date" class="parc-d" id="'+prefTipo+'-d-'+i+'" value="'+(ex.data||'')+'">' +
-      '<input type="text" class="parc-d" id="'+prefTipo+'-vl-'+i+'" value="'+vParcela+'" oninput="fmtMoeda(this)" style="background:rgba(180,138,74,.06);border:1px solid rgba(180,138,74,.2);border-radius:4px;padding:4px 7px;color:var(--ch);font-size:12px;font-weight:600;text-align:right;width:100%;" placeholder="0,00">' +
-      '<div class="parc-pg'+(ex.pago?' pago':'')+'" id="'+prefTipo+'-pg-wrap-'+i+'">' +
-        '<input type="checkbox" id="'+prefTipo+'-pg-'+i+'" '+(ex.pago?'checked':'')+' onchange="document.getElementById(\''+prefTipo+'-pg-wrap-'+i+'\').className=\'parc-pg\'+(this.checked?\' pago\':\'\')">' +
-        '<label for="'+prefTipo+'-pg-'+i+'">Pago</label>' +
-      '</div>';
-    box.appendChild(row);
-  }
-}
-
-function carregarParcP(prefTipo, parcelas, valorTotal) {
-  var n = parcelas.length;
-  var vUnit = n > 0 ? parseMoeda(valorTotal) / n : 0;
-  var box = document.getElementById(prefTipo+'-parc-box');
-  if (!box) return;
-  box.innerHTML = '';
-  for (var i = 0; i < n; i++) {
-    var p = parcelas[i];
-    var vParcela = p.valorParcela || fmtVal(vUnit);
-    var row = document.createElement('div');
-    row.className = 'parc-row';
-    row.style.gridTemplateColumns = '28px 1fr 1fr auto';
-    row.innerHTML =
-      '<span class="parc-n">'+(i+1)+'ª</span>' +
-      '<input type="date" class="parc-d" id="'+prefTipo+'-d-'+i+'" value="'+(p.data||'')+'">' +
-      '<input type="text" class="parc-d" id="'+prefTipo+'-vl-'+i+'" value="'+vParcela+'" oninput="fmtMoeda(this)" style="background:rgba(180,138,74,.06);border:1px solid rgba(180,138,74,.2);border-radius:4px;padding:4px 7px;color:var(--ch);font-size:12px;font-weight:600;text-align:right;width:100%;" placeholder="0,00">' +
-      '<div class="parc-pg'+(p.pago?' pago':'')+'" id="'+prefTipo+'-pg-wrap-'+i+'">' +
-        '<input type="checkbox" id="'+prefTipo+'-pg-'+i+'" '+(p.pago?'checked':'')+' onchange="document.getElementById(\''+prefTipo+'-pg-wrap-'+i+'\').className=\'parc-pg\'+(this.checked?\' pago\':\'\')">' +
-        '<label for="'+prefTipo+'-pg-'+i+'">Pago</label>' +
-      '</div>';
-    box.appendChild(row);
-  }
 }
 
 function fecharModal() {
@@ -1828,16 +1504,33 @@ function overlayClick(e) {
 }
 
 function limparForm() {
-  setVal('f-nome',''); setVal('f-cpf','');
-  setVal('f-email',''); setVal('f-whats','');
-  setVal('f-orgao',''); setVal('f-obs-geral','');
-  setVal('f-comercial',''); setVal('f-data-comercial','');
-  processosEdicao = [];
-  renderProcessosLista();
+  var ids = ['f-nome','f-data','f-tipo','f-status','f-numproc','f-fase','f-valor','f-obs',
+             'f-email','f-whats','f-cpf','f-orgao','f-pagamento',
+             'f-taxa-val','f-taxa-np','f-hon-val','f-hon-np'];
+  ids.forEach(function(id){ setVal(id, ''); });
+  document.getElementById('ck-taxa').checked = false;
+  document.getElementById('ck-hon').checked = false;
+  document.getElementById('grp-taxa').style.display = 'none';
+  document.getElementById('grp-hon').style.display = 'none';
+  document.getElementById('grp-taxa-parc').style.display = 'none';
+  document.getElementById('grp-hon-parc').style.display = 'none';
+  document.getElementById('grp-proc').style.display = 'none';
+  document.getElementById('taxa-parc').innerHTML = '';
+  document.getElementById('hon-parc').innerHTML = '';
+  setVal('f-taxa-mod','avista');
+  setVal('f-taxa-sit','nao');
+  setVal('f-hon-mod','avista');
+  setVal('f-hon-sit','nao');
+  setVal('f-exito-pct','');
+  setVal('f-exito-custom','');
+  setVal('f-comissao-pct','');
+  document.getElementById('grp-exito').style.display = 'none';
+  document.getElementById('grp-exito-custom').style.display = 'none';
+  document.getElementById('f-comissao-calc').textContent = 'R$ 0,00';
 }
 
 function moAba(n) {
-  for (var i = 0; i < 2; i++) {
+  for (var i = 0; i < 3; i++) {
     document.getElementById('tab-btn-'+i).classList.remove('on');
     document.getElementById('tab-'+i).classList.remove('on');
   }
@@ -1845,40 +1538,166 @@ function moAba(n) {
   document.getElementById('tab-'+n).classList.add('on');
 }
 
-// ========== SALVAR CLIENTE ==========
+// ========== TOGGLES ==========
+function toggleProtocolado() {
+  var v = document.getElementById('f-status').value === 'Protocolado';
+  document.getElementById('grp-proc').style.display = v ? 'block' : 'none';
+}
+function toggleTaxa() {
+  document.getElementById('grp-taxa').style.display = document.getElementById('ck-taxa').checked ? 'block' : 'none';
+}
+function toggleHon() {
+  document.getElementById('grp-hon').style.display = document.getElementById('ck-hon').checked ? 'block' : 'none';
+}
+function toggleTaxaParc() {
+  var v = document.getElementById('f-taxa-mod').value === 'parcelado';
+  document.getElementById('grp-taxa-parc').style.display = v ? 'block' : 'none';
+  if (!v) document.getElementById('taxa-parc').innerHTML = '';
+}
+function toggleHonParc() {
+  var v = document.getElementById('f-hon-mod').value === 'parcelado';
+  document.getElementById('grp-hon-parc').style.display = v ? 'block' : 'none';
+  if (!v) document.getElementById('hon-parc').innerHTML = '';
+}
+function toggleExito() {
+  var v = document.getElementById('f-pagamento').value;
+  var isExito = (v === 'Êxito (percentual)' || v === 'Êxito + fixo');
+  document.getElementById('grp-exito').style.display = isExito ? 'block' : 'none';
+  if (!isExito) {
+    setVal('f-exito-pct','');
+    setVal('f-exito-custom','');
+    document.getElementById('grp-exito-custom').style.display = 'none';
+  }
+}
+function calcComissao() {
+  var pct = parseInt(document.getElementById('f-comissao-pct').value) || 0;
+  if (!pct) { document.getElementById('f-comissao-calc').textContent = 'R$ 0,00'; return; }
+  // Calcular base: soma das taxas pagas (à vista paga, ou parcelas marcadas como pagas)
+  var base = 0;
+  if (document.getElementById('ck-taxa').checked) {
+    var mod = document.getElementById('f-taxa-mod').value;
+    var sit = document.getElementById('f-taxa-sit').value;
+    var valTaxa = parseMoeda(document.getElementById('f-taxa-val').value);
+    if (mod === 'avista') {
+      if (sit === 'sim') base += valTaxa;
+    } else {
+      var np = parseInt(document.getElementById('f-taxa-np').value) || 0;
+      var vUnit = np > 0 ? valTaxa / np : 0;
+      for (var i = 0; i < np; i++) {
+        var ck = document.getElementById('taxa-pg-'+i);
+        if (ck && ck.checked) base += vUnit;
+      }
+    }
+  }
+  var comissao = base * pct / 100;
+  document.getElementById('f-comissao-calc').textContent = 'R$ ' + fmtVal(comissao);
+}
+
+// ========== PARCELAS ==========
+function gerarParc(tipo) {
+  var n = parseInt(document.getElementById('f-'+tipo+'-np').value) || 0;
+  var valTotal = parseMoeda(document.getElementById('f-'+tipo+'-val').value);
+  var vUnit = n > 0 ? valTotal / n : 0;
+  var box = document.getElementById(tipo+'-parc');
+  // Preservar datas existentes
+  var existentes = coletarParc(tipo);
+  box.innerHTML = '';
+  for (var i = 0; i < n; i++) {
+    var ex = existentes[i] || {};
+    var row = document.createElement('div');
+    row.className = 'parc-row';
+    row.innerHTML =
+      '<span class="parc-n">'+(i+1)+'ª</span>' +
+      '<input type="date" class="parc-d" id="'+tipo+'-d-'+i+'" value="'+(ex.data||'')+'">' +
+      '<span class="parc-vl">R$ '+fmtVal(vUnit)+'</span>' +
+      '<div class="parc-pg'+(ex.pago?' pago':'')+'" id="'+tipo+'-pg-wrap-'+i+'">' +
+        '<input type="checkbox" id="'+tipo+'-pg-'+i+'" '+(ex.pago?'checked':'')+' onchange="document.getElementById(\''+tipo+'-pg-wrap-'+i+'\').className=\'parc-pg\'+(this.checked?\' pago\':\'\')">' +
+        '<label for="'+tipo+'-pg-'+i+'">Pago</label>' +
+      '</div>';
+    box.appendChild(row);
+  }
+}
+
+function carregarParc(tipo, parcelas, valorTotal) {
+  var n = parcelas.length;
+  var vUnit = n > 0 ? parseMoeda(valorTotal) / n : 0;
+  var box = document.getElementById(tipo+'-parc');
+  box.innerHTML = '';
+  for (var i = 0; i < n; i++) {
+    var p = parcelas[i];
+    var row = document.createElement('div');
+    row.className = 'parc-row';
+    row.innerHTML =
+      '<span class="parc-n">'+(i+1)+'ª</span>' +
+      '<input type="date" class="parc-d" id="'+tipo+'-d-'+i+'" value="'+(p.data||'')+'">' +
+      '<span class="parc-vl">R$ '+fmtVal(vUnit)+'</span>' +
+      '<div class="parc-pg'+(p.pago?' pago':'')+'" id="'+tipo+'-pg-wrap-'+i+'">' +
+        '<input type="checkbox" id="'+tipo+'-pg-'+i+'" '+(p.pago?'checked':'')+' onchange="document.getElementById(\''+tipo+'-pg-wrap-'+i+'\').className=\'parc-pg\'+(this.checked?\' pago\':\'\')">' +
+        '<label for="'+tipo+'-pg-'+i+'">Pago</label>' +
+      '</div>';
+    box.appendChild(row);
+  }
+}
+
+function coletarParc(tipo) {
+  var resultado = [];
+  var i = 0;
+  while (true) {
+    var d = document.getElementById(tipo+'-d-'+i);
+    var p = document.getElementById(tipo+'-pg-'+i);
+    if (!d) break;
+    resultado.push({ data: d.value, pago: p ? p.checked : false });
+    i++;
+  }
+  return resultado;
+}
+
+// ========== SALVAR ==========
 function salvar() {
   var nome = getVal('f-nome');
+  var data = getVal('f-data');
+  var tipo = getVal('f-tipo');
+  var status = getVal('f-status');
+  var valor = getVal('f-valor');
+
   if (!nome) { toast('Informe o nome do cliente', true); moAba(0); return; }
+  if (!data) { toast('Informe a data do contrato', true); moAba(0); return; }
+  if (!tipo) { toast('Informe o tipo de ação', true); moAba(0); return; }
+  if (!status) { toast('Informe o status do processo', true); moAba(0); return; }
+  if (!valor) { toast('Informe o valor do processo', true); moAba(0); return; }
 
-  coletarProcessosDoDOM();
+  var taxa = null;
+  if (document.getElementById('ck-taxa').checked) {
+    var tMod = getVal('f-taxa-mod');
+    taxa = {
+      valor: getVal('f-taxa-val'),
+      mod: tMod,
+      pago: getVal('f-taxa-sit') === 'sim',
+      parcelas: tMod === 'parcelado' ? coletarParc('taxa') : []
+    };
+  }
 
-  if (!processosEdicao.length || !processosEdicao[0].tipo) {
-    toast('Adicione ao menos um processo com o tipo de ação', true); moAba(1); return;
+  var hon = null;
+  if (document.getElementById('ck-hon').checked) {
+    var hMod = getVal('f-hon-mod');
+    hon = {
+      valor: getVal('f-hon-val'),
+      mod: hMod,
+      pago: getVal('f-hon-sit') === 'sim',
+      parcelas: hMod === 'parcelado' ? coletarParc('hon') : []
+    };
   }
 
   var obj = {
-    nome: nome,
-    cpf: getVal('f-cpf'),
-    email: getVal('f-email'),
-    whats: getVal('f-whats'),
-    orgao: getVal('f-orgao'),
-    obsGeral: getVal('f-obs-geral'),
-    comercial: getVal('f-comercial'),
-    dataComercial: getVal('f-data-comercial'),
-    processos: processosEdicao,
-    // Campos legado para compatibilidade com relatórios e alertas
-    tipo: processosEdicao[0].tipo,
-    data: processosEdicao[0].data,
-    status: processosEdicao[0].status,
-    valor: processosEdicao[0].valor,
-    numproc: processosEdicao[0].numproc,
-    fase: processosEdicao[0].fase,
-    pagamento: processosEdicao[0].pagamento,
-    exitoPct: processosEdicao[0].exitoPct,
-    comissaoPct: processosEdicao[0].comissaoPct,
-    taxa: processosEdicao[0].taxa,
-    hon: processosEdicao[0].hon,
-    obs: processosEdicao[0].obs
+    nome: nome, data: data, tipo: tipo, status: status,
+    numproc: getVal('f-numproc'), fase: getVal('f-fase'),
+    valor: valor, obs: getVal('f-obs'),
+    pagamento: getVal('f-pagamento'),
+    exitoPct: getVal('f-exito-pct') === 'outro' ? getVal('f-exito-custom') : getVal('f-exito-pct'),
+    comissaoPct: getVal('f-comissao-pct'),
+    email: getVal('f-email'), whats: getVal('f-whats'),
+    cpf: getVal('f-cpf'), orgao: getVal('f-orgao'),
+    taxa: taxa, hon: hon
   };
 
   if (editId !== null) {
@@ -1886,59 +1705,14 @@ function salvar() {
     window._fbSave(obj);
     toast('✓ Cliente atualizado');
   } else {
-    window._fbSave(obj);
+    window._fbSave(obj).then(function(newId) {
+      // Firebase listener atualiza DB automaticamente
+    });
     toast('✓ Cliente cadastrado');
   }
+
   fecharModal();
 }
-
-// Stubs de toggles legados (não mais usados, mantidos para segurança)
-function toggleProtocolado(){}
-function toggleTaxa(){}
-function toggleHon(){}
-function toggleTaxaParc(){}
-function toggleHonParc(){}
-function toggleExito(){}
-function calcComissao(){} // stub legado — use calcComissaoP(idx)
-function calcComissaoP(idx) {
-  var pref = 'p' + idx + '-';
-  var pctEl = document.getElementById(pref + 'comissao-pct');
-  var calcEl = document.getElementById(pref + 'comissao-calc');
-  if (!pctEl || !calcEl) return;
-  var pct = parseInt(pctEl.value) || 0;
-  if (!pct) { calcEl.textContent = 'R$ 0,00'; return; }
-  var base = 0;
-  var ckTaxa = document.getElementById(pref + 'ck-taxa');
-  if (ckTaxa && ckTaxa.checked) {
-    var mod = document.getElementById(pref + 'taxa-mod');
-    var sit = document.getElementById(pref + 'taxa-sit');
-    var valEl = document.getElementById(pref + 'taxa-val');
-    if (mod && sit && valEl) {
-      var valTotal = parseMoeda(valEl.value);
-      if (mod.value === 'avista') {
-        if (sit.value === 'sim') base += valTotal;
-      } else {
-        var i = 0;
-        while (true) {
-          var pg = document.getElementById(pref + 'taxa-pg-' + i);
-          var vl = document.getElementById(pref + 'taxa-vl-' + i);
-          if (!pg) break;
-          if (pg.checked) {
-            var npEl = document.getElementById(pref + 'taxa-np');
-            var np = npEl ? (parseInt(npEl.value) || 0) : 0;
-            var vUnit = vl ? parseMoeda(vl.value) : (np > 0 ? valTotal / np : 0);
-            base += vUnit;
-          }
-          i++;
-        }
-      }
-    }
-  }
-  calcEl.textContent = 'R$ ' + fmtVal(base * pct / 100);
-}
-function gerarParc(){}
-function carregarParc(){}
-function coletarParc(){ return []; }
 
 // ========== RENDER TABELA ==========
 function renderTabela() {
@@ -1947,131 +1721,11 @@ function renderTabela() {
   var fTp = document.getElementById('fTp').value;
 
   var lista = DB.filter(function(c) {
-    var procs = c.processos || [c];
-    var okB = !busca ||
-      (c.nome||'').toLowerCase().includes(busca) ||
-      procs.some(function(p){ return (p.tipo||'').toLowerCase().includes(busca) || (p.numproc||'').toLowerCase().includes(busca); });
-    var okS = !fSt || procs.some(function(p){ return p.status === fSt; }) || c.status === fSt;
-    var okT = !fTp || procs.some(function(p){ return p.tipo === fTp; }) || c.tipo === fTp;
+    var okB = !busca || (c.nome||'').toLowerCase().includes(busca) || (c.tipo||'').toLowerCase().includes(busca) || (c.numproc||'').toLowerCase().includes(busca);
+    var okS = !fSt || c.status === fSt;
+    var okT = !fTp || c.tipo === fTp;
     return okB && okS && okT;
   });
-
-  lista.sort(function(a, b) {
-    var va = a[sCol]||'', vb = b[sCol]||'';
-    if (sCol === 'valor') { va = parseMoeda(va); vb = parseMoeda(vb); }
-    if (va < vb) return sDir === 'asc' ? -1 : 1;
-    if (va > vb) return sDir === 'asc' ? 1 : -1;
-    return 0;
-  });
-
-  document.getElementById('tbl-cnt').textContent = lista.length + ' cliente' + (lista.length !== 1 ? 's' : '');
-  var tbody = document.getElementById('tbody');
-
-  if (!lista.length) {
-    tbody.innerHTML = '<tr><td colspan="10"><div class="vazio"><div class="vazio-ic">⚖️</div><div class="vazio-t">Nenhum cliente encontrado</div><div class="vazio-s">Clique em "+ Novo Cliente" para cadastrar</div></div></td></tr>';
-  } else {
-    var html = '';
-    lista.forEach(function(c) {
-      var hoje = new Date(); hoje.setHours(0,0,0,0);
-      var procs = c.processos && c.processos.length ? c.processos : [{
-        tipo: c.tipo, data: c.data, status: c.status, valor: c.valor,
-        numproc: c.numproc, fase: c.fase, pagamento: c.pagamento,
-        exitoPct: c.exitoPct, comissaoPct: c.comissaoPct,
-        taxa: c.taxa, hon: c.hon, obs: c.obs
-      }];
-      var nProcs = procs.length;
-
-      // Alertas de parcelas (todos os processos)
-      var alertaHtml = '';
-      procs.forEach(function(proc) {
-        ['taxa','hon'].forEach(function(tp) {
-          if (!proc[tp] || proc[tp].mod !== 'parcelado') return;
-          (proc[tp].parcelas||[]).forEach(function(p, i) {
-            if (p.pago || !p.data) return;
-            var d = new Date(p.data+'T00:00:00');
-            var diff = Math.round((d - hoje) / 86400000);
-            var nat = tp === 'taxa' ? 'Taxa' : 'Hon.';
-            var procLabel = nProcs > 1 ? ' ('+esc(proc.tipo||'proc')+'): ' : ': ';
-            if (diff < 0) alertaHtml += '<div style="font-size:10px;color:#e89090;margin-top:2px;">🚨 '+nat+procLabel+(i+1)+'ª VENCIDA</div>';
-            else if (diff <= 7) alertaHtml += '<div style="font-size:10px;color:#D4B84A;margin-top:2px;">⚠ '+nat+procLabel+(i+1)+'ª vence em '+diff+'d</div>';
-          });
-        });
-      });
-
-      // Coluna Processos — resumo compacto
-      var procsHtml = '';
-      procs.forEach(function(proc, pi) {
-        var esajUrl = proc.numproc ? 'https://esaj.tjsp.jus.br/cpopg/search.do?cbPesquisa=NUMPROC&dadosConsulta.valorConsultaNuUnificado='+encodeURIComponent(proc.numproc)+'&dadosConsulta.tipoNuProcesso=UNIFICADO' : '';
-        procsHtml += '<div style="margin-bottom:'+(pi<procs.length-1?'8':'0')+'px;padding-bottom:'+(pi<procs.length-1?'8':'0')+'px;border-bottom:'+(pi<procs.length-1?'1px solid rgba(180,138,74,.1)':'none')+'">' +
-          '<div style="font-size:10px;font-weight:600;color:var(--ch);">'+(nProcs>1?'#'+(pi+1)+' ':'')+''+esc(proc.tipo||'—')+'</div>' +
-          (proc.numproc ? '<div style="font-size:10px;color:var(--tw);">'+esc(proc.numproc)+'</div>' : '') +
-          (proc.fase ? '<div style="font-size:9px;color:var(--tw);">'+esc(proc.fase)+'</div>' : '') +
-          '<span class="bgs '+(proc.status==='Protocolado'?'sp':'sn')+'" style="font-size:9px;padding:1px 5px;">'+esc(proc.status||'—')+'</span>' +
-          (esajUrl ? ' <a href="'+esajUrl+'" target="_blank" style="font-size:9px;color:#1a73e8;text-decoration:none;">🔍 ESAJ</a>' : '') +
-          (proc.protocolador ? '<div style="font-size:9px;color:var(--ch);margin-top:2px;">📋 Prot.: '+esc(proc.protocolador)+(proc.dataProtocolo?' em '+fmtData(proc.dataProtocolo):'')+'</div>' : '') +
-        '</div>';
-      });
-
-      // Financeiro consolidado (todos os processos)
-      var taxaHtml = '', honHtml = '', exitoHtml = '', comissaoHtml = '';
-      procs.forEach(function(proc, pi) {
-        var label = nProcs > 1 ? '<span style="font-size:9px;color:var(--tw);">#'+(pi+1)+'</span> ' : '';
-        if (proc.taxa) {
-          var tPagas = proc.taxa.mod === 'parcelado' ? (proc.taxa.parcelas||[]).filter(function(p){return p.pago;}).length : null;
-          var tTotal = proc.taxa.mod === 'parcelado' ? (proc.taxa.parcelas||[]).length : null;
-          taxaHtml += '<div style="font-size:11px;margin-bottom:2px;">'+label+'R$ '+(proc.taxa.valor||'0')+' <span class="bgp '+(proc.taxa.pago?'ok':'no')+'">'+(proc.taxa.pago?'Paga':'Pend.')+'</span>'+(tTotal?' <span style="font-size:9px;color:var(--tw);">'+tPagas+'/'+tTotal+'</span>':'')+'</div>';
-        }
-        if (proc.hon) {
-          var hPagas = proc.hon.mod === 'parcelado' ? (proc.hon.parcelas||[]).filter(function(p){return p.pago;}).length : null;
-          var hTotal = proc.hon.mod === 'parcelado' ? (proc.hon.parcelas||[]).length : null;
-          honHtml += '<div style="font-size:11px;margin-bottom:2px;">'+label+'R$ '+(proc.hon.valor||'0')+' <span class="bgp '+(proc.hon.pago?'ok':'no')+'">'+(proc.hon.pago?'Pago':'Pend.')+'</span>'+(hTotal?' <span style="font-size:9px;color:var(--tw);">'+hPagas+'/'+hTotal+'</span>':'')+'</div>';
-        }
-        var isExito = (proc.pagamento === 'Êxito (percentual)' || proc.pagamento === 'Êxito + fixo');
-        if (isExito && proc.exitoPct) exitoHtml += '<div style="font-size:11px;color:var(--ch);font-weight:600;">'+label+'Êxito: '+proc.exitoPct+'%</div>';
-        if (proc.comissaoPct) {
-          var base = 0;
-          if (proc.taxa) {
-            if (proc.taxa.mod==='avista') { if(proc.taxa.pago) base += parseMoeda(proc.taxa.valor); }
-            else { var ps=proc.taxa.parcelas||[]; var vU=ps.length>0?parseMoeda(proc.taxa.valor)/ps.length:0; ps.forEach(function(p){if(p.pago)base+=vU;}); }
-          }
-          var comV = base * parseInt(proc.comissaoPct) / 100;
-          comissaoHtml += '<div style="font-size:10px;color:var(--tw);">'+label+proc.comissaoPct+'% = <span style="color:'+(comV>0?'#e89090':'var(--tw)')+'">R$'+fmtVal(comV)+'</span></div>';
-        }
-      });
-      if (!taxaHtml) taxaHtml = '—';
-      if (!honHtml) honHtml = '—';
-      if (!exitoHtml) exitoHtml = '—';
-
-      // Valor total
-      var valorTotal = procs.reduce(function(s,p){ return s + parseMoeda(p.valor); }, 0);
-
-      html += '<tr>' +
-        '<td class="td-nm">' +
-          '<span style="cursor:pointer;text-decoration:underline dotted;color:var(--ch)" onclick="abrirDetalhe(\''+c.id+'\')">'+esc(c.nome)+'</span>' +
-          (c.orgao ? '<span class="sub">'+esc(c.orgao)+'</span>' : '') +
-          (c.comercial ? '<span class="sub" style="color:var(--do);">🤝 '+esc(c.comercial)+'</span>' : '') +
-          (nProcs > 1 ? '<span class="sub" style="color:var(--do);font-weight:600;">'+nProcs+' processos</span>' : '') +
-          alertaHtml +
-        '</td>' +
-        '<td style="font-size:11px;min-width:180px;">'+procsHtml+'</td>' +
-        '<td style="font-weight:600;color:var(--ch);white-space:nowrap;">R$ '+fmtVal(valorTotal)+'</td>' +
-        '<td>'+taxaHtml+'</td>' +
-        '<td>'+honHtml+'</td>' +
-        '<td style="min-width:110px;">'+exitoHtml+comissaoHtml+'</td>' +
-        '<td><div class="acoes">' +
-          '<button class="btn-ic" title="Ver detalhes" onclick="abrirDetalhe(\''+c.id+'\')">👁</button>' +
-          '<button class="btn-ic" title="Editar" onclick="abrirModal(\''+c.id+'\')">✏️</button>' +
-          '<button class="btn-ic x" title="Excluir" onclick="pedirDel(\''+c.id+'\')">🗑️</button>' +
-        '</div></td>' +
-      '</tr>';
-    });
-    tbody.innerHTML = html;
-  }
-
-  atualizarStats();
-  atualizarFiltroTipo();
-  renderAlertasBanner();
-}
 
   lista.sort(function(a, b) {
     var va = a[sCol]||'', vb = b[sCol]||'';
@@ -2103,14 +1757,86 @@ function renderTabela() {
         });
       });
 
-      var qtdProc = (c.processos && c.processos.length) ? c.processos.length : 1;
-    }); // fim lista.forEach
+      var qtdProc = DB.filter(function(x){ return x.nome === c.nome; }).length;
+
+      var taxaHtml = '—';
+      if (c.taxa) {
+        var tPagas = c.taxa.mod === 'parcelado' ? (c.taxa.parcelas||[]).filter(function(p){return p.pago;}).length : null;
+        var tTotal = c.taxa.mod === 'parcelado' ? (c.taxa.parcelas||[]).length : null;
+        taxaHtml = '<div style="font-size:11px;">R$ '+(c.taxa.valor||'0')+'</div>' +
+          '<span class="bgp '+(c.taxa.pago?'ok':'no')+'">'+(c.taxa.pago?'Paga':'Pendente')+'</span>' +
+          (tTotal ? '<div style="font-size:10px;color:var(--tw);margin-top:1px;">'+tPagas+'/'+tTotal+' pagas</div>' : '');
+      }
+
+      var honHtml = '—';
+      if (c.hon) {
+        var hPagas = c.hon.mod === 'parcelado' ? (c.hon.parcelas||[]).filter(function(p){return p.pago;}).length : null;
+        var hTotal = c.hon.mod === 'parcelado' ? (c.hon.parcelas||[]).length : null;
+        honHtml = '<div style="font-size:11px;">R$ '+(c.hon.valor||'0')+'</div>' +
+          '<span class="bgp '+(c.hon.pago?'ok':'no')+'">'+(c.hon.pago?'Pago':'Pendente')+'</span>' +
+          (hTotal ? '<div style="font-size:10px;color:var(--tw);margin-top:1px;">'+hPagas+'/'+hTotal+' pagas</div>' : '');
+      }
+
+      // ÊXITO E COMISSÃO
+      var exitoHtml = '—';
+      var isExito = (c.pagamento === 'Êxito (percentual)' || c.pagamento === 'Êxito + fixo');
+      if (isExito && c.exitoPct) {
+        exitoHtml = '<div style="font-size:11px;color:var(--ch);font-weight:600;">Êxito: '+c.exitoPct+'%</div>';
+      }
+
+      var comissaoHtml = '';
+      if (c.comissaoPct) {
+        // Calcular base paga da taxa
+        var basePaga = 0;
+        if (c.taxa) {
+          if (c.taxa.mod === 'avista') {
+            if (c.taxa.pago) basePaga += parseMoeda(c.taxa.valor);
+          } else {
+            var ps = c.taxa.parcelas || [];
+            var vU = ps.length > 0 ? parseMoeda(c.taxa.valor) / ps.length : 0;
+            ps.forEach(function(p){ if(p.pago) basePaga += vU; });
+          }
+        }
+        var comVal = basePaga * parseInt(c.comissaoPct) / 100;
+        comissaoHtml = '<div style="font-size:10px;color:var(--tw);margin-top:3px;">Comissão: '+c.comissaoPct+'%</div>' +
+          '<div style="font-size:11px;color:'+(comVal>0?'#e89090':'var(--tw)')+';">R$ '+fmtVal(comVal)+'</div>' +
+          (basePaga > 0 ? '<div style="font-size:9px;color:var(--tw);">base paga: R$'+fmtVal(basePaga)+'</div>' : '<div style="font-size:9px;color:var(--tw);">sem base paga ainda</div>');
+      }
+
+      html += '<tr>' +
+        '<td class="td-nm">' +
+          '<span style="cursor:pointer;text-decoration:underline dotted;color:var(--ch)" onclick="abrirDetalhe(\''+c.id+'\')">'+esc(c.nome)+'</span>' +
+          (c.orgao ? '<span class="sub">'+esc(c.orgao)+'</span>' : '') +
+          (qtdProc > 1 ? '<span class="sub" style="color:var(--do)">'+qtdProc+' processos</span>' : '') +
+          alertaHtml +
+        '</td>' +
+        '<td style="font-size:11px;color:var(--tw);white-space:nowrap">'+fmtData(c.data)+'</td>' +
+        '<td><span class="bgt" title="'+esc(c.tipo||'')+'">'+esc(c.tipo||'')+'</span></td>' +
+        '<td style="font-size:11px;min-width:130px;">' +
+          (c.numproc ? '<div style="color:var(--ch);font-weight:600;font-size:11px;">'+esc(c.numproc)+'</div>' : '') +
+          (c.fase ? '<div style="color:var(--tw);font-size:10px;margin-top:2px;">'+esc(c.fase)+'</div>' : '') +
+        '</td>' +
+        '<td style="font-weight:600;color:var(--ch);white-space:nowrap;">R$ '+(c.valor||'0,00')+'<div style="font-size:10px;color:var(--tw);font-weight:400;">'+esc(c.pagamento||'')+'</div></td>' +
+        '<td>'+taxaHtml+'</td>' +
+        '<td>'+honHtml+'</td>' +
+        '<td><span class="bgs '+(c.status==='Protocolado'?'sp':'sn')+'">'+esc(c.status)+'</span></td>' +
+        '<td style="min-width:180px;">' + buildAndamentoCell(c) + '</td>' +
+        '<td style="min-width:120px;">'+exitoHtml+comissaoHtml+'</td>' +
+        '<td><div class="acoes">' +
+          '<button class="btn-ic" title="Ver detalhes" onclick="abrirDetalhe(\''+c.id+'\')">👁</button>' +
+          '<button class="btn-ic" title="Editar" onclick="abrirModal(\''+c.id+'\')">✏️</button>' +
+          '<button class="btn-ic" title="Alternar status" onclick="toggleStatus(\''+c.id+'\')">🔄</button>' +
+          '<button class="btn-ic x" title="Excluir" onclick="pedirDel(\''+c.id+'\')">🗑️</button>' +
+        '</div></td>' +
+      '</tr>';
+    });
     tbody.innerHTML = html;
-  } // fim else
+  }
 
   atualizarStats();
   atualizarFiltroTipo();
   renderAlertasBanner();
+}
 
 // ========== DETALHE CLIENTE ==========
 function abrirDetalhe(id) {
@@ -2122,58 +1848,20 @@ function abrirDetalhe(id) {
   var cont = '';
   if (c.email) cont += '<div class="det-lk">📧 <a href="mailto:'+esc(c.email)+'">'+esc(c.email)+'</a></div>';
   if (c.whats) cont += '<div class="det-lk">📱 <a href="https://wa.me/55'+c.whats.replace(/\D/g,'')+'" target="_blank">'+esc(c.whats)+'</a></div>';
-  if (c.comercial) cont += '<div class="det-lk" style="color:var(--do)">🤝 Comercial: <strong>'+esc(c.comercial)+'</strong>'+(c.dataComercial?' em '+fmtData(c.dataComercial):'')+'</div>';
-  if (c.obsGeral) cont += '<div class="det-lk" style="color:var(--tw)">📝 '+esc(c.obsGeral)+'</div>';
   document.getElementById('det-cont').innerHTML = cont || '<span style="color:var(--tw);font-size:12px;">Sem dados de contato cadastrados</span>';
 
-  var procs = c.processos && c.processos.length ? c.processos : [{
-    tipo:c.tipo, data:c.data, status:c.status, valor:c.valor,
-    numproc:c.numproc, fase:c.fase, pagamento:c.pagamento,
-    exitoPct:c.exitoPct, taxa:c.taxa, hon:c.hon, obs:c.obs
-  }];
-
+  var procs = DB.filter(function(x){ return x.nome === c.nome; });
   var html = '<div style="font-size:10px;color:var(--tw);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">'+procs.length+' processo(s) vinculado(s)</div>';
-  procs.forEach(function(p, pi) {
-    var esajUrl = p.numproc ? 'https://esaj.tjsp.jus.br/cpopg/search.do?cbPesquisa=NUMPROC&dadosConsulta.valorConsultaNuUnificado='+encodeURIComponent(p.numproc)+'&dadosConsulta.tipoNuProcesso=UNIFICADO' : '';
+  procs.forEach(function(p) {
     html += '<div class="proc-card">' +
-      '<div class="pc-hdr">' +
-        '<span class="pc-tipo">'+(procs.length>1?'#'+(pi+1)+' ':'')+''+esc(p.tipo||'')+'</span>' +
-        '<span class="bgs '+(p.status==='Protocolado'?'sp':'sn')+'">'+esc(p.status||'—')+'</span>' +
-      '</div>' +
+      '<div class="pc-hdr"><span class="pc-tipo">'+esc(p.tipo||'')+'</span><span class="bgs '+(p.status==='Protocolado'?'sp':'sn')+'">'+esc(p.status)+'</span></div>' +
       '<div class="pc-grid">' +
-        '<div class="pc-it"><div class="lbl">Data Contrato</div><div class="val">'+fmtData(p.data||'')+'</div></div>' +
+        '<div class="pc-it"><div class="lbl">Data Contrato</div><div class="val">'+fmtData(p.data)+'</div></div>' +
         '<div class="pc-it"><div class="lbl">Valor</div><div class="val">R$ '+(p.valor||'0,00')+'</div></div>' +
-        (p.numproc?'<div class="pc-it"><div class="lbl">Nº Processo</div><div class="val">'+esc(p.numproc)+(esajUrl?' <a href="'+esajUrl+'" target="_blank" style="color:#1a73e8;font-size:10px;">🔍 ESAJ</a>':'')+'</div></div>':'') +
+        (p.numproc?'<div class="pc-it"><div class="lbl">Nº Processo</div><div class="val">'+esc(p.numproc)+'</div></div>':'') +
         (p.fase?'<div class="pc-it"><div class="lbl">Fase</div><div class="val">'+esc(p.fase)+'</div></div>':'') +
-        (p.pagamento?'<div class="pc-it"><div class="lbl">Honorários do Processo</div><div class="val">'+esc(p.pagamento)+(p.exitoPct?' — '+p.exitoPct+'%':'')+'</div></div>':'') +
-        (p.protocolador?'<div class="pc-it"><div class="lbl">📋 Protocolado por</div><div class="val" style="color:var(--ch);font-weight:600;">'+esc(p.protocolador)+(p.dataProtocolo?' em '+fmtData(p.dataProtocolo):'')+'</div></div>':'') +
-        (function() {
-          if (!p.taxa) return '';
-          var html = '<div class="pc-it" style="grid-column:1/-1"><div class="lbl">💳 Taxa Administrativa</div><div class="val">';
-          html += 'R$ '+esc(p.taxa.valor||'0')+' — '+(p.taxa.mod==='parcelado'?'Parcelado':'À vista')+' — ';
-          if (p.taxa.mod==='parcelado') {
-            var ps=p.taxa.parcelas||[]; var pagas=ps.filter(function(x){return x.pago;}).length;
-            html += '<span style="color:'+(pagas===ps.length?'#7ec492':'var(--ch)')+'">'+pagas+'/'+ps.length+' parcelas pagas</span>';
-            html += '<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;">';
-            ps.forEach(function(pa,i){ html += '<span style="font-size:9px;padding:2px 6px;border-radius:4px;background:'+(pa.pago?'rgba(126,196,146,.2)':'rgba(212,184,74,.15)')+';color:'+(pa.pago?'#7ec492':'#D4B84A')+'">'+(i+1)+'ª '+(pa.valorParcela||'')+(pa.data?' '+fmtData(pa.data):'')+(pa.pago?' ✓':'')+'</span>'; });
-            html += '</div>';
-          } else { html += (p.taxa.pago?'<span style="color:#7ec492">Paga ✓</span>':'<span style="color:var(--ch)">Pendente</span>'); }
-          return html + '</div></div>';
-        })() +
-        (function() {
-          if (!p.hon) return '';
-          var html = '<div class="pc-it" style="grid-column:1/-1"><div class="lbl">⚖️ Honorários Iniciais</div><div class="val">';
-          html += 'R$ '+esc(p.hon.valor||'0')+' — '+(p.hon.mod==='parcelado'?'Parcelado':'À vista')+' — ';
-          if (p.hon.mod==='parcelado') {
-            var ps=p.hon.parcelas||[]; var pagas=ps.filter(function(x){return x.pago;}).length;
-            html += '<span style="color:'+(pagas===ps.length?'#7ec492':'var(--ch)')+'">'+pagas+'/'+ps.length+' parcelas pagas</span>';
-            html += '<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;">';
-            ps.forEach(function(pa,i){ html += '<span style="font-size:9px;padding:2px 6px;border-radius:4px;background:'+(pa.pago?'rgba(126,196,146,.2)':'rgba(212,184,74,.15)')+';color:'+(pa.pago?'#7ec492':'#D4B84A')+'">'+(i+1)+'ª '+(pa.valorParcela||'')+(pa.data?' '+fmtData(pa.data):'')+(pa.pago?' ✓':'')+'</span>'; });
-            html += '</div>';
-          } else { html += (p.hon.pago?'<span style="color:#7ec492">Pago ✓</span>':'<span style="color:var(--ch)">Pendente</span>'); }
-          return html + '</div></div>';
-        })() +
-        (p.comissaoPct?'<div class="pc-it"><div class="lbl">🏷️ Comissão Comercial</div><div class="val" style="color:var(--rc)">'+p.comissaoPct+'% sobre taxas pagas</div></div>':'') +
+        (p.taxa?'<div class="pc-it"><div class="lbl">Taxa Adm.</div><div class="val">R$ '+esc(p.taxa.valor||'0')+' — '+(p.taxa.pago?'<span style="color:#7ec492">Paga</span>':'<span style="color:var(--ch)">Pendente</span>')+'</div></div>':'') +
+        (p.hon?'<div class="pc-it"><div class="lbl">Honorários</div><div class="val">R$ '+esc(p.hon.valor||'0')+' — '+(p.hon.pago?'<span style="color:#7ec492">Pago</span>':'<span style="color:var(--ch)">Pendente</span>')+'</div></div>':'') +
         (p.obs?'<div class="pc-it" style="grid-column:1/-1"><div class="lbl">Obs.</div><div class="val">'+esc(p.obs)+'</div></div>':'') +
       '</div></div>';
   });
@@ -2187,40 +1875,27 @@ function renderRecebimentos() {
   var parcelas = [];
 
   DB.forEach(function(c) {
-    var procs = c.processos && c.processos.length ? c.processos : [c];
-    procs.forEach(function(proc) {
-      ['taxa','hon'].forEach(function(tp) {
-        if (!proc[tp] || proc[tp].mod !== 'parcelado') return;
-        var nat = tp === 'taxa' ? 'Taxa Administrativa' : 'Honorários';
-        var ps = proc[tp].parcelas || [];
-        var vUnit = ps.length > 0 ? parseMoeda(proc[tp].valor) / ps.length : 0;
-        ps.forEach(function(p, i) {
-          if (!p.data) return;
-          var d = new Date(p.data+'T00:00:00');
-          var vP = p.valorParcela ? parseMoeda(p.valorParcela) : vUnit;
-          parcelas.push({ nome:c.nome, tipo:proc.tipo||c.tipo, nat:nat, num:i+1, tot:ps.length, data:d, dataStr:p.data, val:vP, pago:p.pago });
-        });
+    ['taxa','hon'].forEach(function(tp) {
+      if (!c[tp] || c[tp].mod !== 'parcelado') return;
+      var nat = tp === 'taxa' ? 'Taxa Administrativa' : 'Honorários';
+      var ps = c[tp].parcelas || [];
+      var vUnit = ps.length > 0 ? parseMoeda(c[tp].valor) / ps.length : 0;
+      ps.forEach(function(p, i) {
+        if (!p.data) return;
+        var d = new Date(p.data+'T00:00:00');
+        parcelas.push({ nome:c.nome, tipo:c.tipo, nat:nat, num:i+1, tot:ps.length, data:d, dataStr:p.data, val:vUnit, pago:p.pago });
       });
     });
   });
 
   parcelas.sort(function(a,b){ return a.data - b.data; });
   var aberto = parcelas.filter(function(p){ return !p.pago; });
-  var p7  = aberto.filter(function(p){ var d=Math.round((p.data-hoje)/86400000); return d>=0&&d<=7; });
+  var p7 = aberto.filter(function(p){ var d=Math.round((p.data-hoje)/86400000); return d>=0&&d<=7; });
   var p30 = aberto.filter(function(p){ var d=Math.round((p.data-hoje)/86400000); return d>=0&&d<=30; });
 
-  // Cards de totais
-  var soma = function(arr){ return arr.reduce(function(s,p){return s+p.val;},0); };
-  var el7  = document.getElementById('rec-v7');
-  var el30 = document.getElementById('rec-v30');
-  var elT  = document.getElementById('rec-vtot');
-  if(el7)  el7.textContent  = 'R$ '+fmtVal(soma(p7));
-  if(el30) el30.textContent = 'R$ '+fmtVal(soma(p30));
-  if(elT)  elT.textContent  = 'R$ '+fmtVal(soma(aberto));
-
-  document.getElementById('rec7').innerHTML   = p7.length    ? p7.map(linhaPrc).join('')    : vazioRec('Nenhuma parcela vence nos próximos 7 dias');
-  document.getElementById('rec30').innerHTML  = p30.length   ? p30.map(linhaPrc).join('')   : vazioRec('Nenhuma parcela nos próximos 30 dias');
-  document.getElementById('recAll').innerHTML = aberto.length ? aberto.map(linhaPrc).join('')+totalRec(aberto) : vazioRec('Todas as parcelas estão pagas ✓');
+  document.getElementById('rec7').innerHTML = p7.length ? p7.map(linhaPrc).join('') : vazioRec('Nenhuma parcela vence nos próximos 7 dias');
+  document.getElementById('rec30').innerHTML = p30.length ? p30.map(linhaPrc).join('') : vazioRec('Nenhuma parcela nos próximos 30 dias');
+  document.getElementById('recAll').innerHTML = aberto.length ? aberto.map(linhaPrc).join('') + totalRec(aberto) : vazioRec('Todas as parcelas estão pagas ✓');
 }
 
 function linhaPrc(p) {
@@ -2280,17 +1955,14 @@ function coletarAlertas(dias) {
   var hoje = new Date(); hoje.setHours(0,0,0,0);
   var res = [];
   DB.forEach(function(c) {
-    var procs = c.processos && c.processos.length ? c.processos : [c];
-    procs.forEach(function(proc) {
-      ['taxa','hon'].forEach(function(tp) {
-        if (!proc[tp] || proc[tp].mod !== 'parcelado') return;
-        var nat = tp === 'taxa' ? 'Taxa Adm.' : 'Honorários';
-        (proc[tp].parcelas||[]).forEach(function(p, i) {
-          if (p.pago || !p.data) return;
-          var d = new Date(p.data+'T00:00:00');
-          var diff = Math.round((d - hoje) / 86400000);
-          if (diff <= dias) res.push({ cid:c.id, nome:c.nome, nat:nat, idx:i+1, diff:diff, data:p.data, tipo:proc.tipo||'' });
-        });
+    ['taxa','hon'].forEach(function(tp) {
+      if (!c[tp] || c[tp].mod !== 'parcelado') return;
+      var nat = tp === 'taxa' ? 'Taxa Adm.' : 'Honorários';
+      (c[tp].parcelas||[]).forEach(function(p, i) {
+        if (p.pago || !p.data) return;
+        var d = new Date(p.data+'T00:00:00');
+        var diff = Math.round((d - hoje) / 86400000);
+        if (diff <= dias) res.push({ cid:c.id, nome:c.nome, nat:nat, idx:i+1, diff:diff, data:p.data });
       });
     });
   });
@@ -2301,21 +1973,19 @@ function coletarAlertas(dias) {
 // ========== STATS ==========
 function atualizarStats() {
   var tot = DB.length;
-  var pro = 0, vol = 0, recAberto = 0;
+  var pro = DB.filter(function(c){ return c.status==='Protocolado'; }).length;
+  var vol = DB.reduce(function(s,c){ return s+parseMoeda(c.valor); },0);
+  var recAberto = 0;
   DB.forEach(function(c) {
-    var procs = c.processos && c.processos.length ? c.processos : [c];
-    procs.forEach(function(proc) {
-      if (proc.status === 'Protocolado') pro++;
-      vol += parseMoeda(proc.valor);
-      ['taxa','hon'].forEach(function(tp) {
-        if (!proc[tp]) return;
-        if (proc[tp].mod === 'parcelado') {
-          var ps = proc[tp].parcelas||[];
-          ps.forEach(function(p){ if(!p.pago) recAberto += p.valorParcela ? parseMoeda(p.valorParcela) : (ps.length>0?parseMoeda(proc[tp].valor)/ps.length:0); });
-        } else if (!proc[tp].pago) {
-          recAberto += parseMoeda(proc[tp].valor);
-        }
-      });
+    ['taxa','hon'].forEach(function(tp) {
+      if (!c[tp]) return;
+      if (c[tp].mod==='parcelado') {
+        var ps = c[tp].parcelas||[];
+        var vU = ps.length>0 ? parseMoeda(c[tp].valor)/ps.length : 0;
+        ps.forEach(function(p){ if(!p.pago) recAberto+=vU; });
+      } else if (!c[tp].pago) {
+        recAberto += parseMoeda(c[tp].valor);
+      }
     });
   });
   var fmt = function(v){ return v>=1000?'R$'+(v/1000).toFixed(0)+'k':'R$'+v.toFixed(0); };
@@ -2327,10 +1997,7 @@ function atualizarStats() {
 
 function atualizarFiltroTipo() {
   var tipos = [];
-  DB.forEach(function(c){
-    var procs = c.processos && c.processos.length ? c.processos : [c];
-    procs.forEach(function(p){ if(p.tipo && tipos.indexOf(p.tipo)<0) tipos.push(p.tipo); });
-  });
+  DB.forEach(function(c){ if(c.tipo && tipos.indexOf(c.tipo)<0) tipos.push(c.tipo); });
   tipos.sort();
   var sel = document.getElementById('fTp');
   var cur = sel.value;
@@ -2658,46 +2325,61 @@ function exportRelCSV() {
   toast('✓ Relatório exportado');
 }
 
-// ========== CONSULTA PROCESSUAL — TJSP/ESAJ ==========
+// ========== DATAJUD — ANDAMENTO AUTOMÁTICO ==========
+var DATAJUD_KEY = 'cDZHYzlZa0JadVREZDJCendQbXY6SkJlTzNjLV9TRENyQk1RdnFKZGRQdw==';
 var andamentosCache = {};
 
 function buildAndamentoCell(c) {
   if (!c.numproc) return '<span style="color:var(--tw);font-size:10px;">Sem nº processo</span>';
-
   var cache = andamentosCache[c.numproc];
-  var cacheHtml = '';
   if (cache) {
-    cacheHtml = '<div class="andamento-chip" title="'+esc(cache.nome)+'">📋 '+esc(cache.nome.substring(0,38))+'</div>' +
-                '<div style="font-size:9px;color:var(--tw);margin-top:2px;">'+fmtData(cache.data)+'</div>';
+    return '<div class="andamento-chip" title="'+esc(cache.nome)+'">📋 '+esc(cache.nome.substring(0,40))+'</div>' +
+           '<div style="font-size:9px;color:var(--tw);margin-top:2px;">'+fmtData(cache.data.split('T')[0])+'</div>' +
+           '<button class="btn-atualizar" onclick="buscarAndamento(\''+esc(c.numproc)+'\')">↻ Atualizar</button>';
   }
-
-  // Extrair número limpo e código foro para montar link ESAJ
-  var numLimpo = c.numproc.replace(/\D/g,''); // ex: 10000010020238260001
-  // Dígito verificador e foro ficam nos últimos 7 dígitos (NNNNNNN = digito(2)+tribunal(4)+foro(4))
-  // O ESAJ aceita o número completo na busca
-  var esajUrl = 'https://esaj.tjsp.jus.br/cpopg/search.do?conversationId=&cbPesquisa=NUMPROC&numeroDigitoAnoUnificado='+encodeURIComponent(c.numproc)+'&foroNumeroUnificado=&dadosConsulta.valorConsultaNuUnificado='+encodeURIComponent(c.numproc)+'&dadosConsulta.valorConsulta=&dadosConsulta.tipoNuProcesso=UNIFICADO';
-  var pjeUrl = 'https://pje.tjsp.jus.br/pje/ConsultaPublica/listView.seam?CA='+encodeURIComponent(numLimpo);
-  var cnj1gUrl = 'https://api-publica.datajud.cnj.jus.br/api_publica_tjsp/_search';
-
-  return cacheHtml +
-    '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:'+(cache?'4':'0')+'px;">' +
-      '<a href="'+esajUrl+'" target="_blank" class="btn-atualizar" style="text-decoration:none;color:var(--ch);display:inline-flex;align-items:center;gap:3px;" title="Consultar no ESAJ — 1º Grau">🔍 ESAJ 1G</a>' +
-      '<a href="https://esaj.tjsp.jus.br/cposg/search.do?conversationId=&cbPesquisa=NUMPROC&dadosConsulta.valorConsultaNuUnificado='+encodeURIComponent(c.numproc)+'&dadosConsulta.tipoNuProcesso=UNIFICADO" target="_blank" class="btn-atualizar" style="text-decoration:none;color:var(--tw);display:inline-flex;align-items:center;gap:3px;" title="Consultar no ESAJ — 2º Grau">🔍 ESAJ 2G</a>' +
-      '<button class="btn-atualizar" onclick="registrarAndamento(\''+esc(c.id)+'\')" title="Registrar andamento manualmente">✏️ Anotar</button>' +
-    '</div>';
+  return '<button class="btn-atualizar" onclick="buscarAndamento(\''+esc(c.numproc)+'\')">🔍 Consultar TJSP</button>';
 }
 
-function registrarAndamento(id) {
-  var c = DB.find(function(x){ return x.id === id; });
-  if (!c) return;
-  var texto = prompt('Cole o último andamento do processo de ' + c.nome + ':\n(copie do ESAJ e cole aqui)', '');
-  if (!texto || !texto.trim()) return;
-  andamentosCache[c.numproc] = {
-    nome: texto.trim(),
-    data: new Date().toISOString().split('T')[0]
-  };
-  toast('✓ Andamento registrado');
-  renderTabela();
+function buscarAndamento(numproc) {
+  if (!numproc) return;
+  var numLimpo = numproc.replace(/[.\-]/g,'');
+  var url = 'https://api-publica.datajud.cnj.jus.br/api_publica_tjsp/_search';
+  var body = JSON.stringify({ query: { match: { numeroProcesso: numproc } }, size: 1 });
+
+  // Marcar botão como carregando
+  var btns = document.querySelectorAll('.btn-atualizar');
+  btns.forEach(function(b){ if(b.onclick && b.onclick.toString().includes(numproc)) { b.textContent = '⏳'; b.classList.add('loading'); } });
+
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Authorization': 'APIKey '+DATAJUD_KEY, 'Content-Type': 'application/json' },
+    body: body
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data) {
+    if (data.hits && data.hits.hits && data.hits.hits.length > 0) {
+      var proc = data.hits.hits[0]._source;
+      var movimentos = proc.movimentos || [];
+      if (movimentos.length > 0) {
+        // Pegar o mais recente
+        movimentos.sort(function(a,b){ return new Date(b.dataHora) - new Date(a.dataHora); });
+        var ult = movimentos[0];
+        andamentosCache[numproc] = { nome: ult.nome || ult.descricao || 'Movimento registrado', data: ult.dataHora || new Date().toISOString() };
+        toast('✓ Andamento atualizado: '+ult.nome);
+      } else {
+        andamentosCache[numproc] = { nome: 'Processo localizado — sem movimentos registrados', data: new Date().toISOString() };
+        toast('Processo localizado no DataJud');
+      }
+    } else {
+      andamentosCache[numproc] = { nome: 'Processo não localizado no DataJud/CNJ', data: new Date().toISOString() };
+      toast('Processo não encontrado no DataJud', true);
+    }
+    renderTabela();
+  })
+  .catch(function(e) {
+    toast('DataJud indisponível no momento — tente mais tarde', true);
+    renderTabela();
+  });
 }
 
 // ========== PRAZOS & INTIMAÇÕES ==========
@@ -3202,24 +2884,17 @@ function exportPADcsv() {
 // ========== ATENDIMENTOS ==========
 function abrirModalAtend(id) {
   editAtendId = id;
-  atendSalvo = null;
-  popularListaComercial();
-  ['at-nome','at-data','at-devolutiva','at-assunto','at-doc-det','at-whats','at-email','at-obs','at-comercial'].forEach(function(f){ setVal(f,''); });
+  ['at-nome','at-data','at-assunto','at-doc-det','at-whats','at-email','at-obs'].forEach(function(f){ setVal(f,''); });
   setVal('at-tipo','Parecer'); setVal('at-situacao','Pendente'); setVal('at-doc-local','');
-  desativarBotoesAtend();
   if (id) {
     var a=(ATENDIMENTOS||[]).find(function(x){ return x.id===id; });
     if (!a) return;
     document.getElementById('at-mo-tit').textContent='Editar Atendimento';
     setVal('at-nome',a.nome||''); setVal('at-data',a.data||'');
-    setVal('at-devolutiva',a.devolutiva||'');
     setVal('at-tipo',a.tipo||'Parecer'); setVal('at-situacao',a.situacao||'Pendente');
     setVal('at-assunto',a.assunto||''); setVal('at-doc-local',a.docLocal||'');
     setVal('at-doc-det',a.docDet||''); setVal('at-whats',a.whats||'');
     setVal('at-email',a.email||''); setVal('at-obs',a.obs||'');
-    setVal('at-comercial',a.comercial||'');
-    atendSalvo = a;
-    ativarBotoesAtend();
   } else {
     document.getElementById('at-mo-tit').textContent='Novo Atendimento';
     setVal('at-data',new Date().toISOString().split('T')[0]);
@@ -3233,16 +2908,15 @@ function salvarAtend() {
   var nome=getVal('at-nome');
   if (!nome) { toast('Informe o nome do cliente',true); return; }
   var obj={
-    nome:nome, data:getVal('at-data'), devolutiva:getVal('at-devolutiva'),
-    tipo:getVal('at-tipo'), situacao:getVal('at-situacao'), assunto:getVal('at-assunto'),
+    nome:nome, data:getVal('at-data'), tipo:getVal('at-tipo'),
+    situacao:getVal('at-situacao'), assunto:getVal('at-assunto'),
     docLocal:getVal('at-doc-local'), docDet:getVal('at-doc-det'),
-    whats:getVal('at-whats'), email:getVal('at-email'), obs:getVal('at-obs'),
-    comercial:getVal('at-comercial')
+    contato:getVal('at-whats'), docLocal:getVal('at-doc-local'), docDet:getVal('at-doc-det'),
+    whats:getVal('at-whats'), email:getVal('at-email'), obs:getVal('at-obs')
   };
-  if (editAtendId) { obj.id=editAtendId; window._fbSaveAtend(obj); toast('Atendimento atualizado'); }
-  else { window._fbSaveAtend(obj); toast('Atendimento cadastrado'); }
-  atendSalvo = obj;
-  ativarBotoesAtend();
+  if (editAtendId) { obj.id=editAtendId; window._fbSaveAtend(obj); toast('✓ Atendimento atualizado'); }
+  else { window._fbSaveAtend(obj); toast('✓ Atendimento cadastrado'); }
+  document.getElementById('ov-atend').style.display='none'; editAtendId=null;
 }
 
 function renderAtendimentos() {
@@ -3266,9 +2940,8 @@ function renderAtendimentos() {
 
   var docIcons={'Pasta no Drive':'📂','E-mail Dra. Débora':'📧','WhatsApp':'📱','Físico no escritório':'🗂️','Outro':'📎'};
   var sitCores={'Pendente':'#D4B84A','Em andamento':'var(--ch)','Concluído':'#7ec492'};
-  var hoje = new Date(); hoje.setHours(0,0,0,0);
   var tbody=document.getElementById('at-tbody');
-  if (!lista.length) { tbody.innerHTML='<tr><td colspan="9"><div class="vazio"><div class="vazio-ic">📝</div><div class="vazio-t">Nenhum atendimento cadastrado</div><div class="vazio-s">Clique em "+ Novo Atendimento"</div></div></td></tr>'; return; }
+  if (!lista.length) { tbody.innerHTML='<tr><td colspan="8"><div class="vazio"><div class="vazio-ic">📝</div><div class="vazio-t">Nenhum atendimento cadastrado</div><div class="vazio-s">Clique em "+ Novo Atendimento"</div></div></td></tr>'; return; }
   tbody.innerHTML=lista.map(function(a){
     var docHtml='—';
     if (a.docLocal) {
@@ -3276,26 +2949,16 @@ function renderAtendimentos() {
       docHtml='<div style="font-size:11px;">'+(ic)+' '+esc(a.docLocal)+'</div>';
       if (a.docDet) docHtml+='<div style="font-size:10px;color:var(--tw)">'+esc(a.docDet)+'</div>';
     }
-    // Devolutiva com alerta de prazo
-    var devHtml = '—';
-    if (a.devolutiva) {
-      var dDev = new Date(a.devolutiva+'T00:00:00');
-      var diffDev = Math.round((dDev - hoje) / 86400000);
-      var corDev = diffDev < 0 ? 'var(--rc)' : diffDev <= 3 ? '#D4B84A' : '#7ec492';
-      var labelDev = diffDev < 0 ? ' 🚨 VENCIDA' : diffDev === 0 ? ' ⚠️ HOJE' : diffDev <= 3 ? ' ⚠️ '+diffDev+'d' : '';
-      devHtml = '<span style="font-size:11px;color:'+corDev+';font-weight:600;">'+fmtData(a.devolutiva)+labelDev+'</span>';
-    }
     return '<tr>'+
       '<td style="font-weight:600;color:var(--tp)">'+esc(a.nome||'')+'<br>'+
         (a.whats?'<a href="https://wa.me/55'+a.whats.replace(/\D/g,'')+'" target="_blank" style="font-size:10px;color:var(--ch)">📱 '+esc(a.whats)+'</a> ':'')+
         (a.email?'<a href="mailto:'+esc(a.email)+'" style="font-size:10px;color:var(--tw)">✉️ '+esc(a.email)+'</a>':'')+
       '</td>'+
       '<td style="font-size:11px;color:var(--tw);white-space:nowrap">'+fmtData(a.data)+'</td>'+
-      '<td>'+devHtml+'</td>'+
       '<td><span class="bgt">'+esc(a.tipo||'')+'</span></td>'+
       '<td><span style="font-size:11px;font-weight:600;color:'+(sitCores[a.situacao]||'var(--tw)')+'">'+esc(a.situacao||'')+'</span></td>'+
-      '<td style="font-size:11px;color:var(--do);">'+(a.comercial?'🤝 '+esc(a.comercial):'—')+'</td>'+
       '<td>'+docHtml+'</td>'+
+      '<td style="font-size:11px;color:var(--ts);max-width:160px;overflow:hidden;text-overflow:ellipsis">'+esc(a.assunto||'')+'</td>'+
       '<td style="font-size:11px;color:var(--tw)">'+esc(a.obs||'')+'</td>'+
       '<td><div class="acoes">'+
         '<button class="btn-ic" title="Editar" onclick="abrirModalAtend(\''+a.id+'\')">✏️</button>'+
@@ -3310,79 +2973,6 @@ function excluirAtend(id) {
   window._fbDeleteAtend(id); toast('Atendimento removido');
 }
 
-function desativarBotoesAtend() {
-  var b1 = document.getElementById('btn-at-agenda');
-  var b2 = document.getElementById('btn-at-email');
-  var h  = document.getElementById('at-agenda-hint');
-  if (b1) { b1.disabled=true; b1.style.opacity='.5'; b1.style.cursor='not-allowed'; }
-  if (b2) { b2.disabled=true; b2.style.opacity='.5'; b2.style.cursor='not-allowed'; }
-  if (h)  h.textContent='Preencha os dados e salve para ativar os botoes.';
-}
-
-function ativarBotoesAtend() {
-  var b1 = document.getElementById('btn-at-agenda');
-  var b2 = document.getElementById('btn-at-email');
-  var h  = document.getElementById('at-agenda-hint');
-  if (b1) { b1.disabled=false; b1.style.opacity='1'; b1.style.cursor='pointer'; }
-  if (b2) { b2.disabled=false; b2.style.opacity='1'; b2.style.cursor='pointer'; }
-  if (h)  h.textContent='Atendimento salvo! Clique nos botoes acima para abrir o Google Agenda ou enviar o e-mail.';
-}
-
-function abrirAgendaAtend() {
-  var a = atendSalvo;
-  if (!a) { toast('Salve o atendimento primeiro', true); return; }
-
-  var dataBase = a.data || new Date().toISOString().split('T')[0];
-  var dtStr = dataBase.replace(/-/g,'') + 'T090000';
-  var dtFimStr = dataBase.replace(/-/g,'') + 'T100000';
-
-  var titulo = encodeURIComponent('[ATENDIMENTO] ' + (a.tipo||'Atendimento') + ' — ' + (a.nome||''));
-  var detalhes = encodeURIComponent(
-    'TIPO: ' + (a.tipo||'') + '\n' +
-    'CLIENTE: ' + (a.nome||'') + '\n' +
-    'ASSUNTO: ' + (a.assunto||'não informado') + '\n' +
-    'SITUAÇÃO: ' + (a.situacao||'') + '\n' +
-    (a.docLocal ? 'DOCS: ' + a.docLocal + (a.docDet ? ' — ' + a.docDet : '') + '\n' : '') +
-    (a.obs ? 'OBS: ' + a.obs + '\n' : '') + '\n' +
-    'Escritório Débora Constantino — OAB/SP 378.037'
-  );
-  var convidados = encodeURIComponent('deboraewenne@gmail.com,documentoprocessoadvocacia@gmail.com');
-
-  var url = 'https://calendar.google.com/calendar/render?action=TEMPLATE' +
-    '&text=' + titulo +
-    '&dates=' + dtStr + '/' + dtFimStr +
-    '&details=' + detalhes +
-    '&add=' + convidados;
-
-  window.open(url, '_blank');
-  toast('Google Agenda aberto — ajuste o horario e salve!');
-}
-
-function enviarEmailAtend() {
-  var a = atendSalvo;
-  if (!a) { toast('Salve o atendimento primeiro', true); return; }
-
-  var assunto = encodeURIComponent('[ATENDIMENTO] ' + (a.tipo||'Atendimento') + ' — ' + (a.nome||'') + ' — ' + fmtData(a.data||''));
-  var corpo = encodeURIComponent(
-    'Bom dia,\n\n' +
-    'Segue o registro de atendimento cadastrado no sistema:\n\n' +
-    '▸ Cliente: ' + (a.nome||'') + '\n' +
-    '▸ Tipo: ' + (a.tipo||'') + '\n' +
-    '▸ Data: ' + fmtData(a.data||'') + '\n' +
-    '▸ Assunto: ' + (a.assunto||'não informado') + '\n' +
-    '▸ Situação: ' + (a.situacao||'') + '\n' +
-    (a.docLocal ? '▸ Localização dos docs: ' + a.docLocal + (a.docDet ? ' — ' + a.docDet : '') + '\n' : '') +
-    (a.whats ? '▸ WhatsApp: ' + a.whats + '\n' : '') +
-    (a.email ? '▸ E-mail cliente: ' + a.email + '\n' : '') +
-    (a.obs ? '▸ Obs: ' + a.obs + '\n' : '') +
-    '\nEscritório Débora Constantino — OAB/SP 378.037'
-  );
-
-  var destinatarios = 'deboraewenne@gmail.com,documentoprocessoadvocacia@gmail.com';
-  window.location.href = 'mailto:' + destinatarios + '?subject=' + assunto + '&body=' + corpo;
-  toast('Cliente de e-mail aberto com o aviso!');
-}
-
 function exportAtendCSV() {
   var h=['Cliente','Data','Tipo','Situação','Assunto','Local Docs','Detalhe Docs','Contato','Obs'];
   var rows=(ATENDIMENTOS||[]).map(function(a){ return [a.nome,fmtData(a.data),a.tipo,a.situacao,a.assunto,a.docLocal,a.docDet,a.contato,a.obs]; });
@@ -3392,469 +2982,642 @@ function exportAtendCSV() {
   toast('✓ CSV exportado');
 }
 
-// ========== AUDIÊNCIAS ==========
-function abrirModalAud(id) {
-  editAudId = id;
-  audSalva = null;
-  ['au-nome','au-whats','au-email-cliente','au-numproc','au-local','au-assunto','au-obs'].forEach(function(f){ setVal(f,''); });
-  setVal('au-tipo','Judicial');
-  setVal('au-tipo-aud','Audiência de Conciliação');
-  setVal('au-duracao','60');
-  setVal('au-situacao','Agendada');
-  desativarBotoesAgenda();
-  if (id) {
-    var a = (AUDIENCIAS||[]).find(function(x){ return x.id===id; });
-    if (!a) return;
-    document.getElementById('au-mo-tit').textContent = 'Editar Audiência';
-    setVal('au-nome', a.nome||''); setVal('au-whats', a.whats||'');
-    setVal('au-email-cliente', a.emailCliente||'');
-    setVal('au-tipo', a.tipo||'Judicial');
-    setVal('au-tipo-aud', a.tipoAud||'Audiência de Conciliação');
-    setVal('au-data', a.data||''); setVal('au-hora', a.hora||'');
-    setVal('au-duracao', a.duracao||'60');
-    setVal('au-numproc', a.numproc||'');
-    setVal('au-situacao', a.situacao||'Agendada');
-    setVal('au-local', a.local||'');
-    setVal('au-assunto', a.assunto||'');
-    setVal('au-obs', a.obs||'');
-    audSalva = a;
-    ativarBotoesAgenda();
-  } else {
-    document.getElementById('au-mo-tit').textContent = 'Nova Audiência';
-    setVal('au-data', new Date().toISOString().split('T')[0]);
+// ========== DEJEN + GOOGLE CALENDAR ==========
+// OAB/SP: 378.037 | Advogada: Débora Ewenne Santos da Silva
+
+var DEJEN_OAB        = '378037';
+var DEJEN_OAB_UF     = 'SP';
+var DEJEN_NOME       = 'Debora Ewenne Santos da Silva';
+var DEJEN_NOME_ALT   = 'Débora Ewenne Santos da Silva';
+var DEJEN_BASE_URL   = 'https://comunicaapi.pje.jus.br';
+var DEJEN_HISTORICO      = [];
+var DEJEN_COMUNICACOES   = [];
+var DEJEN_TRIBUNAIS      = [];
+var DEJEN_EM_CONSULTA    = false;
+var DEJEN_AGENDADOS      = {}; // hash -> eventId
+var _dejenLog = '';
+
+// ---- Google OAuth (Calendar API) ----
+// Client ID do projeto Google Cloud — uso pessoal/escritório
+// IMPORTANTE: registre https://advdeboraconstantino.github.io como origem autorizada no Console Google Cloud
+var GCAL_CLIENT_ID  = '1056658250886-jmu8ldvb00p2rojtp860sc17se5iblu2.apps.googleusercontent.com';
+var GCAL_SCOPES     = 'https://www.googleapis.com/auth/calendar.events';
+var GCAL_TOKEN      = null; // access_token obtido via OAuth
+var GCAL_TOKEN_EXPIRY = 0;
+
+// ---- Mapeamento: tipo de comunicação → peça jurídica sugerida ----
+var MAPA_PECAS = [
+  { palavras: ['contestação','citar','citação','citado'],        peca: 'Contestação',         prazo: 15, descr: 'Apresentar contestação com todos os fundamentos de defesa.' },
+  { palavras: ['contrarrazões','contrarrazo','recurso da parte contrária'], peca: 'Contrarrazões',     prazo: 15, descr: 'Apresentar contrarrazões ao recurso interposto pela parte adversa.' },
+  { palavras: ['apelação','apelaç','apelado'],                   peca: 'Contrarrazões de Apelação', prazo: 15, descr: 'Apresentar contrarrazões à apelação nos autos.' },
+  { palavras: ['agravo','agravado','agravante'],                 peca: 'Resposta ao Agravo',   prazo: 15, descr: 'Apresentar resposta/contrarrazões ao agravo interposto.' },
+  { palavras: ['recurso','recorrer','recorrente'],               peca: 'Recurso',              prazo: 15, descr: 'Interpor recurso cabível contra a decisão.' },
+  { palavras: ['embargos de declaração','embargos decl'],       peca: 'Embargos de Declaração', prazo: 5, descr: 'Opor embargos de declaração para sanar omissão, contradição ou obscuridade.' },
+  { palavras: ['manifestação','manifeste','se manifestar','impugn'], peca: 'Manifestação/Impugnação', prazo: 15, descr: 'Apresentar manifestação nos autos sobre o ato intimado.' },
+  { palavras: ['réplica','impugnar a contestação'],              peca: 'Réplica',              prazo: 15, descr: 'Apresentar réplica à contestação apresentada pela parte contrária.' },
+  { palavras: ['audiência','designada','marcada','sessão de julgamento'], peca: 'Preparação para Audiência', prazo: 0, descr: 'Preparar memoriais, documentos e estratégia para a audiência/sessão.' },
+  { palavras: ['sentença','julgado','extinto','procedente','improcedente'], peca: 'Análise da Sentença / Recurso', prazo: 15, descr: 'Analisar a sentença e avaliar interposição de apelação ou embargos.' },
+  { palavras: ['despacho','providência','diligência','regularize'], peca: 'Petição de Cumprimento de Diligência', prazo: 5, descr: 'Apresentar petição cumprindo o despacho ou diligência determinada.' },
+  { palavras: ['inicial','petição inicial','distribuição'],      peca: 'Análise da Petição Inicial', prazo: 15, descr: 'Analisar a petição inicial distribuída contra o cliente.' },
+  { palavras: ['memorial','memoriais'],                          peca: 'Memoriais',            prazo: 10, descr: 'Apresentar memoriais finais reforçando a tese defensiva.' },
+  { palavras: ['execução','cumprimento de sentença','penhora'],  peca: 'Impugnação ao Cumprimento / Embargos à Execução', prazo: 15, descr: 'Impugnar o cumprimento de sentença ou opor embargos à execução.' },
+  { palavras: ['pad','processo administrativo','sindicância','comissão processante'], peca: 'Defesa Administrativa (PAD)', prazo: 10, descr: 'Elaborar defesa administrativa robusta no PAD/sindicância — tese de nulidade, proporcionalidade e contraditório.' },
+  { palavras: ['liminar','tutela','antecipada','urgência','cautelar'], peca: 'Petição de Tutela de Urgência', prazo: 5, descr: 'Requerer tutela de urgência/liminar para suspensão do ato impugnado.' },
+  { palavras: ['recurso administrativo','reconsideração'],       peca: 'Recurso Administrativo', prazo: 15, descr: 'Interpor recurso administrativo contra decisão desfavorável.' },
+];
+
+function sugerirPeca(texto, tipo) {
+  var t = ((texto || '') + ' ' + (tipo || '')).toLowerCase();
+  for (var i = 0; i < MAPA_PECAS.length; i++) {
+    var m = MAPA_PECAS[i];
+    for (var j = 0; j < m.palavras.length; j++) {
+      if (t.indexOf(m.palavras[j]) >= 0) return m;
+    }
   }
-  document.getElementById('ov-aud').style.display = 'block';
+  return { peca: 'Manifestação / Petição', prazo: 15, descr: 'Verificar o teor da intimação e adotar as medidas processuais cabíveis no prazo legal.' };
 }
 
-function desativarBotoesAgenda() {
-  var b1 = document.getElementById('btn-google-agenda');
-  var b2 = document.getElementById('btn-enviar-email');
-  var h = document.getElementById('au-agenda-hint');
-  if (b1) { b1.disabled = true; b1.style.opacity = '.5'; b1.style.cursor = 'not-allowed'; }
-  if (b2) { b2.disabled = true; b2.style.opacity = '.5'; b2.style.cursor = 'not-allowed'; }
-  if (h) h.textContent = 'Preencha os dados e salve para ativar os botoes de agenda.';
+function calcDataVencimento(dataPublicacao, prazoEmDias) {
+  if (!dataPublicacao) return null;
+  var d = new Date(dataPublicacao.split('T')[0] + 'T12:00:00');
+  d.setDate(d.getDate() + (prazoEmDias || 15));
+  return d;
 }
 
-function ativarBotoesAgenda() {
-  var b1 = document.getElementById('btn-google-agenda');
-  var b2 = document.getElementById('btn-enviar-email');
-  var h = document.getElementById('au-agenda-hint');
-  if (b1) { b1.disabled = false; b1.style.opacity = '1'; b1.style.cursor = 'pointer'; }
-  if (b2) { b2.disabled = false; b2.style.opacity = '1'; b2.style.cursor = 'pointer'; }
-  if (h) h.textContent = 'Audiencia salva! Clique nos botoes acima para abrir o Google Agenda ou enviar o e-mail de convite.';
+function calcDataEvento(dataVencimento) {
+  // 2 dias antes do vencimento
+  var d = new Date(dataVencimento);
+  d.setDate(d.getDate() - 2);
+  return d;
 }
 
-function salvarAud() {
-  var nome = getVal('au-nome');
-  var data = getVal('au-data');
-  var hora = getVal('au-hora');
-  var local = getVal('au-local');
-  if (!nome) { toast('Informe o nome do cliente', true); return; }
-  if (!data) { toast('Informe a data da audiencia', true); return; }
-  if (!hora) { toast('Informe o horario da audiencia', true); return; }
-  if (!local) { toast('Informe o local/vara', true); return; }
+function formatDateISO(d) {
+  return d.toISOString().split('T')[0];
+}
 
-  var obj = {
-    nome: nome,
-    whats: getVal('au-whats'),
-    emailCliente: getVal('au-email-cliente'),
-    tipo: getVal('au-tipo'),
-    tipoAud: getVal('au-tipo-aud'),
-    data: data, hora: hora,
-    duracao: getVal('au-duracao'),
-    numproc: getVal('au-numproc'),
-    situacao: getVal('au-situacao'),
-    local: local,
-    assunto: getVal('au-assunto'),
-    obs: getVal('au-obs')
+// ---- LOG ----
+function logDejen(msg, tipo) {
+  var agora = new Date().toLocaleTimeString('pt-BR');
+  var prefix = tipo==='ok' ? '✅' : tipo==='err' ? '❌' : tipo==='warn' ? '⚠️' : 'ℹ️';
+  _dejenLog += '[' + agora + '] ' + prefix + ' ' + msg + '\n';
+  var el = document.getElementById('dj-log');
+  if (el) { el.textContent = _dejenLog; el.scrollTop = 9999; }
+}
+
+function setDejenStatus(txt, cor) {
+  var el = document.getElementById('dejen-status');
+  if (el) { el.textContent = txt; el.style.color = cor || 'var(--tw)'; }
+}
+
+// ---- INICIALIZAR (ao entrar na aba) ----
+function iniciarDEJEN() {
+  try {
+    var h = localStorage.getItem('dejen_historico_378037');
+    if (h) DEJEN_HISTORICO = JSON.parse(h);
+    var c = localStorage.getItem('dejen_comunicacoes_378037');
+    if (c) { DEJEN_COMUNICACOES = JSON.parse(c); renderDEJEN(); }
+    var t = localStorage.getItem('dejen_ultima_378037');
+    if (t) document.getElementById('dj-ultima').textContent = t;
+    var ag = localStorage.getItem('dejen_agendados_378037');
+    if (ag) DEJEN_AGENDADOS = JSON.parse(ag);
+    var agCount = Object.keys(DEJEN_AGENDADOS).length;
+    document.getElementById('dj-agendados').textContent = agCount;
+    // Verificar token salvo
+    var tok = localStorage.getItem('gcal_token_378037');
+    var exp = parseInt(localStorage.getItem('gcal_token_exp_378037') || '0');
+    if (tok && Date.now() < exp) {
+      GCAL_TOKEN = tok;
+      GCAL_TOKEN_EXPIRY = exp;
+      atualizarStatusCalendar(true);
+    }
+  } catch(e) {}
+}
+
+// ---- GOOGLE CALENDAR OAUTH ----
+function autorizarGoogleCalendar() {
+  if (!GCAL_CLIENT_ID) {
+    // Modo sem Client ID: usar link direto ao Google Calendar
+    toast('⚠️ Para integração automática, configure o Client ID do Google Cloud no código. Por ora, use o botão "Abrir no Google Agenda" em cada comunicação.', true);
+    return;
+  }
+  var redirectUri = encodeURIComponent(window.location.origin + window.location.pathname);
+  var url = 'https://accounts.google.com/o/oauth2/v2/auth' +
+    '?client_id=' + encodeURIComponent(GCAL_CLIENT_ID) +
+    '&redirect_uri=' + redirectUri +
+    '&response_type=token' +
+    '&scope=' + encodeURIComponent(GCAL_SCOPES) +
+    '&prompt=consent';
+  window.open(url, '_blank', 'width=500,height=600');
+}
+
+// Capturar token do hash da URL (retorno OAuth)
+(function capturarTokenOAuth() {
+  var hash = window.location.hash;
+  if (hash && hash.indexOf('access_token') >= 0) {
+    var params = {};
+    hash.substring(1).split('&').forEach(function(p) {
+      var kv = p.split('=');
+      params[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || '');
+    });
+    if (params.access_token) {
+      GCAL_TOKEN = params.access_token;
+      var expiresIn = parseInt(params.expires_in || '3600') * 1000;
+      GCAL_TOKEN_EXPIRY = Date.now() + expiresIn;
+      try {
+        localStorage.setItem('gcal_token_378037', GCAL_TOKEN);
+        localStorage.setItem('gcal_token_exp_378037', String(GCAL_TOKEN_EXPIRY));
+      } catch(e) {}
+      history.replaceState(null, '', window.location.pathname);
+      atualizarStatusCalendar(true);
+      toast('✓ Google Agenda conectado com sucesso!');
+    }
+  }
+})();
+
+function atualizarStatusCalendar(conectado) {
+  var el = document.getElementById('gcal-status');
+  var btn = document.getElementById('btn-gcal-auth');
+  if (conectado) {
+    if (el) { el.textContent = '📅 Agenda: conectada'; el.style.color = '#7ec492'; }
+    if (btn) { btn.textContent = '✓ Agenda conectada'; btn.style.opacity = '0.6'; }
+  } else {
+    if (el) { el.textContent = '📅 Agenda: desconectada'; el.style.color = 'var(--tw)'; }
+    if (btn) { btn.textContent = '🔐 Conectar Agenda'; btn.style.opacity = '1'; }
+  }
+}
+
+function gcalConectado() {
+  return GCAL_TOKEN && Date.now() < GCAL_TOKEN_EXPIRY;
+}
+
+// ---- CRIAR EVENTO NO GOOGLE CALENDAR ----
+async function criarEventoCalendar(comm) {
+  var texto  = comm.texto || comm.conteudo || comm.resumo || '';
+  var tipo   = comm.tipoComunicacao || comm.tipo || '';
+  var proc   = comm.numeroProcesso || comm.numero || comm.nup || '—';
+  var trib   = comm.tribunal || comm.siglaOrgao || comm.orgaoJulgador || '—';
+  var dataComm = comm.dataComunicacao || comm.dataPublicacao || comm.dataDisponibilizacao || '';
+  if (dataComm && dataComm.includes('T')) dataComm = dataComm.split('T')[0];
+
+  var sugestao = sugerirPeca(texto, tipo);
+  var dataVenc = calcDataVencimento(dataComm, sugestao.prazo);
+  if (!dataVenc) { logDejen('Sem data de comunicação para: ' + proc, 'warn'); return null; }
+  var dataEvt  = calcDataEvento(dataVenc);
+
+  // Descrição detalhada
+  var descricao =
+    '⚖️ GESTÃO JURÍDICA — DÉBORA CONSTANTINO\n' +
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' +
+    '📋 PEÇA JURÍDICA SUGERIDA:\n' +
+    sugestao.peca.toUpperCase() + '\n\n' +
+    '📌 ORIENTAÇÃO:\n' + sugestao.descr + '\n\n' +
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+    '🔢 Processo: ' + proc + '\n' +
+    '🏛️ Tribunal/Órgão: ' + trib + '\n' +
+    '📅 Data da Publicação: ' + (dataComm || '—') + '\n' +
+    '⏰ Prazo: ' + sugestao.prazo + ' dias úteis\n' +
+    '📆 Vencimento estimado: ' + dataVenc.toLocaleDateString('pt-BR') + '\n' +
+    '🔔 ESTE EVENTO: 2 dias antes do vencimento\n\n' +
+    (texto ? '📝 Resumo da publicação:\n' + texto.substring(0, 500) + (texto.length > 500 ? '...' : '') + '\n\n' : '') +
+    '─────────────────────────────────\n' +
+    'OAB/SP 378.037 | Sistema de Gestão Jurídica';
+
+  var titulo = '⚖️ ' + sugestao.peca + ' — Proc. ' + proc.substring(0, 25) + (proc.length > 25 ? '...' : '') + ' [' + trib + ']';
+
+  var evento = {
+    summary: titulo,
+    description: descricao,
+    start: { date: formatDateISO(dataEvt) },
+    end:   { date: formatDateISO(dataEvt) },
+    reminders: {
+      useDefault: false,
+      overrides: [
+        { method: 'popup',  minutes: 480 },  // 8h antes (início do dia)
+        { method: 'popup',  minutes: 60  },   // 1h antes
+        { method: 'email',  minutes: 1440 }   // 1 dia antes (e-mail)
+      ]
+    },
+    colorId: sugestao.prazo <= 5 ? '11' : '9'  // 11=vermelho urgente, 9=azul
   };
 
-  if (editAudId) {
-    obj.id = editAudId;
-    window._fbSaveAud(obj);
-    toast('Audiencia atualizada');
-  } else {
-    window._fbSaveAud(obj).then(function(newId) {
-      obj.id = newId;
-    });
-    toast('Audiencia cadastrada');
-  }
-  audSalva = obj;
-  ativarBotoesAgenda();
-}
-
-function abrirGoogleAgenda() {
-  var a = audSalva;
-  if (!a || !a.data || !a.hora) { toast('Salve a audiencia primeiro', true); return; }
-
-  // Formatar data/hora para Google Agenda (formato: YYYYMMDDTHHMMSS)
-  var dataHora = a.data.replace(/-/g,'') + 'T' + a.hora.replace(':','') + '00';
-  var dur = parseInt(a.duracao||60);
-  var dtFim = new Date(a.data+'T'+a.hora+':00');
-  dtFim.setMinutes(dtFim.getMinutes() + dur);
-  var dtFimStr = dtFim.getFullYear().toString() +
-    String(dtFim.getMonth()+1).padStart(2,'0') +
-    String(dtFim.getDate()).padStart(2,'0') + 'T' +
-    String(dtFim.getHours()).padStart(2,'0') +
-    String(dtFim.getMinutes()).padStart(2,'0') + '00';
-
-  var titulo = encodeURIComponent('[AUDIÊNCIA] ' + a.tipoAud + ' — ' + a.nome);
-  var detalhes = encodeURIComponent(
-    'TIPO: ' + (a.tipo||'') + '\n' +
-    'CLIENTE: ' + (a.nome||'') + '\n' +
-    'PROCESSO: ' + (a.numproc||'não informado') + '\n' +
-    'ASSUNTO: ' + (a.assunto||'não informado') + '\n' +
-    'OBSERVAÇÕES: ' + (a.obs||'não informado') + '\n\n' +
-    'Escritório Débora Constantino — OAB/SP 378.037'
-  );
-  var local = encodeURIComponent(a.local||'');
-
-  // Adicionar convidados fixos
-  var convidados = encodeURIComponent('deboraewenne@gmail.com,documentoprocessoadvocacia@gmail.com');
-
-  var url = 'https://calendar.google.com/calendar/render?action=TEMPLATE' +
-    '&text=' + titulo +
-    '&dates=' + dataHora + '/' + dtFimStr +
-    '&details=' + detalhes +
-    '&location=' + local +
-    '&add=' + convidados;
-
-  window.open(url, '_blank');
-  toast('Google Agenda aberto — confirme e salve o evento!');
-}
-
-function enviarEmailAudiencia() {
-  var a = audSalva;
-  if (!a) { toast('Salve a audiencia primeiro', true); return; }
-
-  var assunto = encodeURIComponent('[AUDIÊNCIA] ' + (a.tipoAud||'Audiência') + ' — ' + (a.nome||'') + ' — ' + fmtData(a.data||''));
-  var corpo = encodeURIComponent(
-    'Bom dia,\n\n' +
-    'Segue a confirmação de audiência cadastrada no sistema:\n\n' +
-    '▸ Cliente: ' + (a.nome||'') + '\n' +
-    '▸ Tipo: ' + (a.tipo||'') + ' — ' + (a.tipoAud||'') + '\n' +
-    '▸ Data: ' + fmtData(a.data||'') + '\n' +
-    '▸ Horário: ' + (a.hora||'') + '\n' +
-    '▸ Local/Vara: ' + (a.local||'') + '\n' +
-    '▸ Processo: ' + (a.numproc||'não informado') + '\n' +
-    '▸ Assunto: ' + (a.assunto||'não informado') + '\n' +
-    '▸ Situação: ' + (a.situacao||'Agendada') + '\n' +
-    (a.obs ? '▸ Obs: ' + a.obs + '\n' : '') +
-    '\nEscritorório Débora Constantino — OAB/SP 378.037'
-  );
-
-  var destinatarios = 'deboraewenne@gmail.com,documentoprocessoadvocacia@gmail.com';
-  var mailtoUrl = 'mailto:' + destinatarios + '?subject=' + assunto + '&body=' + corpo;
-  window.location.href = mailtoUrl;
-  toast('Cliente de e-mail aberto com o convite!');
-}
-
-function renderAudiencias() {
-  var busca = (getVal('au-busca')||'').toLowerCase();
-  var fTipo = getVal('au-filtro-tipo');
-  var fSit = getVal('au-filtro-sit');
-
-  var lista = (AUDIENCIAS||[]).filter(function(a) {
-    var okB = !busca || (a.nome||'').toLowerCase().includes(busca) || (a.local||'').toLowerCase().includes(busca) || (a.numproc||'').toLowerCase().includes(busca);
-    return okB && (!fTipo || a.tipo === fTipo) && (!fSit || a.situacao === fSit);
-  });
-
-  lista.sort(function(a,b) {
-    var da = (a.data||'')+(a.hora||'');
-    var db = (b.data||'')+(b.hora||'');
-    return da < db ? -1 : 1;
-  });
-
-  // Cards
-  var hoje = new Date(); hoje.setHours(0,0,0,0);
-  var proximas = 0, adm = 0, jud = 0, realizadas = 0;
-  (AUDIENCIAS||[]).forEach(function(a) {
-    if (a.tipo === 'Administrativo') adm++;
-    else jud++;
-    if (a.situacao === 'Realizada') realizadas++;
-    if (a.situacao === 'Agendada' && a.data) {
-      var d = new Date(a.data+'T00:00:00');
-      var diff = Math.round((d-hoje)/86400000);
-      if (diff >= 0 && diff <= 7) proximas++;
+  if (gcalConectado()) {
+    // Criar via API
+    try {
+      var resp = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + GCAL_TOKEN,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(evento)
+      });
+      if (resp.ok) {
+        var data = await resp.json();
+        logDejen('Evento criado: "' + titulo + '" em ' + formatDateISO(dataEvt), 'ok');
+        return data.id || 'criado';
+      } else {
+        var err = await resp.json().catch(function(){ return {}; });
+        if (resp.status === 401) { GCAL_TOKEN = null; atualizarStatusCalendar(false); }
+        logDejen('Erro ao criar evento: HTTP ' + resp.status + ' — ' + (err.error && err.error.message ? err.error.message : ''), 'err');
+        return null;
+      }
+    } catch(e) {
+      logDejen('Erro API Calendar: ' + e.message, 'err');
+      return null;
     }
+  } else {
+    // Fallback: abrir Google Calendar no navegador com evento pré-preenchido
+    var dtStart = formatDateISO(dataEvt).replace(/-/g,'');
+    var gcalUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+      '&text=' + encodeURIComponent(titulo) +
+      '&dates=' + dtStart + '/' + dtStart +
+      '&details=' + encodeURIComponent(descricao.substring(0, 1500));
+    window.open(gcalUrl, '_blank');
+    logDejen('Evento aberto no Google Agenda (modo manual): ' + proc, 'ok');
+    return 'manual';
+  }
+}
+
+// ---- AGENDAR UMA COMUNICAÇÃO ----
+async function agendarComunicacao(idx) {
+  var comm = DEJEN_COMUNICACOES[idx];
+  if (!comm) return;
+  var chave = comm._chave || comm._hashId || idx;
+
+  if (DEJEN_AGENDADOS[chave]) {
+    if (!confirm('Este prazo já foi agendado. Criar outro evento mesmo assim?')) return;
+  }
+
+  var btn = document.getElementById('btn-ag-' + idx);
+  if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
+
+  var eventId = await criarEventoCalendar(comm);
+
+  if (eventId) {
+    DEJEN_AGENDADOS[chave] = eventId;
+    try { localStorage.setItem('dejen_agendados_378037', JSON.stringify(DEJEN_AGENDADOS)); } catch(e) {}
+    document.getElementById('dj-agendados').textContent = Object.keys(DEJEN_AGENDADOS).length;
+    comm._agendado = true;
+    if (btn) { btn.textContent = '✓ Agendado'; btn.style.color = '#7ec492'; btn.disabled = false; }
+    if (gcalConectado()) toast('✓ Evento criado no Google Agenda!');
+  } else {
+    if (btn) { btn.textContent = '📅 Agendar'; btn.disabled = false; }
+    toast('Falha ao criar evento. Veja o log.', true);
+  }
+}
+
+// ---- AGENDAR TODAS AS NOVIDADES ----
+async function agendarTodasNovidades() {
+  var novas = DEJEN_COMUNICACOES.filter(function(c) { return c._status === 'novo' && !c._agendado; });
+  if (!novas.length) { toast('Nenhuma novidade para agendar.', true); return; }
+
+  if (!gcalConectado() && !GCAL_CLIENT_ID) {
+    if (!confirm('Google Agenda não conectada. Deseja abrir ' + novas.length + ' evento(s) manualmente no navegador?')) return;
+  }
+
+  var btn = document.getElementById('btn-agendar-todas');
+  btn.disabled = true; btn.textContent = '⏳ Agendando...';
+  logDejen('Iniciando agendamento de ' + novas.length + ' comunicação(ões)...');
+
+  var sucesso = 0;
+  for (var i = 0; i < novas.length; i++) {
+    var comm = novas[i];
+    var chave = comm._chave || comm._hashId || i;
+    var eventId = await criarEventoCalendar(comm);
+    if (eventId) {
+      DEJEN_AGENDADOS[chave] = eventId;
+      comm._agendado = true;
+      sucesso++;
+    }
+    await new Promise(function(r){ setTimeout(r, 300); }); // evitar rate limit
+  }
+
+  try { localStorage.setItem('dejen_agendados_378037', JSON.stringify(DEJEN_AGENDADOS)); } catch(e) {}
+  document.getElementById('dj-agendados').textContent = Object.keys(DEJEN_AGENDADOS).length;
+  renderDEJEN();
+  btn.disabled = false; btn.textContent = '📅 Agendar Todas as Novidades';
+  toast('✓ ' + sucesso + ' de ' + novas.length + ' evento(s) agendado(s).');
+  logDejen('Agendamento concluído: ' + sucesso + '/' + novas.length, 'ok');
+}
+
+// ---- CONSULTAR DEJEN ----
+async function consultarDEJEN() {
+  if (DEJEN_EM_CONSULTA) { toast('Consulta em andamento...', true); return; }
+  DEJEN_EM_CONSULTA = true;
+  _dejenLog = '';
+  document.getElementById('dj-log').style.display = 'block';
+  document.getElementById('dj-log').textContent = '';
+  var btnConsultar = document.getElementById('btn-dejen-consultar');
+  btnConsultar.disabled = true; btnConsultar.textContent = '⏳ Consultando...';
+  setDejenStatus('🟡 Consultando DEJEN...', '#D4B84A');
+
+  logDejen('=== INÍCIO DA CONSULTA DEJEN ===');
+  logDejen('Advogada: ' + DEJEN_NOME_ALT + ' | OAB/SP: ' + DEJEN_OAB);
+
+  try {
+    logDejen('--- Etapa 1: Tribunais ---');
+    var tribunais = await consultarTribunaisDEJEN();
+
+    logDejen('--- Etapa 2: Busca por OAB ---');
+    var todasComm = [];
+    var r1 = await consultarComunicacoesDEJEN({ oab: DEJEN_OAB, oabUF: DEJEN_OAB_UF });
+    if (r1 && r1.length) { logDejen('OAB: ' + r1.length + ' resultado(s)', 'ok'); todasComm = todasComm.concat(r1); }
+    else logDejen('OAB: sem resultados', 'warn');
+
+    logDejen('--- Etapa 3: Busca por nome ---');
+    var r2 = await consultarComunicacoesDEJEN({ nome: DEJEN_NOME });
+    if (r2 && r2.length) {
+      r2.forEach(function(r) { if (!todasComm.find(function(x){ return x._hashId === r._hashId; })) todasComm.push(r); });
+      logDejen('Nome: +' + r2.length + ' resultado(s)', 'ok');
+    }
+
+    logDejen('Total único: ' + todasComm.length, todasComm.length ? 'ok' : 'warn');
+
+    logDejen('--- Etapa 4: Certidões ---');
+    var certCount = 0;
+    for (var i = 0; i < Math.min(todasComm.length, 20); i++) {
+      var comm = todasComm[i];
+      var hash = comm.hash || comm.hashComunicacao || comm.idHash || comm.id || null;
+      if (hash) {
+        var cert = await consultarCertidaoDEJEN(hash);
+        if (cert) { comm._certidao = cert; comm._certidaoStatus = 'Obtida'; certCount++; logDejen('Certidão: ' + hash.toString().substring(0,20) + '...', 'ok'); }
+        else comm._certidaoStatus = 'Indisponível';
+      } else { comm._certidaoStatus = 'Hash ausente'; }
+    }
+
+    logDejen('--- Etapa 5: Comparar com histórico e sugerir peças ---');
+    var novas = 0;
+    todasComm.forEach(function(c) {
+      var chave = c._hashId || c.hash || c.id || c.numeroProcesso || '';
+      c._status = DEJEN_HISTORICO.indexOf(chave) >= 0 ? 'reportado' : 'novo';
+      c._chave  = chave;
+      c._agendado = !!DEJEN_AGENDADOS[chave];
+      if (c._status === 'novo') novas++;
+      // Sugestão de peça
+      var s = sugerirPeca(c.texto || c.conteudo || c.resumo || '', c.tipoComunicacao || c.tipo || '');
+      c._pecaSugerida = s.peca;
+      c._prazoSugerido = s.prazo;
+      c._pecaDescr    = s.descr;
+      // Data de vencimento
+      var dataC = c.dataComunicacao || c.dataPublicacao || c.dataDisponibilizacao || '';
+      if (dataC && dataC.includes('T')) dataC = dataC.split('T')[0];
+      c._dataCommFmt = dataC;
+      if (dataC) {
+        var dv = calcDataVencimento(dataC, s.prazo);
+        c._dataVenc = dv ? dv.toLocaleDateString('pt-BR') : '—';
+        var de = dv ? calcDataEvento(dv) : null;
+        c._dataEvento = de ? de.toLocaleDateString('pt-BR') : '—';
+      } else { c._dataVenc = '—'; c._dataEvento = '—'; }
+    });
+
+    // Atualizar histórico
+    todasComm.forEach(function(c) { if (c._chave && DEJEN_HISTORICO.indexOf(c._chave) < 0) DEJEN_HISTORICO.push(c._chave); });
+    DEJEN_COMUNICACOES = todasComm;
+
+    try {
+      localStorage.setItem('dejen_historico_378037', JSON.stringify(DEJEN_HISTORICO));
+      localStorage.setItem('dejen_comunicacoes_378037', JSON.stringify(DEJEN_COMUNICACOES));
+      var agora = new Date().toLocaleString('pt-BR');
+      localStorage.setItem('dejen_ultima_378037', agora);
+      document.getElementById('dj-ultima').textContent = agora;
+    } catch(e) {}
+
+    if (tribunais.length) atualizarFiltroTribunaisDEJEN(tribunais);
+
+    document.getElementById('dj-total').textContent = todasComm.length;
+    document.getElementById('dj-novas').textContent = novas;
+    document.getElementById('dj-certidoes').textContent = certCount;
+    document.getElementById('dj-tribunais').textContent = DEJEN_TRIBUNAIS.length;
+
+    if (novas > 0) { document.getElementById('badge-dejen').style.display='inline'; document.getElementById('badge-dejen').textContent=novas; }
+
+    renderDEJEN();
+    logDejen('=== CONSULTA CONCLUÍDA: ' + todasComm.length + ' comm. | ' + novas + ' novas | ' + certCount + ' certidões ===', 'ok');
+    setDejenStatus('🟢 Concluída — ' + todasComm.length + ' comunicação(ões)', '#7ec492');
+    if (!todasComm.length) toast('Nenhuma comunicação localizada. Veja o log para detalhes.', true);
+    else toast('✓ DEJEN: ' + todasComm.length + ' comunicação(ões) — ' + novas + ' nova(s)');
+
+  } catch(e) {
+    logDejen('ERRO CRÍTICO: ' + e.message, 'err');
+    setDejenStatus('🔴 Erro na consulta', 'var(--rc)');
+    toast('Erro ao consultar DEJEN: ' + e.message, true);
+  } finally {
+    DEJEN_EM_CONSULTA = false;
+    btnConsultar.disabled = false; btnConsultar.textContent = '🔍 Consultar DEJEN';
+  }
+}
+
+async function consultarTribunaisDEJEN() {
+  try {
+    logDejen('GET ' + DEJEN_BASE_URL + '/api/v1/comunicacao/tribunal');
+    var resp = await fetch(DEJEN_BASE_URL + '/api/v1/comunicacao/tribunal', { headers: { 'Accept': 'application/json' } });
+    logDejen('HTTP ' + resp.status);
+    if (!resp.ok) { logDejen('Tribunais: HTTP ' + resp.status, 'err'); return []; }
+    var data = await resp.json();
+    var lista = Array.isArray(data) ? data : (data.conteudo || data.data || data.tribunais || []);
+    DEJEN_TRIBUNAIS = lista;
+    logDejen(lista.length + ' tribunal(is) carregado(s)', 'ok');
+    return lista;
+  } catch(e) { logDejen('Tribunais: ' + e.message, 'err'); return []; }
+}
+
+async function consultarComunicacoesDEJEN(params) {
+  try {
+    var url = new URL(DEJEN_BASE_URL + '/api/v1/comunicacao');
+    if (params.oab)   url.searchParams.set('numeroOAB', params.oab);
+    if (params.oabUF) url.searchParams.set('siglaUFOAB', params.oabUF);
+    if (params.nome)  url.searchParams.set('nome', params.nome);
+    url.searchParams.set('pagina', '1');
+    url.searchParams.set('tamanhoPagina', '100');
+    logDejen('GET ' + url.toString());
+    var resp = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+    logDejen('HTTP ' + resp.status);
+    if (resp.status === 401 || resp.status === 403) { logDejen('Autenticação necessária (HTTP ' + resp.status + ')', 'err'); return []; }
+    if (!resp.ok) { logDejen('HTTP ' + resp.status, 'err'); return []; }
+    var data = await resp.json();
+    var lista = Array.isArray(data) ? data : (data.conteudo || data.content || data.data || data.itens || []);
+    lista.forEach(function(item, idx) { item._hashId = item.hash || item.hashComunicacao || item.idHash || item.id || ('sem-hash-'+idx); });
+    var totalPags = data.totalPages || data.totalPaginas || 1;
+    for (var p = 2; p <= Math.min(totalPags, 10); p++) {
+      url.searchParams.set('pagina', String(p));
+      var r2 = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+      if (!r2.ok) break;
+      var d2 = await r2.json();
+      var l2 = Array.isArray(d2) ? d2 : (d2.conteudo || d2.content || d2.data || d2.itens || []);
+      l2.forEach(function(item, idx) { item._hashId = item.hash || item.id || ('p'+p+'-'+idx); lista.push(item); });
+    }
+    return lista;
+  } catch(e) { logDejen('Comunicações: ' + e.message, 'err'); return []; }
+}
+
+async function consultarCertidaoDEJEN(hash) {
+  try {
+    var resp = await fetch(DEJEN_BASE_URL + '/api/v1/comunicacao/' + encodeURIComponent(hash) + '/certidao', { headers: { 'Accept': 'application/json,application/pdf,text/html' } });
+    if (!resp.ok) return null;
+    var ct = resp.headers.get('content-type') || '';
+    return ct.includes('application/json') ? JSON.stringify(await resp.json()) : await resp.text();
+  } catch(e) { return null; }
+}
+
+function atualizarFiltroTribunaisDEJEN(tribunais) {
+  var sel = document.getElementById('dj-filtro-tribunal');
+  sel.innerHTML = '<option value="">Todos os tribunais</option>';
+  var vistos = [];
+  var adicionarOpt = function(val, nome) {
+    if (val && vistos.indexOf(val) < 0) {
+      vistos.push(val);
+      var o = document.createElement('option'); o.value = val; o.textContent = nome || val; sel.appendChild(o);
+    }
+  };
+  (tribunais || []).forEach(function(t) { adicionarOpt(t.sigla || t.codigo || t.id || '', t.nome || t.sigla || ''); });
+  DEJEN_COMUNICACOES.forEach(function(c) { adicionarOpt(c.tribunal || c.siglaOrgao || c.orgaoJulgador || '', ''); });
+}
+
+function filtrarDEJEN() { renderDEJEN(); }
+
+// ---- RENDER PRINCIPAL ----
+function renderDEJEN() {
+  var fStatus   = document.getElementById('dj-filtro-status').value;
+  var fTribunal = document.getElementById('dj-filtro-tribunal').value;
+  var lista = DEJEN_COMUNICACOES.filter(function(c) {
+    var okS = !fStatus   || c._status === fStatus;
+    var trib = c.tribunal || c.siglaOrgao || c.orgaoJulgador || '';
+    var okT = !fTribunal || trib === fTribunal;
+    return okS && okT;
   });
-  setTxt('au-tot', (AUDIENCIAS||[]).length);
-  setTxt('au-prox', proximas);
-  setTxt('au-adm', adm);
-  setTxt('au-jud', jud);
-  setTxt('au-real', realizadas);
-  document.getElementById('au-cnt').textContent = lista.length + ' registro' + (lista.length !== 1 ? 's' : '');
+  document.getElementById('dj-cnt').textContent = lista.length + ' registro' + (lista.length!==1?'s':'');
+  var container = document.getElementById('dj-lista');
 
-  var sitCores = {'Agendada':'#D4B84A','Realizada':'#7ec492','Cancelada':'var(--rc)','Adiada':'var(--tw)'};
-  var tipoCores = {'Judicial':'var(--vi)','Administrativo':'var(--ch)'};
-  var tbody = document.getElementById('au-tbody');
-
+  if (!DEJEN_COMUNICACOES.length) {
+    container.innerHTML = '<div class="vazio" style="padding:60px 40px;"><div class="vazio-ic">📡</div><div style="font-family:\'Playfair Display\',serif;font-size:15px;opacity:.55;margin-bottom:5px;">Nenhuma consulta realizada</div><div class="vazio-s">Clique em "Consultar DEJEN" para buscar publicações e intimações.</div></div>';
+    return;
+  }
   if (!lista.length) {
-    tbody.innerHTML = '<tr><td colspan="9"><div class="vazio"><div class="vazio-ic">🏛️</div><div class="vazio-t">Nenhuma audiência cadastrada</div><div class="vazio-s">Clique em "+ Nova Audiência" para cadastrar</div></div></td></tr>';
+    container.innerHTML = '<div class="vazio" style="padding:40px;"><div class="vazio-ic">🔎</div><div style="font-family:\'Playfair Display\',serif;opacity:.55;">Nenhum resultado para este filtro</div></div>';
     return;
   }
 
-  tbody.innerHTML = lista.map(function(a) {
-    var d = a.data ? new Date(a.data+'T00:00:00') : null;
-    var diff = d ? Math.round((d-hoje)/86400000) : null;
-    var urgHtml = '';
-    if (a.situacao === 'Agendada' && diff !== null) {
-      if (diff < 0) urgHtml = '<div style="font-size:10px;color:var(--rc);margin-top:2px;">PASSOU</div>';
-      else if (diff === 0) urgHtml = '<div style="font-size:10px;color:#D4B84A;font-weight:700;margin-top:2px;">HOJE</div>';
-      else if (diff <= 3) urgHtml = '<div style="font-size:10px;color:#D4B84A;margin-top:2px;">em '+diff+' dia(s)</div>';
-    }
-    var agendaUrl = '';
-    if (a.data && a.hora) {
-      var dtStr = a.data.replace(/-/g,'')+'T'+a.hora.replace(':','')+'00';
-      var dtFimO = new Date(a.data+'T'+a.hora+':00');
-      dtFimO.setMinutes(dtFimO.getMinutes() + parseInt(a.duracao||60));
-      var dtFimStr2 = dtFimO.getFullYear().toString()+String(dtFimO.getMonth()+1).padStart(2,'0')+String(dtFimO.getDate()).padStart(2,'0')+'T'+String(dtFimO.getHours()).padStart(2,'0')+String(dtFimO.getMinutes()).padStart(2,'0')+'00';
-      var tit2 = encodeURIComponent('[AUDIÊNCIA] '+(a.tipoAud||'')+'—'+a.nome);
-      var loc2 = encodeURIComponent(a.local||'');
-      var conv2 = encodeURIComponent('deboraewenne@gmail.com,documentoprocessoadvocacia@gmail.com');
-      agendaUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE&text='+tit2+'&dates='+dtStr+'/'+dtFimStr2+'&location='+loc2+'&add='+conv2;
-    }
-    return '<tr>' +
-      '<td style="font-weight:600;color:var(--tp)">' + esc(a.nome||'') + '<br>' +
-        (a.whats ? '<a href="https://wa.me/55'+a.whats.replace(/\D/g,'')+'" target="_blank" style="font-size:10px;color:var(--ch)">📱 '+esc(a.whats)+'</a> ' : '') +
-        (a.emailCliente ? '<a href="mailto:'+esc(a.emailCliente)+'" style="font-size:10px;color:var(--tw)">✉️ '+esc(a.emailCliente)+'</a>' : '') +
-      '</td>' +
-      '<td style="white-space:nowrap;font-size:11px;"><strong>'+fmtData(a.data||'')+'</strong><br><span style="color:var(--ch)">'+(a.hora||'')+'</span>'+urgHtml+'</td>' +
-      '<td><span style="font-size:11px;font-weight:600;color:'+(tipoCores[a.tipo]||'var(--tw)')+'">'+esc(a.tipo||'')+'</span><br><span style="font-size:10px;color:var(--tw)">'+esc(a.tipoAud||'')+'</span></td>' +
-      '<td style="font-size:11px;color:var(--ch)">'+esc(a.numproc||'—')+'</td>' +
-      '<td style="font-size:11px;color:var(--ts);max-width:180px;overflow:hidden;text-overflow:ellipsis">'+esc(a.local||'')+'</td>' +
-      '<td><span style="font-size:11px;font-weight:600;color:'+(sitCores[a.situacao]||'var(--tw)')+'">'+esc(a.situacao||'')+'</span></td>' +
-      '<td>' +
-        (agendaUrl ? '<a href="'+agendaUrl+'" target="_blank" style="font-size:10px;color:#1a73e8;text-decoration:none;white-space:nowrap;">📅 Google Agenda</a>' : '—') +
-      '</td>' +
-      '<td style="font-size:11px;color:var(--tw);max-width:140px;overflow:hidden;text-overflow:ellipsis">'+esc(a.obs||'')+'</td>' +
-      '<td><div class="acoes">' +
-        '<button class="btn-ic" title="Editar" onclick="abrirModalAud(\''+a.id+'\')">✏️</button>' +
-        '<button class="btn-ic x" title="Excluir" onclick="excluirAud(\''+a.id+'\')">🗑️</button>' +
-      '</div></td>' +
-    '</tr>';
-  }).join('');
-}
+  var urgCorMap = { 5: '#e89090', 10: '#D4B84A', 15: 'var(--ch)' };
 
-function excluirAud(id) {
-  if (!confirm('Excluir esta audiência?')) return;
-  window._fbDeleteAud(id);
-  toast('Audiência removida');
-}
+  var html = '';
+  lista.forEach(function(c, idx) {
+    var isNovo   = c._status !== 'reportado';
+    var isAgend  = !!c._agendado;
+    var processo = c.numeroProcesso || c.numero || c.nup || '—';
+    var tribunal = c.tribunal || c.siglaOrgao || c.orgaoJulgador || c.nomeOrgao || '—';
+    var tipo     = c.tipoComunicacao || c.tipo || '—';
+    var dataComm = c._dataCommFmt || '—';
+    var resumo   = (c.texto || c.conteudo || c.resumo || '').substring(0, 300);
+    var hash     = c.hash || c.hashComunicacao || c.id || '—';
+    var certSt   = c._certidaoStatus || 'Não consultada';
+    var peca     = c._pecaSugerida || '—';
+    var prazo    = c._prazoSugerido || 15;
+    var descPeca = c._pecaDescr || '';
+    var dtVenc   = c._dataVenc || '—';
+    var dtEvt    = c._dataEvento || '—';
+    var urgCor   = urgCorMap[prazo] || 'var(--ch)';
+    var link     = c.link || c.url || '';
 
-function atualizarBadgeAudiencias() {
-  var hoje = new Date(); hoje.setHours(0,0,0,0);
-  var proximas = (AUDIENCIAS||[]).filter(function(a) {
-    if (a.situacao !== 'Agendada' || !a.data) return false;
-    var d = new Date(a.data+'T00:00:00');
-    var diff = Math.round((d-hoje)/86400000);
-    return diff >= 0 && diff <= 7;
+    // Prazo urgente (≤5 dias)
+    var urgBanner = prazo <= 5 ?
+      '<div style="background:rgba(192,80,74,.15);border:1px solid rgba(192,80,74,.4);border-radius:5px;padding:5px 10px;font-size:10px;font-weight:700;color:#e89090;margin-bottom:8px;">🚨 PRAZO CURTO — ' + prazo + ' DIAS</div>' : '';
+
+    html +=
+    '<div style="border-bottom:1px solid var(--bd);padding:18px 22px;background:' + (isNovo ? 'rgba(63,103,73,.04)' : 'transparent') + ';">' +
+      urgBanner +
+
+      // Linha 1: badges + processo + tribunal
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:12px;">' +
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
+          (isNovo ? '<span style="background:rgba(63,103,73,.2);color:#7ec492;border:1px solid rgba(86,120,90,.35);padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;">🆕 NOVO</span>' :
+                    '<span style="background:rgba(180,138,74,.1);color:var(--tw);border:1px solid var(--bd);padding:3px 9px;border-radius:20px;font-size:10px;">✓ reportado</span>') +
+          (isAgend ? '<span style="background:rgba(26,115,232,.15);color:#7aadff;border:1px solid rgba(26,115,232,.3);padding:3px 9px;border-radius:20px;font-size:10px;font-weight:600;">📅 Agendado</span>' : '') +
+          '<span style="font-family:\'Playfair Display\',serif;font-size:13px;color:var(--tp);">Proc. ' + esc(processo) + '</span>' +
+          '<span style="font-size:10px;color:var(--ch);background:rgba(180,138,74,.1);padding:2px 8px;border-radius:10px;">' + esc(tribunal) + '</span>' +
+        '</div>' +
+        '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">' +
+          (link ? '<a href="' + esc(link) + '" target="_blank" class="btn-o" style="font-size:10px;padding:4px 10px;text-decoration:none;">🔗 Certidão</a>' : '') +
+          '<button class="btn-v" id="btn-ag-' + idx + '" onclick="agendarComunicacao(' + idx + ')" style="font-size:11px;padding:6px 14px;' + (isAgend?'opacity:.6':'') + '">' +
+            (isAgend ? '✓ Agendado' : '📅 Agendar') +
+          '</button>' +
+        '</div>' +
+      '</div>' +
+
+      // BLOCO PEÇA SUGERIDA
+      '<div style="background:linear-gradient(135deg,rgba(63,103,73,.12),rgba(180,138,74,.08));border:1px solid rgba(180,138,74,.25);border-radius:8px;padding:12px 15px;margin-bottom:12px;">' +
+        '<div style="font-size:9px;color:var(--ch);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:6px;">⚖️ Peça Jurídica Sugerida</div>' +
+        '<div style="font-size:14px;font-family:\'Playfair Display\',serif;color:var(--tp);font-weight:700;margin-bottom:4px;">' + esc(peca) + '</div>' +
+        '<div style="font-size:11px;color:var(--ts);line-height:1.55;margin-bottom:8px;">' + esc(descPeca) + '</div>' +
+        '<div style="display:flex;gap:16px;flex-wrap:wrap;">' +
+          '<div><div style="font-size:9px;color:var(--tw);text-transform:uppercase;letter-spacing:.8px;">Prazo</div>' +
+            '<div style="font-size:12px;font-weight:700;color:' + urgCor + ';">' + prazo + ' dias úteis</div></div>' +
+          '<div><div style="font-size:9px;color:var(--tw);text-transform:uppercase;letter-spacing:.8px;">Vencimento estimado</div>' +
+            '<div style="font-size:12px;font-weight:700;color:var(--ch);">' + esc(dtVenc) + '</div></div>' +
+          '<div><div style="font-size:9px;color:var(--tw);text-transform:uppercase;letter-spacing:.8px;">Evento na Agenda</div>' +
+            '<div style="font-size:12px;font-weight:700;color:#7aadff;">📅 ' + esc(dtEvt) + '</div></div>' +
+        '</div>' +
+      '</div>' +
+
+      // Detalhes da comunicação
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:10px;">' +
+        '<div><div style="font-size:9px;color:var(--tw);text-transform:uppercase;letter-spacing:.8px;">Tipo</div><div style="font-size:11px;color:var(--ts);margin-top:2px;">' + esc(tipo) + '</div></div>' +
+        '<div><div style="font-size:9px;color:var(--tw);text-transform:uppercase;letter-spacing:.8px;">Publicação</div><div style="font-size:11px;color:var(--ts);margin-top:2px;">' + (dataComm !== '—' ? fmtData(dataComm) : '—') + '</div></div>' +
+        '<div><div style="font-size:9px;color:var(--tw);text-transform:uppercase;letter-spacing:.8px;">Certidão</div><div style="font-size:11px;color:' + (certSt==='Obtida'?'#7ec492':'var(--tw)') + ';margin-top:2px;">' + esc(certSt) + '</div></div>' +
+        '<div><div style="font-size:9px;color:var(--tw);text-transform:uppercase;letter-spacing:.8px;">Hash</div><div style="font-size:10px;color:var(--tw);margin-top:2px;font-family:monospace;word-break:break-all;">' + esc(String(hash).substring(0,28)) + '</div></div>' +
+      '</div>' +
+
+      // Resumo
+      (resumo ? '<div style="background:var(--fi);border:1px solid var(--bd);border-radius:6px;padding:10px 13px;font-size:11px;color:var(--tw);line-height:1.6;">' + esc(resumo) + (resumo.length >= 300 ? '...' : '') + '</div>' : '') +
+    '</div>';
   });
-  var badge = document.getElementById('badge-aud');
-  if (badge) badge.textContent = proximas.length;
-  if (document.getElementById('pg-audiencias').classList.contains('on')) renderAudiencias();
+
+  container.innerHTML = html;
+  atualizarFiltroTribunaisDEJEN(DEJEN_TRIBUNAIS);
 }
 
-function exportAudCSV() {
-  var h = ['Cliente','WhatsApp','E-mail','Tipo Processo','Tipo Audiência','Data','Hora','Duração','Processo','Local','Situação','Assunto','Obs'];
-  var rows = (AUDIENCIAS||[]).map(function(a) {
-    return [a.nome, a.whats, a.emailCliente, a.tipo, a.tipoAud, fmtData(a.data), a.hora, a.duracao+'min', a.numproc, a.local, a.situacao, a.assunto, a.obs];
+function exportDejenCSV() {
+  if (!DEJEN_COMUNICACOES.length) { toast('Nenhuma comunicação para exportar', true); return; }
+  var h = ['Status','Nº Processo','Tribunal','Tipo','Data Publicação','Vencimento','Evento Agenda','Peça Sugerida','Prazo (dias)','Certidão','Hash','Resumo'];
+  var rows = DEJEN_COMUNICACOES.map(function(c) {
+    return [
+      c._status==='novo'?'Novo':'Reportado',
+      c.numeroProcesso||c.numero||c.nup||'',
+      c.tribunal||c.siglaOrgao||c.orgaoJulgador||'',
+      c.tipoComunicacao||c.tipo||'',
+      c._dataCommFmt||'',
+      c._dataVenc||'',
+      c._dataEvento||'',
+      c._pecaSugerida||'',
+      c._prazoSugerido||'',
+      c._certidaoStatus||'',
+      c.hash||c.hashComunicacao||c.id||'',
+      (c.texto||c.conteudo||c.resumo||'').replace(/\n/g,' ').substring(0,500)
+    ];
   });
   var csv = [h].concat(rows).map(function(r){ return r.map(function(v){ return '"'+(v||'').toString().replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
   var blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
   var url = URL.createObjectURL(blob);
-  var a = document.createElement('a'); a.href=url; a.download='audiencias.csv'; a.click(); URL.revokeObjectURL(url);
-  toast('CSV exportado');
+  var a = document.createElement('a'); a.href=url; a.download='dejen-378037.csv'; a.click(); URL.revokeObjectURL(url);
+  toast('✓ CSV DEJEN exportado');
 }
 
-function agendarDevolutiva() {
-  var nome = getVal('at-nome');
-  var data = getVal('at-devolutiva');
-  var assunto = getVal('at-assunto');
-  var tipo = getVal('at-tipo');
-  if (!data) { toast('Informe primeiro o prazo para devolutiva', true); return; }
-  var dtStr = data.replace(/-/g,'') + 'T090000';
-  var dtFimStr = data.replace(/-/g,'') + 'T100000';
-  var titulo = encodeURIComponent('[DEVOLUTIVA] ' + tipo + ' — ' + (nome||'Cliente'));
-  var detalhes = encodeURIComponent(
-    'Prazo de devolutiva ao cliente\n' +
-    'Cliente: ' + (nome||'') + '\n' +
-    'Assunto: ' + (assunto||'não informado') + '\n\n' +
-    'Escritório Débora Constantino — OAB/SP 378.037'
-  );
-  var convidados = encodeURIComponent('deboraewenne@gmail.com,documentoprocessoadvocacia@gmail.com');
-  var url = 'https://calendar.google.com/calendar/render?action=TEMPLATE' +
-    '&text=' + titulo + '&dates=' + dtStr + '/' + dtFimStr +
-    '&details=' + detalhes + '&add=' + convidados;
-  window.open(url, '_blank');
-  toast('Google Agenda aberto para a devolutiva!');
+function limparHistoricoDejen() {
+  if (!confirm('Limpar histórico DEJEN? Todas as comunicações aparecerão como "novas" na próxima consulta.')) return;
+  DEJEN_HISTORICO = []; DEJEN_COMUNICACOES = []; DEJEN_AGENDADOS = {};
+  try {
+    ['dejen_historico_378037','dejen_comunicacoes_378037','dejen_ultima_378037','dejen_agendados_378037'].forEach(function(k){ localStorage.removeItem(k); });
+  } catch(e) {}
+  ['dj-total','dj-novas','dj-certidoes','dj-agendados'].forEach(function(id){ document.getElementById(id).textContent='0'; });
+  document.getElementById('dj-ultima').textContent = '—';
+  document.getElementById('badge-dejen').style.display = 'none';
+  renderDEJEN();
+  toast('✓ Histórico DEJEN limpo');
 }
-
-// ========== RECEBIDOS ==========
-function toggleRcbModo() {
-  var modo = document.getElementById('rcb-modo').value;
-  document.getElementById('rcb-grp-mes').style.display = modo === 'mes' ? 'flex' : 'none';
-}
-
-function iniciarRecebidos() {
-  var anos = [];
-  var anoAtual = new Date().getFullYear();
-  DB.forEach(function(c) {
-    var procs = c.processos && c.processos.length ? c.processos : [c];
-    procs.forEach(function(proc) {
-      ['taxa','hon'].forEach(function(tp) {
-        if (!proc[tp]) return;
-        if (proc[tp].mod === 'parcelado') {
-          (proc[tp].parcelas||[]).forEach(function(p) {
-            if (p.data && p.pago) { var a=parseInt(p.data.split('-')[0]); if(a&&anos.indexOf(a)<0) anos.push(a); }
-          });
-        } else if (proc[tp].pago && proc.data) {
-          var a=parseInt(proc.data.split('-')[0]); if(a&&anos.indexOf(a)<0) anos.push(a);
-        }
-      });
-    });
-  });
-  if (anos.indexOf(anoAtual)<0) anos.push(anoAtual);
-  anos.sort(function(a,b){return b-a;});
-  var sel = document.getElementById('rcb-ano');
-  sel.innerHTML = '';
-  anos.forEach(function(a){ var o=document.createElement('option'); o.value=a; o.textContent=a; if(a===anoAtual)o.selected=true; sel.appendChild(o); });
-  document.getElementById('rcb-mes').value = new Date().getMonth()+1;
-  renderRecebidos();
-}
-
-function renderRecebidos() {
-  var modo = document.getElementById('rcb-modo').value;
-  var mes = parseInt(document.getElementById('rcb-mes').value);
-  var ano = parseInt(document.getElementById('rcb-ano').value);
-  var meses = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-
-  var registros = [];
-  DB.forEach(function(c) {
-    var procs = c.processos && c.processos.length ? c.processos : [c];
-    procs.forEach(function(proc) {
-      var comPct = parseInt(proc.comissaoPct||c.comissaoPct) || 0;
-      ['taxa','hon'].forEach(function(tp) {
-        if (!proc[tp]) return;
-        var nat = tp==='taxa' ? 'Taxa Adm.' : 'Honorários';
-        if (proc[tp].mod === 'parcelado') {
-          var ps = proc[tp].parcelas||[];
-          ps.forEach(function(p,i) {
-            if (!p.pago || !p.data) return;
-            var pA=parseInt(p.data.split('-')[0]), pM=parseInt(p.data.split('-')[1]);
-            var ok = modo==='tudo' || (modo==='ano'&&pA===ano) || (modo==='mes'&&pA===ano&&pM===mes);
-            if (!ok) return;
-            var vP = p.valorParcela ? parseMoeda(p.valorParcela) : (ps.length>0?parseMoeda(proc[tp].valor)/ps.length:0);
-            var com = (tp==='taxa') ? vP*comPct/100 : 0;
-            registros.push({nome:c.nome,tipo:proc.tipo||c.tipo||'',nat:nat,parc:(i+1)+'ª/'+ps.length,data:p.data,val:vP,com:com,comPct:comPct});
-          });
-        } else if (proc[tp].pago) {
-          var refData = proc.data||c.data||'';
-          var pA=parseInt((refData||'').split('-')[0]), pM=parseInt((refData||'').split('-')[1]);
-          var ok = modo==='tudo' || (modo==='ano'&&pA===ano) || (modo==='mes'&&pA===ano&&pM===mes);
-          if (!ok) return;
-          var vP = parseMoeda(proc[tp].valor);
-          var com = (tp==='taxa') ? vP*comPct/100 : 0;
-          registros.push({nome:c.nome,tipo:proc.tipo||c.tipo||'',nat:nat,parc:'À vista',data:refData,val:vP,com:com,comPct:comPct});
-        }
-      });
-    });
-  });
-
-  registros.sort(function(a,b){ return (b.data||'')>(a.data||'')?1:-1; });
-
-  var totGeral=0,totTaxa=0,totHon=0,totCom=0;
-  registros.forEach(function(r){
-    totGeral+=r.val;
-    if(r.nat==='Taxa Adm.')totTaxa+=r.val; else totHon+=r.val;
-    totCom+=r.com;
-  });
-  setTxt('rcb-total','R$ '+fmtVal(totGeral));
-  setTxt('rcb-taxa','R$ '+fmtVal(totTaxa));
-  setTxt('rcb-hon','R$ '+fmtVal(totHon));
-  setTxt('rcb-com','R$ '+fmtVal(totCom));
-
-  var tbody = document.getElementById('rcb-tbody');
-  if (!registros.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="rel-vazio">Nenhum pagamento confirmado no período</td></tr>';
-    return;
-  }
-  tbody.innerHTML = registros.map(function(r) {
-    var agendaUrl = '';
-    if (r.data) {
-      var dtS = r.data.replace(/-/g,'')+'T090000';
-      var dtF = r.data.replace(/-/g,'')+'T100000';
-      var tit = encodeURIComponent('[RECEBIDO] '+r.nat+' — '+r.nome);
-      var det = encodeURIComponent('Pagamento confirmado\nCliente: '+r.nome+'\nNatureza: '+r.nat+'\nValor: R$ '+fmtVal(r.val));
-      agendaUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE&text='+tit+'&dates='+dtS+'/'+dtF+'&details='+det;
-    }
-    return '<tr>'+
-      '<td style="font-weight:600;color:var(--tp)">'+esc(r.nome)+'</td>'+
-      '<td><span class="bgt">'+esc(r.tipo)+'</span></td>'+
-      '<td style="font-size:11px;color:var(--ch)">'+esc(r.nat)+'</td>'+
-      '<td style="font-size:11px;color:var(--tw)">'+esc(r.parc)+'</td>'+
-      '<td style="font-size:11px;color:var(--tw);white-space:nowrap">'+fmtData(r.data)+'</td>'+
-      '<td style="font-weight:600;color:#7ec492">R$ '+fmtVal(r.val)+'</td>'+
-      '<td style="font-size:11px;color:'+(r.com>0?'var(--rc)':'var(--tw)')+'">'+
-        (r.com>0?r.comPct+'% = R$ '+fmtVal(r.com):'—')+'</td>'+
-      '<td>'+(agendaUrl?'<a href="'+agendaUrl+'" target="_blank" style="font-size:10px;color:#1a73e8;text-decoration:none;">📅 Anotar</a>':'—')+'</td>'+
-    '</tr>';
-  }).join('');
-}
-
-function exportRecebidosCSV() {
-  var h = ['Cliente','Tipo','Natureza','Parcela','Data Pagto','Valor','Comissão %','Comissão R$'];
-  var modo=document.getElementById('rcb-modo').value;
-  var mes=parseInt(document.getElementById('rcb-mes').value);
-  var ano=parseInt(document.getElementById('rcb-ano').value);
-  var rows = [];
-  DB.forEach(function(c) {
-    var procs = c.processos && c.processos.length ? c.processos : [c];
-    procs.forEach(function(proc) {
-      var comPct = parseInt(proc.comissaoPct||c.comissaoPct)||0;
-      ['taxa','hon'].forEach(function(tp) {
-        if (!proc[tp]) return;
-        var nat = tp==='taxa'?'Taxa Adm.':'Honorários';
-        if (proc[tp].mod==='parcelado') {
-          (proc[tp].parcelas||[]).forEach(function(p,i) {
-            if (!p.pago||!p.data) return;
-            var pA=parseInt(p.data.split('-')[0]),pM=parseInt(p.data.split('-')[1]);
-            var ok=modo==='tudo'||(modo==='ano'&&pA===ano)||(modo==='mes'&&pA===ano&&pM===mes);
-            if (!ok) return;
-            var vP=p.valorParcela?parseMoeda(p.valorParcela):(parseMoeda(proc[tp].valor)/((proc[tp].parcelas||[]).length||1));
-            rows.push([c.nome,proc.tipo||c.tipo||'',nat,(i+1)+'ª',fmtData(p.data),fmtVal(vP),comPct&&tp==='taxa'?comPct+'%':'',comPct&&tp==='taxa'?fmtVal(vP*comPct/100):'']);
-          });
-        } else if (proc[tp].pago) {
-          var refData=proc.data||c.data||'';
-          var pA=parseInt(refData.split('-')[0]),pM=parseInt(refData.split('-')[1]);
-          var ok=modo==='tudo'||(modo==='ano'&&pA===ano)||(modo==='mes'&&pA===ano&&pM===mes);
-          if (!ok) return;
-          var vP=parseMoeda(proc[tp].valor);
-          rows.push([c.nome,proc.tipo||c.tipo||'',nat,'À vista',fmtData(refData),fmtVal(vP),comPct&&tp==='taxa'?comPct+'%':'',comPct&&tp==='taxa'?fmtVal(vP*comPct/100):'']);
-        }
-      });
-    });
-  });
-  var csv=[h].concat(rows).map(function(r){return r.map(function(v){return '"'+(v||'').toString().replace(/"/g,'""')+'"';}).join(',');}).join('\n');
-  var blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
-  var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='recebidos.csv';a.click();URL.revokeObjectURL(url);
-  toast('CSV exportado');
-}
-
-// Popula o datalist de responsáveis comerciais com todos os nomes já usados
-function popularListaComercial() {
-  var nomes = ['Débora Constantino','Equipe Comercial'];
-  DB.forEach(function(c) { if (c.comercial && nomes.indexOf(c.comercial) < 0) nomes.push(c.comercial); });
-  (ATENDIMENTOS||[]).forEach(function(a) { if (a.comercial && nomes.indexOf(a.comercial) < 0) nomes.push(a.comercial); });
-  var dl = document.getElementById('comercial-list');
-  if (!dl) return;
-  dl.innerHTML = '';
-  nomes.sort().forEach(function(n) { var o = document.createElement('option'); o.value = n; dl.appendChild(o); });
-}
+// ========== FIM DEJEN ==========
 
 // ========== INIT ==========
 document.addEventListener('keydown', function(e){ 
-  if(e.key==='Escape'){ 
+  if(e.key==='Escape'){
     fecharModal(); 
     document.getElementById('conf-ov').classList.remove('on');
     document.getElementById('ov-det').style.display='none';
