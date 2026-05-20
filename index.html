@@ -3284,8 +3284,8 @@ function renderFinanceiro() {
           (e.cargo?'<div class="fin-sub-card-cargo">'+esc(e.cargo)+'</div>':'') +
           '</div>' +
           '<div style="display:flex;gap:6px;">' +
-            '<button class="btn-ic" onclick="abrirModalEquipe(''+e.id+'')" title="Editar">✏️</button>' +
-            '<button class="btn-ic x" onclick="excluirEquipe(''+e.id+'')" title="Excluir">🗑️</button>' +
+            '<button class="btn-ic" onclick="abrirModalEquipe(\''+e.id+'\')" title="Editar">✏️</button>' +
+            '<button class="btn-ic x" onclick="excluirEquipe(\''+e.id+'\')" title="Excluir">🗑️</button>' +
           '</div>' +
         '</div>' +
         '<div class="fin-grid">' +
@@ -3318,8 +3318,8 @@ function renderFinanceiro() {
         '<td style="color:var(--ch);font-weight:600">R$ '+fmtVal(parseMoeda(d.valor))+'</td>' +
         '<td style="font-size:11px;color:var(--tw)">'+esc(d.obs||'—')+'</td>' +
         '<td><div class="acoes">' +
-          '<button class="btn-ic" onclick="abrirModalDespesaEdit(''+d.id+'')" title="Editar">✏️</button>' +
-          '<button class="btn-ic x" onclick="excluirDespesa(''+d.id+'')" title="Excluir">🗑️</button>' +
+          '<button class="btn-ic" onclick="abrirModalDespesaEdit(\''+d.id+'\')" title="Editar">✏️</button>' +
+          '<button class="btn-ic x" onclick="excluirDespesa(\''+d.id+'\')" title="Excluir">🗑️</button>' +
         '</div></td>' +
       '</tr>';
     });
@@ -3345,8 +3345,8 @@ function renderFinanceiro() {
         '<td style="color:#e89090;font-weight:600">R$ '+fmtVal(parseMoeda(d.valor))+'</td>' +
         '<td style="font-size:11px;color:var(--tw)">'+esc(d.obs||'—')+'</td>' +
         '<td><div class="acoes">' +
-          '<button class="btn-ic" onclick="abrirModalDespesaEdit(''+d.id+'')" title="Editar">✏️</button>' +
-          '<button class="btn-ic x" onclick="excluirDespesa(''+d.id+'')" title="Excluir">🗑️</button>' +
+          '<button class="btn-ic" onclick="abrirModalDespesaEdit(\''+d.id+'\')" title="Editar">✏️</button>' +
+          '<button class="btn-ic x" onclick="excluirDespesa(\''+d.id+'\')" title="Excluir">🗑️</button>' +
         '</div></td>' +
       '</tr>';
     });
