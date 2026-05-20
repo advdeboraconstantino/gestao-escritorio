@@ -27,8 +27,6 @@
   const indicacoesRef = collection(db, "indicacoes");
   const padRef = collection(db, "pad");
   const atendRef = collection(db, "atendimentos");
-  const equipeRef = collection(db, "equipe");
-  const despesasRef = collection(db, "despesas");
 
   // Expor funções globais para o código legado
   window._fbSave = async function(obj) {
@@ -97,24 +95,6 @@
   window._fbDeleteAtend = async function(id) {
     try { await deleteDoc(doc(db, "atendimentos", id)); } catch(e) { console.error(e); }
   };
-  window._fbSaveEquipe = async function(obj) {
-    try {
-      if (obj.id && typeof obj.id === 'string') { await setDoc(doc(db, "equipe", obj.id), obj); }
-      else { const ref = await addDoc(equipeRef, obj); return ref.id; }
-    } catch(e) { console.error(e); }
-  };
-  window._fbDeleteEquipe = async function(id) {
-    try { await deleteDoc(doc(db, "equipe", id)); } catch(e) { console.error(e); }
-  };
-  window._fbSaveDespesa = async function(obj) {
-    try {
-      if (obj.id && typeof obj.id === 'string') { await setDoc(doc(db, "despesas", obj.id), obj); }
-      else { const ref = await addDoc(despesasRef, obj); return ref.id; }
-    } catch(e) { console.error(e); }
-  };
-  window._fbDeleteDespesa = async function(id) {
-    try { await deleteDoc(doc(db, "despesas", id)); } catch(e) { console.error(e); }
-  };
 
   window._fbListen = function(callback) {
     return onSnapshot(colRef, function(snapshot) {
@@ -163,16 +143,6 @@
       window.ATENDIMENTOS = [];
       snap.forEach(function(d){ window.ATENDIMENTOS.push(Object.assign({id:d.id}, d.data())); });
       if (document.getElementById('pg-atendimentos').classList.contains('on')) renderAtendimentos();
-    });
-    onSnapshot(equipeRef, function(snap) {
-      window.EQUIPE = [];
-      snap.forEach(function(d){ window.EQUIPE.push(Object.assign({id:d.id}, d.data())); });
-      if (document.getElementById('pg-financeiro').classList.contains('on')) renderFinanceiro();
-    });
-    onSnapshot(despesasRef, function(snap) {
-      window.DESPESAS = [];
-      snap.forEach(function(d){ window.DESPESAS.push(Object.assign({id:d.id}, d.data())); });
-      if (document.getElementById('pg-financeiro').classList.contains('on')) renderFinanceiro();
     });
   });
 </script>
@@ -420,35 +390,6 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
 .footer{text-align:center;padding:20px;font-size:10px;color:var(--tw);border-top:1px solid var(--bd);margin-top:30px;letter-spacing:.5px;}
 .footer span{color:var(--ch);}
 
-/* FINANCEIRO */
-.fin-sec{margin-bottom:32px;}
-.fin-sec-tit{font-family:'Playfair Display',serif;font-size:15px;color:var(--tp);margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid var(--bd);display:flex;align-items:center;justify-content:space-between;gap:8px;}
-.fin-sec-tit span{font-size:12px;color:var(--tw);font-family:'DM Sans',sans-serif;font-weight:400;}
-.fin-sub-card{background:var(--fs);border:1px solid var(--bd);border-radius:8px;padding:14px 16px;margin-bottom:10px;}
-.fin-sub-card-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
-.fin-sub-card-nome{font-weight:600;color:var(--tp);font-size:13px;}
-.fin-sub-card-cargo{font-size:10px;color:var(--ch);text-transform:uppercase;letter-spacing:.8px;margin-top:2px;}
-.fin-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:8px;}
-.fin-item .lbl{font-size:9px;color:var(--tw);text-transform:uppercase;letter-spacing:.7px;}
-.fin-item .val{font-size:13px;color:var(--ts);font-weight:500;margin-top:2px;}
-.fin-item .val.destaque{color:var(--do);font-family:'Playfair Display',serif;font-size:15px;}
-.fin-item .val.gasto{color:#e89090;}
-.fin-item .val.ok{color:#7ec492;}
-.fin-total-row{background:rgba(63,103,73,.08);border:1px solid rgba(86,120,90,.2);border-radius:6px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;margin-top:8px;}
-.fin-total-row .lbl{font-size:10px;color:var(--ch);text-transform:uppercase;letter-spacing:1px;}
-.fin-total-row .val{font-family:'Playfair Display',serif;font-size:18px;color:var(--do);}
-.fin-total-row .val.gasto{color:#e89090;}
-.desp-chip{display:inline-flex;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;}
-.desp-chip.fixa{background:rgba(180,138,74,.15);color:var(--do);border:1px solid rgba(180,138,74,.3);}
-.desp-chip.variavel{background:rgba(192,80,74,.12);color:#e89090;border:1px solid rgba(192,80,74,.25);}
-.resultado-card{background:var(--fs);border:2px solid var(--do);border-radius:10px;padding:20px 24px;margin-bottom:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;}
-.res-item .lbl{font-size:9px;color:var(--ch);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
-.res-item .val{font-family:'Playfair Display',serif;font-size:26px;color:var(--do);}
-.res-item .val.rec{color:#7ec492;}
-.res-item .val.gas{color:#e89090;}
-.res-item .val.luc{color:var(--do);}
-.res-item .val.pre{color:#D4B84A;}
-
 ::-webkit-scrollbar{width:5px;height:5px;}
 ::-webkit-scrollbar-track{background:var(--fp);}
 ::-webkit-scrollbar-thumb{background:var(--bd);border-radius:3px;}
@@ -487,7 +428,6 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
   <button class="aba" onclick="mudarAba('atendimentos',this)">📝 Atendimentos</button>
   <button class="aba" onclick="mudarAba('parceiros',this)">🤝 Advogados Parceiros</button>
   <button class="aba" onclick="mudarAba('relatorios',this)">📊 Relatórios Financeiros</button>
-  <button class="aba" onclick="mudarAba('financeiro',this)">🏦 Gestão Financeira</button>
   <button class="aba" onclick="mudarAba('alertas',this)">🔔 Alertas <span class="abadge" id="badge-n">0</span></button>
 </nav>
 
@@ -757,6 +697,10 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
         <div class="fg"><label class="fl">Data do Atendimento *</label><input type="date" class="fi" id="at-data"></div>
       </div>
       <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Horário de Início</label><input type="time" class="fi parc-d" id="at-hora-ini" placeholder="09:00"></div>
+        <div class="fg"><label class="fl">Horário de Término</label><input type="time" class="fi parc-d" id="at-hora-fim" placeholder="10:00"></div>
+      </div>
+      <div class="gr gr2" style="margin-bottom:13px;">
         <div class="fg"><label class="fl">Tipo *</label>
           <select class="fi" id="at-tipo">
             <option value="Parecer">Parecer</option>
@@ -801,7 +745,11 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
     </div>
     <div class="mo-foot">
       <button class="btn-o" onclick="document.getElementById('ov-atend').style.display='none'">Cancelar</button>
-      <button class="btn-v" onclick="salvarAtend()">✓ Salvar Atendimento</button>
+      <button class="btn-v" onclick="salvarAtend(false)">✓ Salvar Atendimento</button>
+      <button class="btn-v" style="background:linear-gradient(135deg,#1a73e8,#0d47a1);gap:6px;display:inline-flex;align-items:center;" onclick="salvarAtend(true)" title="Salvar e abrir Google Calendar">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg>
+        Salvar + Google Agenda
+      </button>
     </div>
   </div>
 </div>
@@ -1014,210 +962,11 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
   <div class="rel-sec">
     <div class="rel-sec-tit">🏷️ Comissões Devidas ao Setor Comercial</div>
     <div class="tbl-box"><div class="tbl-sc"><table>
-      <thead><tr><th>Cliente</th><th>Tipo</th><th>Natureza</th><th>Base Paga</th><th>% Comissão</th><th>Valor Comissão</th></tr></thead>
+      <thead><tr><th>Cliente</th><th>Tipo</th><th>Base Paga (Taxa)</th><th>% Comissão</th><th>Valor Comissão</th></tr></thead>
       <tbody id="rel-tbody-com"></tbody>
     </table></div></div>
   </div>
 
-</div>
-
-<!-- ===== PÁGINA: GESTÃO FINANCEIRA ===== -->
-<div class="pg" id="pg-financeiro">
-
-  <!-- FILTROS -->
-  <div class="rel-filtros" style="margin-bottom:24px;">
-    <div style="display:flex;align-items:center;gap:6px;">
-      <label>Mês</label>
-      <select class="sel" id="fin-mes">
-        <option value="1">Janeiro</option><option value="2">Fevereiro</option>
-        <option value="3">Março</option><option value="4">Abril</option>
-        <option value="5">Maio</option><option value="6">Junho</option>
-        <option value="7">Julho</option><option value="8">Agosto</option>
-        <option value="9">Setembro</option><option value="10">Outubro</option>
-        <option value="11">Novembro</option><option value="12">Dezembro</option>
-      </select>
-    </div>
-    <div style="display:flex;align-items:center;gap:6px;">
-      <label>Ano</label>
-      <select class="sel" id="fin-ano"></select>
-    </div>
-    <button class="btn-v" onclick="renderFinanceiro()" style="padding:8px 18px;">🔍 Filtrar</button>
-    <button class="btn-o" onclick="exportFinanceiroCSV()">⬇ Exportar</button>
-  </div>
-
-  <!-- RESULTADO DO MÊS -->
-  <div class="resultado-card" id="fin-resultado">
-    <div class="res-item"><div class="lbl">Contratos Fechados</div><div class="val pre" id="fin-r-contratos">0</div></div>
-    <div class="res-item"><div class="lbl">Total Recebido</div><div class="val rec" id="fin-r-recebido">R$ 0</div></div>
-    <div class="res-item"><div class="lbl">Total de Gastos</div><div class="val gas" id="fin-r-gastos">R$ 0</div></div>
-    <div class="res-item"><div class="lbl">Resultado Líquido</div><div class="val luc" id="fin-r-liquido">R$ 0</div></div>
-    <div class="res-item"><div class="lbl">Comissões Devidas</div><div class="val gas" id="fin-r-comissoes">R$ 0</div></div>
-  </div>
-
-  <!-- EQUIPE -->
-  <div class="fin-sec">
-    <div class="fin-sec-tit">
-      👥 Equipe — Custos do Período
-      <button class="btn-v" onclick="abrirModalEquipe(null)" style="padding:6px 14px;font-size:11px;">+ Colaborador</button>
-    </div>
-    <div id="fin-equipe-lista"></div>
-    <div class="fin-total-row" id="fin-equipe-total" style="display:none;">
-      <div class="lbl">Total com Equipe no Período</div>
-      <div class="val gasto" id="fin-equipe-total-val">R$ 0,00</div>
-    </div>
-  </div>
-
-  <!-- DESPESAS FIXAS -->
-  <div class="fin-sec">
-    <div class="fin-sec-tit">
-      🏢 Despesas Fixas
-      <button class="btn-v" onclick="abrirModalDespesa('fixa')" style="padding:6px 14px;font-size:11px;">+ Despesa Fixa</button>
-    </div>
-    <div id="fin-despesas-fixas-lista"></div>
-    <div class="fin-total-row" id="fin-despesas-fixas-total" style="display:none;">
-      <div class="lbl">Total Despesas Fixas</div>
-      <div class="val gasto" id="fin-despesas-fixas-total-val">R$ 0,00</div>
-    </div>
-  </div>
-
-  <!-- DESPESAS VARIÁVEIS -->
-  <div class="fin-sec">
-    <div class="fin-sec-tit">
-      📦 Despesas Variáveis
-      <button class="btn-v" onclick="abrirModalDespesa('variavel')" style="padding:6px 14px;font-size:11px;">+ Despesa Variável</button>
-    </div>
-    <div id="fin-despesas-var-lista"></div>
-    <div class="fin-total-row" id="fin-despesas-var-total" style="display:none;">
-      <div class="lbl">Total Despesas Variáveis</div>
-      <div class="val gasto" id="fin-despesas-var-total-val">R$ 0,00</div>
-    </div>
-  </div>
-
-  <!-- COMISSÕES SOBRE HONORÁRIOS -->
-  <div class="fin-sec">
-    <div class="fin-sec-tit">🏷️ Comissões sobre Honorários Iniciais Recebidos</div>
-    <div class="tbl-box"><div class="tbl-sc"><table>
-      <thead><tr><th>Cliente</th><th>Tipo</th><th>Hon. Base Pago</th><th>Modalidade</th><th>Data Pagto</th><th>% Comissão</th><th>Valor Comissão</th></tr></thead>
-      <tbody id="fin-tbody-com-hon"></tbody>
-    </table></div></div>
-    <div class="fin-total-row" id="fin-com-hon-total" style="margin-top:10px;display:none;">
-      <div class="lbl">Total Comissões sobre Honorários</div>
-      <div class="val gasto" id="fin-com-hon-total-val">R$ 0,00</div>
-    </div>
-  </div>
-
-</div>
-
-<!-- MODAL COLABORADOR -->
-<div id="ov-equipe" style="position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;display:none;overflow-y:auto;padding:20px;" onclick="if(event.target===this)this.style.display='none'">
-  <div class="modal" style="max-width:620px;">
-    <div class="mo-head">
-      <div><div class="mo-tit" id="eq-mo-tit">Novo Colaborador</div><div class="mo-sub">Cadastro de membro da equipe</div></div>
-      <button class="mo-cls" onclick="document.getElementById('ov-equipe').style.display='none'">✕</button>
-    </div>
-    <div style="padding:20px 26px;">
-      <div class="sec">Identificação</div>
-      <div class="gr gr2" style="margin-bottom:13px;">
-        <div class="fg"><label class="fl">Nome *</label><input class="fi" id="eq-nome" placeholder="Nome completo"></div>
-        <div class="fg"><label class="fl">Cargo / Função</label><input class="fi" id="eq-cargo" placeholder="Ex.: Assistente Jurídico, Comercial..."></div>
-      </div>
-      <div class="sec">Remuneração Mensal</div>
-      <div class="gr gr2" style="margin-bottom:13px;">
-        <div class="fg"><label class="fl">Salário Fixo (R$)</label><input class="fi" id="eq-salario" placeholder="0,00" oninput="fmtMoeda(this)"></div>
-        <div class="fg"><label class="fl">Ajuda de Custo (R$)</label><input class="fi" id="eq-ajuda" placeholder="0,00" oninput="fmtMoeda(this)"></div>
-      </div>
-      <div class="sec">Comissões</div>
-      <div class="gr gr2" style="margin-bottom:13px;">
-        <div class="fg"><label class="fl">% Comissão sobre Taxas</label>
-          <select class="fi" id="eq-com-taxa">
-            <option value="">Não recebe</option>
-            <option value="10">10%</option>
-            <option value="20">20%</option>
-            <option value="30">30%</option>
-            <option value="40">40%</option>
-            <option value="50">50%</option>
-          </select>
-        </div>
-        <div class="fg"><label class="fl">% Comissão sobre Honorários</label>
-          <select class="fi" id="eq-com-hon">
-            <option value="">Não recebe</option>
-            <option value="10">10%</option>
-            <option value="20">20%</option>
-            <option value="30">30%</option>
-            <option value="40">40%</option>
-            <option value="50">50%</option>
-          </select>
-        </div>
-      </div>
-      <div class="gr" style="margin-bottom:13px;">
-        <div class="fg"><label class="fl">Data de Início</label><input type="date" class="fi" id="eq-inicio"></div>
-      </div>
-      <div class="gr" style="margin-bottom:13px;">
-        <div class="fg"><label class="fl">Observações</label><input class="fi" id="eq-obs" placeholder="Notas adicionais (opcional)"></div>
-      </div>
-    </div>
-    <div class="mo-foot">
-      <button class="btn-o" onclick="document.getElementById('ov-equipe').style.display='none'">Cancelar</button>
-      <button class="btn-v" onclick="salvarEquipe()">✓ Salvar Colaborador</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL DESPESA -->
-<div id="ov-despesa" style="position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;display:none;overflow-y:auto;padding:20px;" onclick="if(event.target===this)this.style.display='none'">
-  <div class="modal" style="max-width:560px;">
-    <div class="mo-head">
-      <div><div class="mo-tit" id="desp-mo-tit">Nova Despesa</div><div class="mo-sub" id="desp-mo-sub">Despesa do escritório</div></div>
-      <button class="mo-cls" onclick="document.getElementById('ov-despesa').style.display='none'">✕</button>
-    </div>
-    <div style="padding:20px 26px;">
-      <input type="hidden" id="desp-tipo">
-      <div class="gr gr2" style="margin-bottom:13px;">
-        <div class="fg"><label class="fl">Descrição *</label><input class="fi" id="desp-nome" placeholder="Ex.: Aluguel, Telefone, Material..."></div>
-        <div class="fg"><label class="fl">Valor (R$) *</label><input class="fi" id="desp-valor" placeholder="0,00" oninput="fmtMoeda(this)"></div>
-      </div>
-      <div class="gr gr2" style="margin-bottom:13px;">
-        <div class="fg"><label class="fl">Mês de Referência *</label>
-          <select class="fi" id="desp-mes">
-            <option value="1">Janeiro</option><option value="2">Fevereiro</option>
-            <option value="3">Março</option><option value="4">Abril</option>
-            <option value="5">Maio</option><option value="6">Junho</option>
-            <option value="7">Julho</option><option value="8">Agosto</option>
-            <option value="9">Setembro</option><option value="10">Outubro</option>
-            <option value="11">Novembro</option><option value="12">Dezembro</option>
-          </select>
-        </div>
-        <div class="fg"><label class="fl">Ano de Referência *</label><input type="number" class="fi" id="desp-ano" placeholder="2025" min="2020" max="2099"></div>
-      </div>
-      <div class="gr" style="margin-bottom:13px;">
-        <div class="fg"><label class="fl">Categoria</label>
-          <input class="fi" id="desp-categoria" list="desp-cat-list" placeholder="Ex.: Aluguel, Cartório, Marketing...">
-          <datalist id="desp-cat-list">
-            <option value="Aluguel">
-            <option value="Energia Elétrica">
-            <option value="Internet">
-            <option value="Telefone">
-            <option value="Contabilidade">
-            <option value="Software Jurídico">
-            <option value="Material de Escritório">
-            <option value="Marketing e Publicidade">
-            <option value="Cartório">
-            <option value="Correios / Motoboy">
-            <option value="Impostos e Tributos">
-            <option value="Limpeza e Conservação">
-            <option value="Outros">
-          </datalist>
-        </div>
-      </div>
-      <div class="gr" style="margin-bottom:13px;">
-        <div class="fg"><label class="fl">Observações</label><input class="fi" id="desp-obs" placeholder="Notas adicionais (opcional)"></div>
-      </div>
-    </div>
-    <div class="mo-foot">
-      <button class="btn-o" onclick="document.getElementById('ov-despesa').style.display='none'">Cancelar</button>
-      <button class="btn-v" onclick="salvarDespesa()">✓ Salvar Despesa</button>
-    </div>
-  </div>
 </div>
 
 <!-- ===== PÁGINA: ALERTAS ===== -->
@@ -1397,9 +1146,9 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
       </div>
 
       <div class="sec">Comissão do Setor Comercial</div>
-      <div style="font-size:11px;color:var(--tw);margin-bottom:10px;">Comissões calculadas sobre os valores efetivamente pagos</div>
-      <div class="gr gr2" style="margin-bottom:10px;">
-        <div class="fg"><label class="fl">% Comissão sobre Taxas</label>
+      <div style="font-size:11px;color:var(--tw);margin-bottom:10px;">Calculada sobre o valor das taxas efetivamente pagas</div>
+      <div class="gr gr2">
+        <div class="fg"><label class="fl">Percentual de Comissão</label>
           <select class="fi" id="f-comissao-pct" onchange="calcComissao()">
             <option value="">Sem comissão</option>
             <option value="20">20%</option>
@@ -1408,22 +1157,8 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
             <option value="50">50%</option>
           </select>
         </div>
-        <div class="fg"><label class="fl">Comissão s/ Taxas (calculada)</label>
+        <div class="fg"><label class="fl">Comissão Calculada</label>
           <div class="fi" id="f-comissao-calc" style="background:rgba(0,0,0,.2);color:var(--ch);cursor:default;display:flex;align-items:center;">R$ 0,00</div>
-        </div>
-      </div>
-      <div class="gr gr2">
-        <div class="fg"><label class="fl">% Comissão sobre Honorários Iniciais</label>
-          <select class="fi" id="f-comissao-hon-pct" onchange="calcComissao()">
-            <option value="">Sem comissão</option>
-            <option value="20">20%</option>
-            <option value="30">30%</option>
-            <option value="40">40%</option>
-            <option value="50">50%</option>
-          </select>
-        </div>
-        <div class="fg"><label class="fl">Comissão s/ Honorários (calculada)</label>
-          <div class="fi" id="f-comissao-hon-calc" style="background:rgba(0,0,0,.2);color:var(--ch);cursor:default;display:flex;align-items:center;">R$ 0,00</div>
         </div>
       </div>
     </div>
@@ -1555,11 +1290,7 @@ var PARCEIROS = [];
 var INDICACOES = [];
 var PAD = [];
 var ATENDIMENTOS = [];
-var EQUIPE = [];
-var DESPESAS = [];
 var editId = null;
-var editEquipeId = null;
-var editDespesaId = null;
 var delId = null;
 var editPrazoId = null;
 var editParceiroId = null;
@@ -1575,7 +1306,6 @@ function saveDB() { }
 function mudarAba(id, btn) {
   document.querySelectorAll('.pg').forEach(function(p){ p.classList.remove('on'); });
   document.querySelectorAll('.aba').forEach(function(b){ b.classList.remove('on'); });
-  if (id === 'financeiro') { iniciarFinanceiro(); }
   document.getElementById('pg-'+id).classList.add('on');
   btn.classList.add('on');
   if (id === 'recebimentos') renderRecebimentos();
@@ -1624,7 +1354,6 @@ function abrirModal(id) {
       document.getElementById('grp-exito-custom').style.display = 'none';
     }
     setVal('f-comissao-pct', c.comissaoPct || '');
-    setVal('f-comissao-hon-pct', c.comissaoHonPct || '');
     toggleProtocolado();
 
     // Taxa
@@ -1694,7 +1423,6 @@ function limparForm() {
   setVal('f-exito-pct','');
   setVal('f-exito-custom','');
   setVal('f-comissao-pct','');
-  setVal('f-comissao-hon-pct','');
   document.getElementById('grp-exito').style.display = 'none';
   document.getElementById('grp-exito-custom').style.display = 'none';
   document.getElementById('f-comissao-calc').textContent = 'R$ 0,00';
@@ -1741,47 +1469,27 @@ function toggleExito() {
   }
 }
 function calcComissao() {
-  // --- Comissão sobre Taxas ---
-  var pctTaxa = parseInt(document.getElementById('f-comissao-pct').value) || 0;
-  var baseTaxa = 0;
+  var pct = parseInt(document.getElementById('f-comissao-pct').value) || 0;
+  if (!pct) { document.getElementById('f-comissao-calc').textContent = 'R$ 0,00'; return; }
+  // Calcular base: soma das taxas pagas (à vista paga, ou parcelas marcadas como pagas)
+  var base = 0;
   if (document.getElementById('ck-taxa').checked) {
-    var modT = document.getElementById('f-taxa-mod').value;
-    var sitT = document.getElementById('f-taxa-sit').value;
+    var mod = document.getElementById('f-taxa-mod').value;
+    var sit = document.getElementById('f-taxa-sit').value;
     var valTaxa = parseMoeda(document.getElementById('f-taxa-val').value);
-    if (modT === 'avista') {
-      if (sitT === 'sim') baseTaxa += valTaxa;
+    if (mod === 'avista') {
+      if (sit === 'sim') base += valTaxa;
     } else {
-      var npT = parseInt(document.getElementById('f-taxa-np').value) || 0;
-      var vUnitT = npT > 0 ? valTaxa / npT : 0;
-      for (var i = 0; i < npT; i++) {
-        var ckT = document.getElementById('taxa-pg-'+i);
-        if (ckT && ckT.checked) baseTaxa += vUnitT;
+      var np = parseInt(document.getElementById('f-taxa-np').value) || 0;
+      var vUnit = np > 0 ? valTaxa / np : 0;
+      for (var i = 0; i < np; i++) {
+        var ck = document.getElementById('taxa-pg-'+i);
+        if (ck && ck.checked) base += vUnit;
       }
     }
   }
-  var comissaoTaxa = baseTaxa * pctTaxa / 100;
-  document.getElementById('f-comissao-calc').textContent = 'R$ ' + fmtVal(comissaoTaxa);
-
-  // --- Comissão sobre Honorários Iniciais ---
-  var pctHon = parseInt(document.getElementById('f-comissao-hon-pct').value) || 0;
-  var baseHon = 0;
-  if (document.getElementById('ck-hon').checked) {
-    var modH = document.getElementById('f-hon-mod').value;
-    var sitH = document.getElementById('f-hon-sit').value;
-    var valHon = parseMoeda(document.getElementById('f-hon-val').value);
-    if (modH === 'avista') {
-      if (sitH === 'sim') baseHon += valHon;
-    } else {
-      var npH = parseInt(document.getElementById('f-hon-np').value) || 0;
-      var vUnitH = npH > 0 ? valHon / npH : 0;
-      for (var j = 0; j < npH; j++) {
-        var ckH = document.getElementById('hon-pg-'+j);
-        if (ckH && ckH.checked) baseHon += vUnitH;
-      }
-    }
-  }
-  var comissaoHon = baseHon * pctHon / 100;
-  document.getElementById('f-comissao-hon-calc').textContent = 'R$ ' + fmtVal(comissaoHon);
+  var comissao = base * pct / 100;
+  document.getElementById('f-comissao-calc').textContent = 'R$ ' + fmtVal(comissao);
 }
 
 // ========== PARCELAS ==========
@@ -1886,7 +1594,6 @@ function salvar() {
     pagamento: getVal('f-pagamento'),
     exitoPct: getVal('f-exito-pct') === 'outro' ? getVal('f-exito-custom') : getVal('f-exito-pct'),
     comissaoPct: getVal('f-comissao-pct'),
-    comissaoHonPct: getVal('f-comissao-hon-pct'),
     email: getVal('f-email'), whats: getVal('f-whats'),
     cpf: getVal('f-cpf'), orgao: getVal('f-orgao'),
     taxa: taxa, hon: hon
@@ -2432,7 +2139,7 @@ function renderRelatorios() {
   } else { htmlHon = '<tr><td colspan="6" class="rel-vazio">Nenhum honorário recebido em '+periodoLabel+'</td></tr>'; }
   document.getElementById('rel-tbody-hon').innerHTML = htmlHon;
 
-  // ---- COMISSÕES SOBRE TAXAS ----
+  // ---- COMISSÕES ----
   var htmlCom = '';
   var registrosCom = [];
 
@@ -2450,31 +2157,11 @@ function renderRelatorios() {
     }
 
     if (basePaga > 0) {
-      registrosCom.push({ nome:c.nome, tipo:c.tipo, base:basePaga, pct:comPct, com:basePaga*comPct/100, nat:'Taxa' });
+      registrosCom.push({ nome:c.nome, tipo:c.tipo, base:basePaga, pct:comPct, com:basePaga*comPct/100 });
     }
   });
 
-  // ---- COMISSÕES SOBRE HONORÁRIOS ----
-  DB.forEach(function(c) {
-    if (!c.hon || !c.comissaoHonPct) return;
-    var comHonPct = parseInt(c.comissaoHonPct);
-    var baseHonPaga = 0;
-
-    if (c.hon.mod === 'avista') {
-      if (c.hon.pago && pertencePeriodo(c.data, mes, ano, modo)) baseHonPaga = parseMoeda(c.hon.valor);
-    } else {
-      var ps = c.hon.parcelas || [];
-      var vUnit = ps.length > 0 ? parseMoeda(c.hon.valor) / ps.length : 0;
-      ps.forEach(function(p) { if (p.pago && pertencePeriodo(p.data, mes, ano, modo)) baseHonPaga += vUnit; });
-    }
-
-    if (baseHonPaga > 0) {
-      registrosCom.push({ nome:c.nome, tipo:c.tipo, base:baseHonPaga, pct:comHonPct, com:baseHonPaga*comHonPct/100, nat:'Honorários' });
-    }
-  });
-
-  var totalComissoesFinal = registrosCom.reduce(function(s,r){ return s+r.com; },0);
-  document.getElementById('rc-com').textContent = 'R$ ' + fmtVal(totalComissoesFinal);
+  document.getElementById('rc-com').textContent = 'R$ ' + fmtVal(totalComissoes);
   document.getElementById('rc-com-s').textContent = periodoLabel;
 
   if (registrosCom.length) {
@@ -2482,14 +2169,14 @@ function renderRelatorios() {
       htmlCom += '<tr>' +
         '<td style="font-weight:600;color:var(--tp)">'+esc(r.nome)+'</td>' +
         '<td><span class="bgt">'+esc(r.tipo||'')+'</span></td>' +
-        '<td style="color:var(--tw);font-size:11px">'+esc(r.nat)+'</td>' +
         '<td style="color:var(--ch);font-weight:600">R$ '+fmtVal(r.base)+'</td>' +
         '<td style="color:var(--tw)">'+r.pct+'%</td>' +
         '<td style="color:#e89090;font-weight:600">R$ '+fmtVal(r.com)+'</td>' +
       '</tr>';
     });
-    htmlCom += '<tr style="background:rgba(139,58,58,.1)"><td colspan="5" style="text-align:right;font-size:10px;color:#e89090;letter-spacing:.5px;">TOTAL COMISSÕES</td><td style="font-weight:600;color:#e89090">R$ '+fmtVal(totalComissoesFinal)+'</td></tr>';
-  } else { htmlCom = '<tr><td colspan="6" class="rel-vazio">Nenhuma comissão devida em '+periodoLabel+'</td></tr>'; }
+    var totalCom = registrosCom.reduce(function(s,r){ return s+r.com; },0);
+    htmlCom += '<tr style="background:rgba(139,58,58,.1)"><td colspan="4" style="text-align:right;font-size:10px;color:#e89090;letter-spacing:.5px;">TOTAL COMISSÕES</td><td style="font-weight:600;color:#e89090">R$ '+fmtVal(totalCom)+'</td></tr>';
+  } else { htmlCom = '<tr><td colspan="5" class="rel-vazio">Nenhuma comissão devida em '+periodoLabel+'</td></tr>'; }
   document.getElementById('rel-tbody-com').innerHTML = htmlCom;
 }
 
@@ -3096,13 +2783,14 @@ function exportPADcsv() {
 // ========== ATENDIMENTOS ==========
 function abrirModalAtend(id) {
   editAtendId = id;
-  ['at-nome','at-data','at-assunto','at-doc-det','at-whats','at-email','at-obs'].forEach(function(f){ setVal(f,''); });
+  ['at-nome','at-data','at-hora-ini','at-hora-fim','at-assunto','at-doc-det','at-whats','at-email','at-obs'].forEach(function(f){ setVal(f,''); });
   setVal('at-tipo','Parecer'); setVal('at-situacao','Pendente'); setVal('at-doc-local','');
   if (id) {
     var a=(ATENDIMENTOS||[]).find(function(x){ return x.id===id; });
     if (!a) return;
     document.getElementById('at-mo-tit').textContent='Editar Atendimento';
     setVal('at-nome',a.nome||''); setVal('at-data',a.data||'');
+    setVal('at-hora-ini',a.horaIni||''); setVal('at-hora-fim',a.horaFim||'');
     setVal('at-tipo',a.tipo||'Parecer'); setVal('at-situacao',a.situacao||'Pendente');
     setVal('at-assunto',a.assunto||''); setVal('at-doc-local',a.docLocal||'');
     setVal('at-doc-det',a.docDet||''); setVal('at-whats',a.whats||'');
@@ -3116,19 +2804,50 @@ function abrirModalAtend(id) {
 
 function toggleAtendDocDetalhe() { /* always visible */ }
 
-function salvarAtend() {
+function gerarLinkGoogleCalendar(a) {
+  // Monta datas no formato YYYYMMDDTHHmmss
+  var data = (a.data||'').replace(/-/g,'');
+  if (!data) return null;
+  var ini = a.horaIni ? a.horaIni.replace(':','')+'00' : '090000';
+  var fim = a.horaFim ? a.horaFim.replace(':','')+'00' : '100000';
+  var dtIni = data+'T'+ini;
+  var dtFim = data+'T'+fim;
+  var titulo = encodeURIComponent('[' + (a.tipo||'Atendimento') + '] ' + (a.nome||''));
+  var descr = encodeURIComponent(
+    'Cliente: ' + (a.nome||'') + '\n' +
+    'Tipo: ' + (a.tipo||'') + '\n' +
+    'Assunto: ' + (a.assunto||'') + '\n' +
+    (a.whats ? 'WhatsApp: ' + a.whats + '\n' : '') +
+    (a.obs ? 'Obs: ' + a.obs : '')
+  );
+  return 'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+    '&text=' + titulo +
+    '&dates=' + dtIni + '/' + dtFim +
+    '&details=' + descr +
+    '&location=' + encodeURIComponent('Escritório Débora Constantino');
+}
+
+function salvarAtend(abrirCalendar) {
   var nome=getVal('at-nome');
   if (!nome) { toast('Informe o nome do cliente',true); return; }
   var obj={
-    nome:nome, data:getVal('at-data'), tipo:getVal('at-tipo'),
+    nome:nome, data:getVal('at-data'),
+    horaIni:getVal('at-hora-ini'), horaFim:getVal('at-hora-fim'),
+    tipo:getVal('at-tipo'),
     situacao:getVal('at-situacao'), assunto:getVal('at-assunto'),
     docLocal:getVal('at-doc-local'), docDet:getVal('at-doc-det'),
-    contato:getVal('at-whats'), docLocal:getVal('at-doc-local'), docDet:getVal('at-doc-det'),
     whats:getVal('at-whats'), email:getVal('at-email'), obs:getVal('at-obs')
   };
+  var gcLink = gerarLinkGoogleCalendar(obj);
+  if (gcLink) obj.gcLink = gcLink;
+
   if (editAtendId) { obj.id=editAtendId; window._fbSaveAtend(obj); toast('✓ Atendimento atualizado'); }
   else { window._fbSaveAtend(obj); toast('✓ Atendimento cadastrado'); }
   document.getElementById('ov-atend').style.display='none'; editAtendId=null;
+
+  if (abrirCalendar && gcLink) {
+    setTimeout(function(){ window.open(gcLink,'_blank'); }, 400);
+  }
 }
 
 function renderAtendimentos() {
@@ -3173,6 +2892,7 @@ function renderAtendimentos() {
       '<td style="font-size:11px;color:var(--ts);max-width:160px;overflow:hidden;text-overflow:ellipsis">'+esc(a.assunto||'')+'</td>'+
       '<td style="font-size:11px;color:var(--tw)">'+esc(a.obs||'')+'</td>'+
       '<td><div class="acoes">'+
+        (a.gcLink?'<a class="btn-ic" title="Abrir no Google Agenda" href="'+a.gcLink+'" target="_blank" style="text-decoration:none;">📅</a>':'')+
         '<button class="btn-ic" title="Editar" onclick="abrirModalAtend(\''+a.id+'\')">✏️</button>'+
         '<button class="btn-ic x" title="Excluir" onclick="excluirAtend(\''+a.id+'\')">🗑️</button>'+
       '</div></td>'+
@@ -3194,346 +2914,12 @@ function exportAtendCSV() {
   toast('✓ CSV exportado');
 }
 
-
-// ========== GESTÃO FINANCEIRA ==========
-function iniciarFinanceiro() {
-  var anoAtual = new Date().getFullYear();
-  var anos = [anoAtual, anoAtual-1, anoAtual-2];
-  var selAno = document.getElementById('fin-ano');
-  if (selAno && !selAno.children.length) {
-    anos.forEach(function(a) {
-      var o = document.createElement('option');
-      o.value = a; o.textContent = a;
-      if (a === anoAtual) o.selected = true;
-      selAno.appendChild(o);
-    });
-  }
-  document.getElementById('fin-mes').value = new Date().getMonth() + 1;
-  renderFinanceiro();
-}
-
-function renderFinanceiro() {
-  var mes = parseInt(document.getElementById('fin-mes').value);
-  var ano = parseInt(document.getElementById('fin-ano').value);
-  var meses = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-  var periodoLabel = meses[mes] + '/' + ano;
-
-  // ---- RESULTADO DO MÊS ----
-  // Contratos fechados no período
-  var contratos = DB.filter(function(c) { return pertencePeriodo(c.data, mes, ano, 'mes'); }).length;
-  setTxt('fin-r-contratos', contratos);
-
-  // Total recebido (taxas + honorários pagos)
-  var totalRecebido = 0;
-  DB.forEach(function(c) {
-    ['taxa','hon'].forEach(function(tp) {
-      if (!c[tp]) return;
-      if (c[tp].mod === 'avista') {
-        if (c[tp].pago && pertencePeriodo(c.data, mes, ano, 'mes')) totalRecebido += parseMoeda(c[tp].valor);
-      } else {
-        var ps = c[tp].parcelas || [];
-        var vUnit = ps.length > 0 ? parseMoeda(c[tp].valor) / ps.length : 0;
-        ps.forEach(function(p) { if (p.pago && pertencePeriodo(p.data, mes, ano, 'mes')) totalRecebido += vUnit; });
-      }
-    });
-  });
-  setTxt('fin-r-recebido', 'R$ ' + fmtVal(totalRecebido));
-
-  // ---- EQUIPE ----
-  var totalEquipe = 0;
-  var equipeHtml = '';
-  if (!(EQUIPE||[]).length) {
-    equipeHtml = '<div class="rel-vazio" style="padding:20px;text-align:center;color:var(--tw);">Nenhum colaborador cadastrado. Clique em "+ Colaborador" para adicionar.</div>';
-    document.getElementById('fin-equipe-total').style.display = 'none';
-  } else {
-    EQUIPE.forEach(function(e) {
-      // Comissão sobre taxas do período para este colaborador
-      var comTaxa = 0, comHon = 0;
-      if (e.comTaxa) {
-        var pctT = parseInt(e.comTaxa);
-        DB.forEach(function(c) {
-          if (!c.taxa) return;
-          if (c.taxa.mod === 'avista') {
-            if (c.taxa.pago && pertencePeriodo(c.data, mes, ano, 'mes')) comTaxa += parseMoeda(c.taxa.valor) * pctT / 100;
-          } else {
-            var ps = c.taxa.parcelas||[]; var vU = ps.length>0?parseMoeda(c.taxa.valor)/ps.length:0;
-            ps.forEach(function(p){ if(p.pago&&pertencePeriodo(p.data,mes,ano,'mes')) comTaxa+=vU*pctT/100; });
-          }
-        });
-      }
-      if (e.comHon) {
-        var pctH = parseInt(e.comHon);
-        DB.forEach(function(c) {
-          if (!c.hon) return;
-          if (c.hon.mod === 'avista') {
-            if (c.hon.pago && pertencePeriodo(c.data, mes, ano, 'mes')) comHon += parseMoeda(c.hon.valor) * pctH / 100;
-          } else {
-            var ps = c.hon.parcelas||[]; var vU = ps.length>0?parseMoeda(c.hon.valor)/ps.length:0;
-            ps.forEach(function(p){ if(p.pago&&pertencePeriodo(p.data,mes,ano,'mes')) comHon+=vU*pctH/100; });
-          }
-        });
-      }
-      var salario = parseMoeda(e.salario);
-      var ajuda = parseMoeda(e.ajuda);
-      var totalColab = salario + ajuda + comTaxa + comHon;
-      totalEquipe += totalColab;
-
-      equipeHtml += '<div class="fin-sub-card">' +
-        '<div class="fin-sub-card-hdr">' +
-          '<div><div class="fin-sub-card-nome">'+esc(e.nome)+'</div>' +
-          (e.cargo?'<div class="fin-sub-card-cargo">'+esc(e.cargo)+'</div>':'') +
-          '</div>' +
-          '<div style="display:flex;gap:6px;">' +
-            '<button class="btn-ic" onclick="abrirModalEquipe(\''+e.id+'\')" title="Editar">✏️</button>' +
-            '<button class="btn-ic x" onclick="excluirEquipe(\''+e.id+'\')" title="Excluir">🗑️</button>' +
-          '</div>' +
-        '</div>' +
-        '<div class="fin-grid">' +
-          '<div class="fin-item"><div class="lbl">Salário Fixo</div><div class="val">R$ '+fmtVal(salario)+'</div></div>' +
-          '<div class="fin-item"><div class="lbl">Ajuda de Custo</div><div class="val">R$ '+fmtVal(ajuda)+'</div></div>' +
-          '<div class="fin-item"><div class="lbl">Comissão s/ Taxas '+(e.comTaxa?' ('+e.comTaxa+'%)':'')+'</div><div class="val gasto">R$ '+fmtVal(comTaxa)+'</div></div>' +
-          '<div class="fin-item"><div class="lbl">Comissão s/ Honorários '+(e.comHon?' ('+e.comHon+'%)':'')+'</div><div class="val gasto">R$ '+fmtVal(comHon)+'</div></div>' +
-          '<div class="fin-item"><div class="lbl">Total '+periodoLabel+'</div><div class="val destaque">R$ '+fmtVal(totalColab)+'</div></div>' +
-        '</div>' +
-      '</div>';
-    });
-    document.getElementById('fin-equipe-total').style.display = 'flex';
-    setTxt('fin-equipe-total-val', 'R$ ' + fmtVal(totalEquipe));
-  }
-  document.getElementById('fin-equipe-lista').innerHTML = equipeHtml;
-
-  // ---- DESPESAS FIXAS ----
-  var despFixas = (DESPESAS||[]).filter(function(d) { return d.tipo === 'fixa' && parseInt(d.mes) === mes && parseInt(d.ano) === ano; });
-  var totalFixas = despFixas.reduce(function(s,d){ return s + parseMoeda(d.valor); }, 0);
-  var fixasHtml = '';
-  if (!despFixas.length) {
-    fixasHtml = '<div class="rel-vazio" style="padding:20px;text-align:center;color:var(--tw);">Nenhuma despesa fixa em '+periodoLabel+'. Clique em "+ Despesa Fixa" para adicionar.</div>';
-    document.getElementById('fin-despesas-fixas-total').style.display = 'none';
-  } else {
-    fixasHtml = '<div class="tbl-box"><div class="tbl-sc"><table><thead><tr><th>Descrição</th><th>Categoria</th><th>Valor</th><th>Obs.</th><th>Ações</th></tr></thead><tbody>';
-    despFixas.forEach(function(d) {
-      fixasHtml += '<tr>' +
-        '<td style="font-weight:600;color:var(--tp)">'+esc(d.nome)+'</td>' +
-        '<td><span class="desp-chip fixa">'+esc(d.categoria||'Fixa')+'</span></td>' +
-        '<td style="color:var(--ch);font-weight:600">R$ '+fmtVal(parseMoeda(d.valor))+'</td>' +
-        '<td style="font-size:11px;color:var(--tw)">'+esc(d.obs||'—')+'</td>' +
-        '<td><div class="acoes">' +
-          '<button class="btn-ic" onclick="abrirModalDespesaEdit(\''+d.id+'\')" title="Editar">✏️</button>' +
-          '<button class="btn-ic x" onclick="excluirDespesa(\''+d.id+'\')" title="Excluir">🗑️</button>' +
-        '</div></td>' +
-      '</tr>';
-    });
-    fixasHtml += '</tbody></table></div></div>';
-    document.getElementById('fin-despesas-fixas-total').style.display = 'flex';
-    setTxt('fin-despesas-fixas-total-val', 'R$ ' + fmtVal(totalFixas));
-  }
-  document.getElementById('fin-despesas-fixas-lista').innerHTML = fixasHtml;
-
-  // ---- DESPESAS VARIÁVEIS ----
-  var despVar = (DESPESAS||[]).filter(function(d) { return d.tipo === 'variavel' && parseInt(d.mes) === mes && parseInt(d.ano) === ano; });
-  var totalVar = despVar.reduce(function(s,d){ return s + parseMoeda(d.valor); }, 0);
-  var varHtml = '';
-  if (!despVar.length) {
-    varHtml = '<div class="rel-vazio" style="padding:20px;text-align:center;color:var(--tw);">Nenhuma despesa variável em '+periodoLabel+'. Clique em "+ Despesa Variável".</div>';
-    document.getElementById('fin-despesas-var-total').style.display = 'none';
-  } else {
-    varHtml = '<div class="tbl-box"><div class="tbl-sc"><table><thead><tr><th>Descrição</th><th>Categoria</th><th>Valor</th><th>Obs.</th><th>Ações</th></tr></thead><tbody>';
-    despVar.forEach(function(d) {
-      varHtml += '<tr>' +
-        '<td style="font-weight:600;color:var(--tp)">'+esc(d.nome)+'</td>' +
-        '<td><span class="desp-chip variavel">'+esc(d.categoria||'Variável')+'</span></td>' +
-        '<td style="color:#e89090;font-weight:600">R$ '+fmtVal(parseMoeda(d.valor))+'</td>' +
-        '<td style="font-size:11px;color:var(--tw)">'+esc(d.obs||'—')+'</td>' +
-        '<td><div class="acoes">' +
-          '<button class="btn-ic" onclick="abrirModalDespesaEdit(\''+d.id+'\')" title="Editar">✏️</button>' +
-          '<button class="btn-ic x" onclick="excluirDespesa(\''+d.id+'\')" title="Excluir">🗑️</button>' +
-        '</div></td>' +
-      '</tr>';
-    });
-    varHtml += '</tbody></table></div></div>';
-    document.getElementById('fin-despesas-var-total').style.display = 'flex';
-    setTxt('fin-despesas-var-total-val', 'R$ ' + fmtVal(totalVar));
-  }
-  document.getElementById('fin-despesas-var-lista').innerHTML = varHtml;
-
-  // ---- COMISSÕES SOBRE HONORÁRIOS (TABELA) ----
-  var comHonRegistros = [];
-  DB.forEach(function(c) {
-    if (!c.hon || !c.comissaoHonPct) return;
-    var pctH = parseInt(c.comissaoHonPct);
-    if (c.hon.mod === 'avista') {
-      if (c.hon.pago && pertencePeriodo(c.data, mes, ano, 'mes')) {
-        var v = parseMoeda(c.hon.valor);
-        comHonRegistros.push({ nome:c.nome, tipo:c.tipo, base:v, mod:'À vista', data:c.data, pct:pctH, com:v*pctH/100 });
-      }
-    } else {
-      var ps = c.hon.parcelas||[]; var vU = ps.length>0?parseMoeda(c.hon.valor)/ps.length:0;
-      ps.forEach(function(p,i) {
-        if (p.pago && pertencePeriodo(p.data, mes, ano, 'mes')) {
-          comHonRegistros.push({ nome:c.nome, tipo:c.tipo, base:vU, mod:'Parc.'+(i+1)+'ª', data:p.data, pct:pctH, com:vU*pctH/100 });
-        }
-      });
-    }
-  });
-  var totalComHon = comHonRegistros.reduce(function(s,r){ return s+r.com; }, 0);
-  var comHonHtml = '';
-  if (!comHonRegistros.length) {
-    comHonHtml = '<tr><td colspan="7" class="rel-vazio">Nenhuma comissão sobre honorários em '+periodoLabel+'</td></tr>';
-    document.getElementById('fin-com-hon-total').style.display = 'none';
-  } else {
-    comHonRegistros.forEach(function(r) {
-      comHonHtml += '<tr>' +
-        '<td style="font-weight:600;color:var(--tp)">'+esc(r.nome)+'</td>' +
-        '<td><span class="bgt">'+esc(r.tipo||'')+'</span></td>' +
-        '<td style="color:var(--ch);font-weight:600">R$ '+fmtVal(r.base)+'</td>' +
-        '<td style="color:var(--tw);font-size:11px">'+r.mod+'</td>' +
-        '<td style="color:var(--tw);font-size:11px">'+fmtData(r.data)+'</td>' +
-        '<td style="color:var(--tw)">'+r.pct+'%</td>' +
-        '<td style="color:#e89090;font-weight:600">R$ '+fmtVal(r.com)+'</td>' +
-      '</tr>';
-    });
-    document.getElementById('fin-com-hon-total').style.display = 'flex';
-    setTxt('fin-com-hon-total-val', 'R$ ' + fmtVal(totalComHon));
-  }
-  document.getElementById('fin-tbody-com-hon').innerHTML = comHonHtml;
-
-  // ---- RESULTADO LÍQUIDO ----
-  var totalGastos = totalEquipe + totalFixas + totalVar;
-  var liquido = totalRecebido - totalGastos;
-  var totalComissoesMes = 0;
-  DB.forEach(function(c) {
-    // comissão taxa
-    if (c.taxa && c.comissaoPct) {
-      var pT = parseInt(c.comissaoPct);
-      if (c.taxa.mod==='avista') { if(c.taxa.pago&&pertencePeriodo(c.data,mes,ano,'mes')) totalComissoesMes+=parseMoeda(c.taxa.valor)*pT/100; }
-      else { var ps=c.taxa.parcelas||[]; var vU=ps.length>0?parseMoeda(c.taxa.valor)/ps.length:0; ps.forEach(function(p){ if(p.pago&&pertencePeriodo(p.data,mes,ano,'mes')) totalComissoesMes+=vU*pT/100; }); }
-    }
-    // comissão honorários
-    if (c.hon && c.comissaoHonPct) {
-      var pH = parseInt(c.comissaoHonPct);
-      if (c.hon.mod==='avista') { if(c.hon.pago&&pertencePeriodo(c.data,mes,ano,'mes')) totalComissoesMes+=parseMoeda(c.hon.valor)*pH/100; }
-      else { var ps=c.hon.parcelas||[]; var vU=ps.length>0?parseMoeda(c.hon.valor)/ps.length:0; ps.forEach(function(p){ if(p.pago&&pertencePeriodo(p.data,mes,ano,'mes')) totalComissoesMes+=vU*pH/100; }); }
-    }
-  });
-  setTxt('fin-r-gastos', 'R$ ' + fmtVal(totalGastos));
-  var liqEl = document.getElementById('fin-r-liquido');
-  if (liqEl) { liqEl.textContent = 'R$ ' + fmtVal(liquido); liqEl.className = 'val ' + (liquido >= 0 ? 'luc' : 'gas'); }
-  setTxt('fin-r-comissoes', 'R$ ' + fmtVal(totalComissoesMes));
-}
-
-// ---- Equipe CRUD ----
-function abrirModalEquipe(id) {
-  editEquipeId = id;
-  ['eq-nome','eq-cargo','eq-salario','eq-ajuda','eq-inicio','eq-obs'].forEach(function(f){ setVal(f,''); });
-  setVal('eq-com-taxa',''); setVal('eq-com-hon','');
-  if (id) {
-    var e = (EQUIPE||[]).find(function(x){ return x.id===id; });
-    if (!e) return;
-    document.getElementById('eq-mo-tit').textContent = 'Editar Colaborador';
-    setVal('eq-nome',e.nome||''); setVal('eq-cargo',e.cargo||'');
-    setVal('eq-salario',e.salario||''); setVal('eq-ajuda',e.ajuda||'');
-    setVal('eq-com-taxa',e.comTaxa||''); setVal('eq-com-hon',e.comHon||'');
-    setVal('eq-inicio',e.inicio||''); setVal('eq-obs',e.obs||'');
-  } else {
-    document.getElementById('eq-mo-tit').textContent = 'Novo Colaborador';
-    setVal('eq-inicio', new Date().toISOString().split('T')[0]);
-  }
-  document.getElementById('ov-equipe').style.display = 'block';
-}
-
-function salvarEquipe() {
-  var nome = getVal('eq-nome');
-  if (!nome) { toast('Informe o nome do colaborador', true); return; }
-  var obj = { nome:nome, cargo:getVal('eq-cargo'), salario:getVal('eq-salario'),
-    ajuda:getVal('eq-ajuda'), comTaxa:getVal('eq-com-taxa'), comHon:getVal('eq-com-hon'),
-    inicio:getVal('eq-inicio'), obs:getVal('eq-obs') };
-  if (editEquipeId) { obj.id = editEquipeId; window._fbSaveEquipe(obj); toast('✓ Colaborador atualizado'); }
-  else { window._fbSaveEquipe(obj); toast('✓ Colaborador cadastrado'); }
-  document.getElementById('ov-equipe').style.display = 'none';
-  editEquipeId = null;
-  renderFinanceiro();
-}
-
-function excluirEquipe(id) {
-  if (!confirm('Excluir este colaborador?')) return;
-  window._fbDeleteEquipe(id); toast('Colaborador removido');
-}
-
-// ---- Despesas CRUD ----
-function abrirModalDespesa(tipo) {
-  editDespesaId = null;
-  ['desp-nome','desp-valor','desp-categoria','desp-obs'].forEach(function(f){ setVal(f,''); });
-  document.getElementById('desp-tipo').value = tipo;
-  document.getElementById('desp-mo-tit').textContent = tipo === 'fixa' ? 'Nova Despesa Fixa' : 'Nova Despesa Variável';
-  document.getElementById('desp-mo-sub').textContent = tipo === 'fixa' ? 'Despesa recorrente (aluguel, assinaturas...)' : 'Despesa pontual do período';
-  var hoje = new Date();
-  document.getElementById('desp-mes').value = hoje.getMonth() + 1;
-  setVal('desp-ano', hoje.getFullYear());
-  document.getElementById('ov-despesa').style.display = 'block';
-}
-
-function abrirModalDespesaEdit(id) {
-  var d = (DESPESAS||[]).find(function(x){ return x.id===id; });
-  if (!d) return;
-  editDespesaId = id;
-  document.getElementById('desp-tipo').value = d.tipo;
-  document.getElementById('desp-mo-tit').textContent = d.tipo === 'fixa' ? 'Editar Despesa Fixa' : 'Editar Despesa Variável';
-  document.getElementById('desp-mo-sub').textContent = '';
-  setVal('desp-nome',d.nome||''); setVal('desp-valor',d.valor||'');
-  document.getElementById('desp-mes').value = d.mes || new Date().getMonth()+1;
-  setVal('desp-ano',d.ano||new Date().getFullYear()); setVal('desp-categoria',d.categoria||''); setVal('desp-obs',d.obs||'');
-  document.getElementById('ov-despesa').style.display = 'block';
-}
-
-function salvarDespesa() {
-  var nome = getVal('desp-nome'), valor = getVal('desp-valor');
-  if (!nome) { toast('Informe a descrição da despesa', true); return; }
-  if (!valor) { toast('Informe o valor da despesa', true); return; }
-  var obj = { tipo: document.getElementById('desp-tipo').value,
-    nome:nome, valor:valor, mes:parseInt(document.getElementById('desp-mes').value),
-    ano:parseInt(getVal('desp-ano')), categoria:getVal('desp-categoria'), obs:getVal('desp-obs') };
-  if (editDespesaId) { obj.id = editDespesaId; window._fbSaveDespesa(obj); toast('✓ Despesa atualizada'); }
-  else { window._fbSaveDespesa(obj); toast('✓ Despesa registrada'); }
-  document.getElementById('ov-despesa').style.display = 'none';
-  editDespesaId = null;
-  renderFinanceiro();
-}
-
-function excluirDespesa(id) {
-  if (!confirm('Excluir esta despesa?')) return;
-  window._fbDeleteDespesa(id); toast('Despesa removida');
-  renderFinanceiro();
-}
-
-function exportFinanceiroCSV() {
-  var mes = parseInt(document.getElementById('fin-mes').value);
-  var ano = parseInt(document.getElementById('fin-ano').value);
-  var meses = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-  var periodo = meses[mes]+'-'+ano;
-  var linhas = [['Tipo','Descrição','Categoria/Natureza','Valor','Mês','Obs']];
-  // Equipe
-  (EQUIPE||[]).forEach(function(e) { linhas.push(['Equipe',e.nome,e.cargo||'',e.salario||'0',periodo,e.obs||'']); });
-  // Despesas fixas
-  (DESPESAS||[]).filter(function(d){ return d.tipo==='fixa'&&parseInt(d.mes)===mes&&parseInt(d.ano)===ano; })
-    .forEach(function(d){ linhas.push(['Despesa Fixa',d.nome,d.categoria||'',d.valor,periodo,d.obs||'']); });
-  // Despesas variáveis
-  (DESPESAS||[]).filter(function(d){ return d.tipo==='variavel'&&parseInt(d.mes)===mes&&parseInt(d.ano)===ano; })
-    .forEach(function(d){ linhas.push(['Despesa Variável',d.nome,d.categoria||'',d.valor,periodo,d.obs||'']); });
-  var csv = linhas.map(function(r){ return r.map(function(v){ return '"'+(v||'').toString().replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
-  var blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a'); a.href=url; a.download='financeiro-'+periodo+'.csv'; a.click(); URL.revokeObjectURL(url);
-  toast('✓ Financeiro exportado');
-}
-
 // ========== INIT ==========
 document.addEventListener('keydown', function(e){ 
   if(e.key==='Escape'){ 
     fecharModal(); 
     document.getElementById('conf-ov').classList.remove('on');
     document.getElementById('ov-det').style.display='none';
-    document.getElementById('ov-equipe').style.display='none';
-    document.getElementById('ov-despesa').style.display='none';
   }
 });
 // Dados carregados pelo Firebase listener em tempo real (ver módulo acima)
