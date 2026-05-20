@@ -27,6 +27,8 @@
   const indicacoesRef = collection(db, "indicacoes");
   const padRef = collection(db, "pad");
   const atendRef = collection(db, "atendimentos");
+  const equipeRef = collection(db, "equipe");
+  const despesasRef = collection(db, "despesas");
 
   // Expor funções globais para o código legado
   window._fbSave = async function(obj) {
@@ -95,6 +97,24 @@
   window._fbDeleteAtend = async function(id) {
     try { await deleteDoc(doc(db, "atendimentos", id)); } catch(e) { console.error(e); }
   };
+  window._fbSaveEquipe = async function(obj) {
+    try {
+      if (obj.id && typeof obj.id === 'string') { await setDoc(doc(db, "equipe", obj.id), obj); }
+      else { const ref = await addDoc(equipeRef, obj); return ref.id; }
+    } catch(e) { console.error(e); }
+  };
+  window._fbDeleteEquipe = async function(id) {
+    try { await deleteDoc(doc(db, "equipe", id)); } catch(e) { console.error(e); }
+  };
+  window._fbSaveDespesa = async function(obj) {
+    try {
+      if (obj.id && typeof obj.id === 'string') { await setDoc(doc(db, "despesas", obj.id), obj); }
+      else { const ref = await addDoc(despesasRef, obj); return ref.id; }
+    } catch(e) { console.error(e); }
+  };
+  window._fbDeleteDespesa = async function(id) {
+    try { await deleteDoc(doc(db, "despesas", id)); } catch(e) { console.error(e); }
+  };
 
   window._fbListen = function(callback) {
     return onSnapshot(colRef, function(snapshot) {
@@ -143,6 +163,16 @@
       window.ATENDIMENTOS = [];
       snap.forEach(function(d){ window.ATENDIMENTOS.push(Object.assign({id:d.id}, d.data())); });
       if (document.getElementById('pg-atendimentos').classList.contains('on')) renderAtendimentos();
+    });
+    onSnapshot(equipeRef, function(snap) {
+      window.EQUIPE = [];
+      snap.forEach(function(d){ window.EQUIPE.push(Object.assign({id:d.id}, d.data())); });
+      if (document.getElementById('pg-financeiro').classList.contains('on')) renderFinanceiro();
+    });
+    onSnapshot(despesasRef, function(snap) {
+      window.DESPESAS = [];
+      snap.forEach(function(d){ window.DESPESAS.push(Object.assign({id:d.id}, d.data())); });
+      if (document.getElementById('pg-financeiro').classList.contains('on')) renderFinanceiro();
     });
   });
 </script>
@@ -390,6 +420,35 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
 .footer{text-align:center;padding:20px;font-size:10px;color:var(--tw);border-top:1px solid var(--bd);margin-top:30px;letter-spacing:.5px;}
 .footer span{color:var(--ch);}
 
+/* FINANCEIRO */
+.fin-sec{margin-bottom:32px;}
+.fin-sec-tit{font-family:'Playfair Display',serif;font-size:15px;color:var(--tp);margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid var(--bd);display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.fin-sec-tit span{font-size:12px;color:var(--tw);font-family:'DM Sans',sans-serif;font-weight:400;}
+.fin-sub-card{background:var(--fs);border:1px solid var(--bd);border-radius:8px;padding:14px 16px;margin-bottom:10px;}
+.fin-sub-card-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.fin-sub-card-nome{font-weight:600;color:var(--tp);font-size:13px;}
+.fin-sub-card-cargo{font-size:10px;color:var(--ch);text-transform:uppercase;letter-spacing:.8px;margin-top:2px;}
+.fin-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:8px;}
+.fin-item .lbl{font-size:9px;color:var(--tw);text-transform:uppercase;letter-spacing:.7px;}
+.fin-item .val{font-size:13px;color:var(--ts);font-weight:500;margin-top:2px;}
+.fin-item .val.destaque{color:var(--do);font-family:'Playfair Display',serif;font-size:15px;}
+.fin-item .val.gasto{color:#e89090;}
+.fin-item .val.ok{color:#7ec492;}
+.fin-total-row{background:rgba(63,103,73,.08);border:1px solid rgba(86,120,90,.2);border-radius:6px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;margin-top:8px;}
+.fin-total-row .lbl{font-size:10px;color:var(--ch);text-transform:uppercase;letter-spacing:1px;}
+.fin-total-row .val{font-family:'Playfair Display',serif;font-size:18px;color:var(--do);}
+.fin-total-row .val.gasto{color:#e89090;}
+.desp-chip{display:inline-flex;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;}
+.desp-chip.fixa{background:rgba(180,138,74,.15);color:var(--do);border:1px solid rgba(180,138,74,.3);}
+.desp-chip.variavel{background:rgba(192,80,74,.12);color:#e89090;border:1px solid rgba(192,80,74,.25);}
+.resultado-card{background:var(--fs);border:2px solid var(--do);border-radius:10px;padding:20px 24px;margin-bottom:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;}
+.res-item .lbl{font-size:9px;color:var(--ch);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+.res-item .val{font-family:'Playfair Display',serif;font-size:26px;color:var(--do);}
+.res-item .val.rec{color:#7ec492;}
+.res-item .val.gas{color:#e89090;}
+.res-item .val.luc{color:var(--do);}
+.res-item .val.pre{color:#D4B84A;}
+
 ::-webkit-scrollbar{width:5px;height:5px;}
 ::-webkit-scrollbar-track{background:var(--fp);}
 ::-webkit-scrollbar-thumb{background:var(--bd);border-radius:3px;}
@@ -428,8 +487,8 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
   <button class="aba" onclick="mudarAba('atendimentos',this)">📝 Atendimentos</button>
   <button class="aba" onclick="mudarAba('parceiros',this)">🤝 Advogados Parceiros</button>
   <button class="aba" onclick="mudarAba('relatorios',this)">📊 Relatórios Financeiros</button>
+  <button class="aba" onclick="mudarAba('financeiro',this)">🏦 Gestão Financeira</button>
   <button class="aba" onclick="mudarAba('alertas',this)">🔔 Alertas <span class="abadge" id="badge-n">0</span></button>
-  <button class="aba" onclick="mudarAba('dejen',this)">📡 DEJEN <span class="abadge" id="badge-dejen" style="display:none">!</span></button>
 </nav>
 
 <!-- ===== PÁGINA: CLIENTES ===== -->
@@ -955,123 +1014,215 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
   <div class="rel-sec">
     <div class="rel-sec-tit">🏷️ Comissões Devidas ao Setor Comercial</div>
     <div class="tbl-box"><div class="tbl-sc"><table>
-      <thead><tr><th>Cliente</th><th>Tipo</th><th>Base Paga (Taxa)</th><th>% Comissão</th><th>Valor Comissão</th></tr></thead>
+      <thead><tr><th>Cliente</th><th>Tipo</th><th>Natureza</th><th>Base Paga</th><th>% Comissão</th><th>Valor Comissão</th></tr></thead>
       <tbody id="rel-tbody-com"></tbody>
     </table></div></div>
   </div>
 
 </div>
 
+<!-- ===== PÁGINA: GESTÃO FINANCEIRA ===== -->
+<div class="pg" id="pg-financeiro">
+
+  <!-- FILTROS -->
+  <div class="rel-filtros" style="margin-bottom:24px;">
+    <div style="display:flex;align-items:center;gap:6px;">
+      <label>Mês</label>
+      <select class="sel" id="fin-mes">
+        <option value="1">Janeiro</option><option value="2">Fevereiro</option>
+        <option value="3">Março</option><option value="4">Abril</option>
+        <option value="5">Maio</option><option value="6">Junho</option>
+        <option value="7">Julho</option><option value="8">Agosto</option>
+        <option value="9">Setembro</option><option value="10">Outubro</option>
+        <option value="11">Novembro</option><option value="12">Dezembro</option>
+      </select>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <label>Ano</label>
+      <select class="sel" id="fin-ano"></select>
+    </div>
+    <button class="btn-v" onclick="renderFinanceiro()" style="padding:8px 18px;">🔍 Filtrar</button>
+    <button class="btn-o" onclick="exportFinanceiroCSV()">⬇ Exportar</button>
+  </div>
+
+  <!-- RESULTADO DO MÊS -->
+  <div class="resultado-card" id="fin-resultado">
+    <div class="res-item"><div class="lbl">Contratos Fechados</div><div class="val pre" id="fin-r-contratos">0</div></div>
+    <div class="res-item"><div class="lbl">Total Recebido</div><div class="val rec" id="fin-r-recebido">R$ 0</div></div>
+    <div class="res-item"><div class="lbl">Total de Gastos</div><div class="val gas" id="fin-r-gastos">R$ 0</div></div>
+    <div class="res-item"><div class="lbl">Resultado Líquido</div><div class="val luc" id="fin-r-liquido">R$ 0</div></div>
+    <div class="res-item"><div class="lbl">Comissões Devidas</div><div class="val gas" id="fin-r-comissoes">R$ 0</div></div>
+  </div>
+
+  <!-- EQUIPE -->
+  <div class="fin-sec">
+    <div class="fin-sec-tit">
+      👥 Equipe — Custos do Período
+      <button class="btn-v" onclick="abrirModalEquipe(null)" style="padding:6px 14px;font-size:11px;">+ Colaborador</button>
+    </div>
+    <div id="fin-equipe-lista"></div>
+    <div class="fin-total-row" id="fin-equipe-total" style="display:none;">
+      <div class="lbl">Total com Equipe no Período</div>
+      <div class="val gasto" id="fin-equipe-total-val">R$ 0,00</div>
+    </div>
+  </div>
+
+  <!-- DESPESAS FIXAS -->
+  <div class="fin-sec">
+    <div class="fin-sec-tit">
+      🏢 Despesas Fixas
+      <button class="btn-v" onclick="abrirModalDespesa('fixa')" style="padding:6px 14px;font-size:11px;">+ Despesa Fixa</button>
+    </div>
+    <div id="fin-despesas-fixas-lista"></div>
+    <div class="fin-total-row" id="fin-despesas-fixas-total" style="display:none;">
+      <div class="lbl">Total Despesas Fixas</div>
+      <div class="val gasto" id="fin-despesas-fixas-total-val">R$ 0,00</div>
+    </div>
+  </div>
+
+  <!-- DESPESAS VARIÁVEIS -->
+  <div class="fin-sec">
+    <div class="fin-sec-tit">
+      📦 Despesas Variáveis
+      <button class="btn-v" onclick="abrirModalDespesa('variavel')" style="padding:6px 14px;font-size:11px;">+ Despesa Variável</button>
+    </div>
+    <div id="fin-despesas-var-lista"></div>
+    <div class="fin-total-row" id="fin-despesas-var-total" style="display:none;">
+      <div class="lbl">Total Despesas Variáveis</div>
+      <div class="val gasto" id="fin-despesas-var-total-val">R$ 0,00</div>
+    </div>
+  </div>
+
+  <!-- COMISSÕES SOBRE HONORÁRIOS -->
+  <div class="fin-sec">
+    <div class="fin-sec-tit">🏷️ Comissões sobre Honorários Iniciais Recebidos</div>
+    <div class="tbl-box"><div class="tbl-sc"><table>
+      <thead><tr><th>Cliente</th><th>Tipo</th><th>Hon. Base Pago</th><th>Modalidade</th><th>Data Pagto</th><th>% Comissão</th><th>Valor Comissão</th></tr></thead>
+      <tbody id="fin-tbody-com-hon"></tbody>
+    </table></div></div>
+    <div class="fin-total-row" id="fin-com-hon-total" style="margin-top:10px;display:none;">
+      <div class="lbl">Total Comissões sobre Honorários</div>
+      <div class="val gasto" id="fin-com-hon-total-val">R$ 0,00</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL COLABORADOR -->
+<div id="ov-equipe" style="position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;display:none;overflow-y:auto;padding:20px;" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal" style="max-width:620px;">
+    <div class="mo-head">
+      <div><div class="mo-tit" id="eq-mo-tit">Novo Colaborador</div><div class="mo-sub">Cadastro de membro da equipe</div></div>
+      <button class="mo-cls" onclick="document.getElementById('ov-equipe').style.display='none'">✕</button>
+    </div>
+    <div style="padding:20px 26px;">
+      <div class="sec">Identificação</div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Nome *</label><input class="fi" id="eq-nome" placeholder="Nome completo"></div>
+        <div class="fg"><label class="fl">Cargo / Função</label><input class="fi" id="eq-cargo" placeholder="Ex.: Assistente Jurídico, Comercial..."></div>
+      </div>
+      <div class="sec">Remuneração Mensal</div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Salário Fixo (R$)</label><input class="fi" id="eq-salario" placeholder="0,00" oninput="fmtMoeda(this)"></div>
+        <div class="fg"><label class="fl">Ajuda de Custo (R$)</label><input class="fi" id="eq-ajuda" placeholder="0,00" oninput="fmtMoeda(this)"></div>
+      </div>
+      <div class="sec">Comissões</div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">% Comissão sobre Taxas</label>
+          <select class="fi" id="eq-com-taxa">
+            <option value="">Não recebe</option>
+            <option value="10">10%</option>
+            <option value="20">20%</option>
+            <option value="30">30%</option>
+            <option value="40">40%</option>
+            <option value="50">50%</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">% Comissão sobre Honorários</label>
+          <select class="fi" id="eq-com-hon">
+            <option value="">Não recebe</option>
+            <option value="10">10%</option>
+            <option value="20">20%</option>
+            <option value="30">30%</option>
+            <option value="40">40%</option>
+            <option value="50">50%</option>
+          </select>
+        </div>
+      </div>
+      <div class="gr" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Data de Início</label><input type="date" class="fi" id="eq-inicio"></div>
+      </div>
+      <div class="gr" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Observações</label><input class="fi" id="eq-obs" placeholder="Notas adicionais (opcional)"></div>
+      </div>
+    </div>
+    <div class="mo-foot">
+      <button class="btn-o" onclick="document.getElementById('ov-equipe').style.display='none'">Cancelar</button>
+      <button class="btn-v" onclick="salvarEquipe()">✓ Salvar Colaborador</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DESPESA -->
+<div id="ov-despesa" style="position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;display:none;overflow-y:auto;padding:20px;" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal" style="max-width:560px;">
+    <div class="mo-head">
+      <div><div class="mo-tit" id="desp-mo-tit">Nova Despesa</div><div class="mo-sub" id="desp-mo-sub">Despesa do escritório</div></div>
+      <button class="mo-cls" onclick="document.getElementById('ov-despesa').style.display='none'">✕</button>
+    </div>
+    <div style="padding:20px 26px;">
+      <input type="hidden" id="desp-tipo">
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Descrição *</label><input class="fi" id="desp-nome" placeholder="Ex.: Aluguel, Telefone, Material..."></div>
+        <div class="fg"><label class="fl">Valor (R$) *</label><input class="fi" id="desp-valor" placeholder="0,00" oninput="fmtMoeda(this)"></div>
+      </div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Mês de Referência *</label>
+          <select class="fi" id="desp-mes">
+            <option value="1">Janeiro</option><option value="2">Fevereiro</option>
+            <option value="3">Março</option><option value="4">Abril</option>
+            <option value="5">Maio</option><option value="6">Junho</option>
+            <option value="7">Julho</option><option value="8">Agosto</option>
+            <option value="9">Setembro</option><option value="10">Outubro</option>
+            <option value="11">Novembro</option><option value="12">Dezembro</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Ano de Referência *</label><input type="number" class="fi" id="desp-ano" placeholder="2025" min="2020" max="2099"></div>
+      </div>
+      <div class="gr" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Categoria</label>
+          <input class="fi" id="desp-categoria" list="desp-cat-list" placeholder="Ex.: Aluguel, Cartório, Marketing...">
+          <datalist id="desp-cat-list">
+            <option value="Aluguel">
+            <option value="Energia Elétrica">
+            <option value="Internet">
+            <option value="Telefone">
+            <option value="Contabilidade">
+            <option value="Software Jurídico">
+            <option value="Material de Escritório">
+            <option value="Marketing e Publicidade">
+            <option value="Cartório">
+            <option value="Correios / Motoboy">
+            <option value="Impostos e Tributos">
+            <option value="Limpeza e Conservação">
+            <option value="Outros">
+          </datalist>
+        </div>
+      </div>
+      <div class="gr" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Observações</label><input class="fi" id="desp-obs" placeholder="Notas adicionais (opcional)"></div>
+      </div>
+    </div>
+    <div class="mo-foot">
+      <button class="btn-o" onclick="document.getElementById('ov-despesa').style.display='none'">Cancelar</button>
+      <button class="btn-v" onclick="salvarDespesa()">✓ Salvar Despesa</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== PÁGINA: ALERTAS ===== -->
 <div class="pg" id="pg-alertas">
   <div id="alertas-full"></div>
-</div>
-
-<!-- ===== PÁGINA: DEJEN ===== -->
-<div class="pg" id="pg-dejen">
-
-  <!-- HEADER INFO + GOOGLE CALENDAR AUTH -->
-  <div style="background:var(--fs);border:1px solid var(--bd);border-radius:10px;padding:18px 22px;margin-bottom:20px;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:14px;">
-    <div>
-      <div style="font-family:'Playfair Display',serif;font-size:16px;color:var(--tp);margin-bottom:4px;">📡 Monitoramento DEJEN + 📅 Google Agenda</div>
-      <div style="font-size:11px;color:var(--tw);line-height:1.6;">
-        Consulta publicações/intimações e agenda prazos automaticamente — 2 dias antes do vencimento.<br>
-        <span style="color:var(--ch);">Advogada:</span> Débora Ewenne Santos da Silva &nbsp;|&nbsp;
-        <span style="color:var(--ch);">OAB/SP:</span> 378.037
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-      <div id="dejen-status" style="font-size:11px;color:var(--tw);padding:6px 12px;background:var(--fp);border:1px solid var(--bd);border-radius:6px;">🔵 Aguardando consulta</div>
-      <div id="gcal-status" style="font-size:11px;padding:6px 12px;background:var(--fp);border:1px solid var(--bd);border-radius:6px;color:var(--tw);">📅 Agenda: desconectada</div>
-      <button class="btn-o" onclick="autorizarGoogleCalendar()" id="btn-gcal-auth" style="font-size:12px;">🔐 Conectar Agenda</button>
-      <button class="btn-v" onclick="consultarDEJEN()" id="btn-dejen-consultar">🔍 Consultar DEJEN</button>
-    </div>
-  </div>
-
-  <!-- CARDS RESUMO -->
-  <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(148px,1fr));margin-bottom:20px;">
-    <div class="card">
-      <div class="card-l">Última Consulta</div>
-      <div class="card-v" id="dj-ultima" style="font-size:13px;color:var(--ch);">—</div>
-      <div class="card-s">data/hora</div>
-    </div>
-    <div class="card">
-      <div class="card-l">Comunicações</div>
-      <div class="card-v" id="dj-total">0</div>
-      <div class="card-s">encontradas</div>
-    </div>
-    <div class="card">
-      <div class="card-l">Novidades</div>
-      <div class="card-v" id="dj-novas" style="color:#7ec492;">0</div>
-      <div class="card-s">não reportadas</div>
-    </div>
-    <div class="card">
-      <div class="card-l">Certidões</div>
-      <div class="card-v" id="dj-certidoes" style="color:var(--do);">0</div>
-      <div class="card-s">obtidas</div>
-    </div>
-    <div class="card">
-      <div class="card-l">Eventos Agendados</div>
-      <div class="card-v" id="dj-agendados" style="color:#7ec492;">0</div>
-      <div class="card-s">no Google Agenda</div>
-    </div>
-    <div class="card">
-      <div class="card-l">Tribunais</div>
-      <div class="card-v" id="dj-tribunais">0</div>
-      <div class="card-s">carregados</div>
-    </div>
-  </div>
-
-  <!-- BARRA DE AÇÕES -->
-  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">
-    <select class="sel" id="dj-filtro-status" onchange="filtrarDEJEN()">
-      <option value="">Todas as comunicações</option>
-      <option value="novo">Somente novidades</option>
-      <option value="reportado">Já reportadas</option>
-    </select>
-    <select class="sel" id="dj-filtro-tribunal" onchange="filtrarDEJEN()">
-      <option value="">Todos os tribunais</option>
-    </select>
-    <button class="btn-v" onclick="agendarTodasNovidades()" id="btn-agendar-todas" style="background:linear-gradient(135deg,#1a73e8,#1557b0);">📅 Agendar Todas as Novidades</button>
-    <button class="btn-o" onclick="exportDejenCSV()">⬇ Exportar CSV</button>
-    <button class="btn-o" onclick="limparHistoricoDejen()" style="color:var(--rc);border-color:rgba(192,80,74,.3);">🗑 Limpar Histórico</button>
-  </div>
-
-  <!-- LEGENDA PEÇAS -->
-  <div style="background:var(--fs);border:1px solid var(--bd);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:11px;color:var(--tw);">
-    <span style="color:var(--ch);font-weight:600;">Sugestão automática de peça jurídica:</span>
-    o sistema analisa o tipo de comunicação e sugere a peça adequada — Contestação, Contrarrazões, Recurso, Manifestação, Petição ou Memorial — com base na jurisprudência do TJSP e na prática forense de servidores públicos.
-    O evento é criado <strong style="color:var(--tp);">2 dias antes do vencimento do prazo</strong>, com alerta no Google Agenda.
-  </div>
-
-  <!-- LISTA DE COMUNICAÇÕES -->
-  <div class="tbl-box" id="dj-container">
-    <div class="tbl-bar">
-      <div class="tbl-tit">Comunicações, Intimações e Prazos</div>
-      <div class="tbl-cnt" id="dj-cnt">0 registros</div>
-    </div>
-    <div id="dj-lista" style="padding:0;">
-      <div class="vazio" style="padding:60px 40px;">
-        <div class="vazio-ic">📡</div>
-        <div style="font-family:'Playfair Display',serif;font-size:15px;opacity:.55;margin-bottom:5px;">Nenhuma consulta realizada</div>
-        <div class="vazio-s">Clique em "Consultar DEJEN" para buscar publicações e intimações.<br>Em seguida, conecte o Google Agenda para agendar os prazos automaticamente.</div>
-        <div style="margin-top:16px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
-          <button class="btn-v" onclick="consultarDEJEN()">🔍 Consultar DEJEN</button>
-          <button class="btn-o" onclick="autorizarGoogleCalendar()">📅 Conectar Google Agenda</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- LOG -->
-  <div style="margin-top:20px;">
-    <div style="font-family:'Playfair Display',serif;font-size:13px;margin-bottom:10px;padding-bottom:7px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;">
-      <span>📋 Log da Última Consulta</span>
-      <button class="btn-o" style="font-size:10px;padding:4px 10px;" onclick="var l=document.getElementById('dj-log');l.style.display=l.style.display==='none'?'block':'none'">Mostrar/Ocultar</button>
-    </div>
-    <div id="dj-log" style="display:none;background:var(--fi);border:1px solid var(--bd);border-radius:8px;padding:16px;font-family:monospace;font-size:11px;color:var(--tw);line-height:1.8;max-height:350px;overflow-y:auto;white-space:pre-wrap;">Nenhuma consulta registrada ainda.</div>
-  </div>
-
 </div>
 
 <!-- ===== OVERLAY / MODAL CADASTRO ===== -->
@@ -1246,9 +1397,9 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
       </div>
 
       <div class="sec">Comissão do Setor Comercial</div>
-      <div style="font-size:11px;color:var(--tw);margin-bottom:10px;">Calculada sobre o valor das taxas efetivamente pagas</div>
-      <div class="gr gr2">
-        <div class="fg"><label class="fl">Percentual de Comissão</label>
+      <div style="font-size:11px;color:var(--tw);margin-bottom:10px;">Comissões calculadas sobre os valores efetivamente pagos</div>
+      <div class="gr gr2" style="margin-bottom:10px;">
+        <div class="fg"><label class="fl">% Comissão sobre Taxas</label>
           <select class="fi" id="f-comissao-pct" onchange="calcComissao()">
             <option value="">Sem comissão</option>
             <option value="20">20%</option>
@@ -1257,8 +1408,22 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
             <option value="50">50%</option>
           </select>
         </div>
-        <div class="fg"><label class="fl">Comissão Calculada</label>
+        <div class="fg"><label class="fl">Comissão s/ Taxas (calculada)</label>
           <div class="fi" id="f-comissao-calc" style="background:rgba(0,0,0,.2);color:var(--ch);cursor:default;display:flex;align-items:center;">R$ 0,00</div>
+        </div>
+      </div>
+      <div class="gr gr2">
+        <div class="fg"><label class="fl">% Comissão sobre Honorários Iniciais</label>
+          <select class="fi" id="f-comissao-hon-pct" onchange="calcComissao()">
+            <option value="">Sem comissão</option>
+            <option value="20">20%</option>
+            <option value="30">30%</option>
+            <option value="40">40%</option>
+            <option value="50">50%</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Comissão s/ Honorários (calculada)</label>
+          <div class="fi" id="f-comissao-hon-calc" style="background:rgba(0,0,0,.2);color:var(--ch);cursor:default;display:flex;align-items:center;">R$ 0,00</div>
         </div>
       </div>
     </div>
@@ -1390,7 +1555,11 @@ var PARCEIROS = [];
 var INDICACOES = [];
 var PAD = [];
 var ATENDIMENTOS = [];
+var EQUIPE = [];
+var DESPESAS = [];
 var editId = null;
+var editEquipeId = null;
+var editDespesaId = null;
 var delId = null;
 var editPrazoId = null;
 var editParceiroId = null;
@@ -1406,6 +1575,7 @@ function saveDB() { }
 function mudarAba(id, btn) {
   document.querySelectorAll('.pg').forEach(function(p){ p.classList.remove('on'); });
   document.querySelectorAll('.aba').forEach(function(b){ b.classList.remove('on'); });
+  if (id === 'financeiro') { iniciarFinanceiro(); }
   document.getElementById('pg-'+id).classList.add('on');
   btn.classList.add('on');
   if (id === 'recebimentos') renderRecebimentos();
@@ -1415,7 +1585,6 @@ function mudarAba(id, btn) {
   if (id === 'parceiros') renderParceiros();
   if (id === 'pad') renderPAD();
   if (id === 'atendimentos') renderAtendimentos();
-  if (id === 'dejen') iniciarDEJEN();
 }
 
 // ========== MODAL ==========
@@ -1455,6 +1624,7 @@ function abrirModal(id) {
       document.getElementById('grp-exito-custom').style.display = 'none';
     }
     setVal('f-comissao-pct', c.comissaoPct || '');
+    setVal('f-comissao-hon-pct', c.comissaoHonPct || '');
     toggleProtocolado();
 
     // Taxa
@@ -1524,6 +1694,7 @@ function limparForm() {
   setVal('f-exito-pct','');
   setVal('f-exito-custom','');
   setVal('f-comissao-pct','');
+  setVal('f-comissao-hon-pct','');
   document.getElementById('grp-exito').style.display = 'none';
   document.getElementById('grp-exito-custom').style.display = 'none';
   document.getElementById('f-comissao-calc').textContent = 'R$ 0,00';
@@ -1570,27 +1741,47 @@ function toggleExito() {
   }
 }
 function calcComissao() {
-  var pct = parseInt(document.getElementById('f-comissao-pct').value) || 0;
-  if (!pct) { document.getElementById('f-comissao-calc').textContent = 'R$ 0,00'; return; }
-  // Calcular base: soma das taxas pagas (à vista paga, ou parcelas marcadas como pagas)
-  var base = 0;
+  // --- Comissão sobre Taxas ---
+  var pctTaxa = parseInt(document.getElementById('f-comissao-pct').value) || 0;
+  var baseTaxa = 0;
   if (document.getElementById('ck-taxa').checked) {
-    var mod = document.getElementById('f-taxa-mod').value;
-    var sit = document.getElementById('f-taxa-sit').value;
+    var modT = document.getElementById('f-taxa-mod').value;
+    var sitT = document.getElementById('f-taxa-sit').value;
     var valTaxa = parseMoeda(document.getElementById('f-taxa-val').value);
-    if (mod === 'avista') {
-      if (sit === 'sim') base += valTaxa;
+    if (modT === 'avista') {
+      if (sitT === 'sim') baseTaxa += valTaxa;
     } else {
-      var np = parseInt(document.getElementById('f-taxa-np').value) || 0;
-      var vUnit = np > 0 ? valTaxa / np : 0;
-      for (var i = 0; i < np; i++) {
-        var ck = document.getElementById('taxa-pg-'+i);
-        if (ck && ck.checked) base += vUnit;
+      var npT = parseInt(document.getElementById('f-taxa-np').value) || 0;
+      var vUnitT = npT > 0 ? valTaxa / npT : 0;
+      for (var i = 0; i < npT; i++) {
+        var ckT = document.getElementById('taxa-pg-'+i);
+        if (ckT && ckT.checked) baseTaxa += vUnitT;
       }
     }
   }
-  var comissao = base * pct / 100;
-  document.getElementById('f-comissao-calc').textContent = 'R$ ' + fmtVal(comissao);
+  var comissaoTaxa = baseTaxa * pctTaxa / 100;
+  document.getElementById('f-comissao-calc').textContent = 'R$ ' + fmtVal(comissaoTaxa);
+
+  // --- Comissão sobre Honorários Iniciais ---
+  var pctHon = parseInt(document.getElementById('f-comissao-hon-pct').value) || 0;
+  var baseHon = 0;
+  if (document.getElementById('ck-hon').checked) {
+    var modH = document.getElementById('f-hon-mod').value;
+    var sitH = document.getElementById('f-hon-sit').value;
+    var valHon = parseMoeda(document.getElementById('f-hon-val').value);
+    if (modH === 'avista') {
+      if (sitH === 'sim') baseHon += valHon;
+    } else {
+      var npH = parseInt(document.getElementById('f-hon-np').value) || 0;
+      var vUnitH = npH > 0 ? valHon / npH : 0;
+      for (var j = 0; j < npH; j++) {
+        var ckH = document.getElementById('hon-pg-'+j);
+        if (ckH && ckH.checked) baseHon += vUnitH;
+      }
+    }
+  }
+  var comissaoHon = baseHon * pctHon / 100;
+  document.getElementById('f-comissao-hon-calc').textContent = 'R$ ' + fmtVal(comissaoHon);
 }
 
 // ========== PARCELAS ==========
@@ -1695,6 +1886,7 @@ function salvar() {
     pagamento: getVal('f-pagamento'),
     exitoPct: getVal('f-exito-pct') === 'outro' ? getVal('f-exito-custom') : getVal('f-exito-pct'),
     comissaoPct: getVal('f-comissao-pct'),
+    comissaoHonPct: getVal('f-comissao-hon-pct'),
     email: getVal('f-email'), whats: getVal('f-whats'),
     cpf: getVal('f-cpf'), orgao: getVal('f-orgao'),
     taxa: taxa, hon: hon
@@ -2240,7 +2432,7 @@ function renderRelatorios() {
   } else { htmlHon = '<tr><td colspan="6" class="rel-vazio">Nenhum honorário recebido em '+periodoLabel+'</td></tr>'; }
   document.getElementById('rel-tbody-hon').innerHTML = htmlHon;
 
-  // ---- COMISSÕES ----
+  // ---- COMISSÕES SOBRE TAXAS ----
   var htmlCom = '';
   var registrosCom = [];
 
@@ -2258,11 +2450,31 @@ function renderRelatorios() {
     }
 
     if (basePaga > 0) {
-      registrosCom.push({ nome:c.nome, tipo:c.tipo, base:basePaga, pct:comPct, com:basePaga*comPct/100 });
+      registrosCom.push({ nome:c.nome, tipo:c.tipo, base:basePaga, pct:comPct, com:basePaga*comPct/100, nat:'Taxa' });
     }
   });
 
-  document.getElementById('rc-com').textContent = 'R$ ' + fmtVal(totalComissoes);
+  // ---- COMISSÕES SOBRE HONORÁRIOS ----
+  DB.forEach(function(c) {
+    if (!c.hon || !c.comissaoHonPct) return;
+    var comHonPct = parseInt(c.comissaoHonPct);
+    var baseHonPaga = 0;
+
+    if (c.hon.mod === 'avista') {
+      if (c.hon.pago && pertencePeriodo(c.data, mes, ano, modo)) baseHonPaga = parseMoeda(c.hon.valor);
+    } else {
+      var ps = c.hon.parcelas || [];
+      var vUnit = ps.length > 0 ? parseMoeda(c.hon.valor) / ps.length : 0;
+      ps.forEach(function(p) { if (p.pago && pertencePeriodo(p.data, mes, ano, modo)) baseHonPaga += vUnit; });
+    }
+
+    if (baseHonPaga > 0) {
+      registrosCom.push({ nome:c.nome, tipo:c.tipo, base:baseHonPaga, pct:comHonPct, com:baseHonPaga*comHonPct/100, nat:'Honorários' });
+    }
+  });
+
+  var totalComissoesFinal = registrosCom.reduce(function(s,r){ return s+r.com; },0);
+  document.getElementById('rc-com').textContent = 'R$ ' + fmtVal(totalComissoesFinal);
   document.getElementById('rc-com-s').textContent = periodoLabel;
 
   if (registrosCom.length) {
@@ -2270,14 +2482,14 @@ function renderRelatorios() {
       htmlCom += '<tr>' +
         '<td style="font-weight:600;color:var(--tp)">'+esc(r.nome)+'</td>' +
         '<td><span class="bgt">'+esc(r.tipo||'')+'</span></td>' +
+        '<td style="color:var(--tw);font-size:11px">'+esc(r.nat)+'</td>' +
         '<td style="color:var(--ch);font-weight:600">R$ '+fmtVal(r.base)+'</td>' +
         '<td style="color:var(--tw)">'+r.pct+'%</td>' +
         '<td style="color:#e89090;font-weight:600">R$ '+fmtVal(r.com)+'</td>' +
       '</tr>';
     });
-    var totalCom = registrosCom.reduce(function(s,r){ return s+r.com; },0);
-    htmlCom += '<tr style="background:rgba(139,58,58,.1)"><td colspan="4" style="text-align:right;font-size:10px;color:#e89090;letter-spacing:.5px;">TOTAL COMISSÕES</td><td style="font-weight:600;color:#e89090">R$ '+fmtVal(totalCom)+'</td></tr>';
-  } else { htmlCom = '<tr><td colspan="5" class="rel-vazio">Nenhuma comissão devida em '+periodoLabel+'</td></tr>'; }
+    htmlCom += '<tr style="background:rgba(139,58,58,.1)"><td colspan="5" style="text-align:right;font-size:10px;color:#e89090;letter-spacing:.5px;">TOTAL COMISSÕES</td><td style="font-weight:600;color:#e89090">R$ '+fmtVal(totalComissoesFinal)+'</td></tr>';
+  } else { htmlCom = '<tr><td colspan="6" class="rel-vazio">Nenhuma comissão devida em '+periodoLabel+'</td></tr>'; }
   document.getElementById('rel-tbody-com').innerHTML = htmlCom;
 }
 
@@ -2982,645 +3194,346 @@ function exportAtendCSV() {
   toast('✓ CSV exportado');
 }
 
-// ========== DEJEN + GOOGLE CALENDAR ==========
-// OAB/SP: 378.037 | Advogada: Débora Ewenne Santos da Silva
 
-var DEJEN_OAB        = '378037';
-var DEJEN_OAB_UF     = 'SP';
-var DEJEN_NOME       = 'Debora Ewenne Santos da Silva';
-var DEJEN_NOME_ALT   = 'Débora Ewenne Santos da Silva';
-var DEJEN_BASE_URL   = 'https://comunicaapi.pje.jus.br';
-var DEJEN_HISTORICO      = [];
-var DEJEN_COMUNICACOES   = [];
-var DEJEN_TRIBUNAIS      = [];
-var DEJEN_EM_CONSULTA    = false;
-var DEJEN_AGENDADOS      = {}; // hash -> eventId
-var _dejenLog = '';
-
-// ---- Google OAuth (Calendar API) ----
-// Client ID do projeto Google Cloud — uso pessoal/escritório
-// IMPORTANTE: registre https://advdeboraconstantino.github.io como origem autorizada no Console Google Cloud
-var GCAL_CLIENT_ID  = '1056658250886-jmu8ldvb00p2rojtp860sc17se5iblu2.apps.googleusercontent.com';
-var GCAL_SCOPES     = 'https://www.googleapis.com/auth/calendar.events';
-var GCAL_TOKEN      = null; // access_token obtido via OAuth
-var GCAL_TOKEN_EXPIRY = 0;
-
-// ---- Mapeamento: tipo de comunicação → peça jurídica sugerida ----
-var MAPA_PECAS = [
-  { palavras: ['contestação','citar','citação','citado'],        peca: 'Contestação',         prazo: 15, descr: 'Apresentar contestação com todos os fundamentos de defesa.' },
-  { palavras: ['contrarrazões','contrarrazo','recurso da parte contrária'], peca: 'Contrarrazões',     prazo: 15, descr: 'Apresentar contrarrazões ao recurso interposto pela parte adversa.' },
-  { palavras: ['apelação','apelaç','apelado'],                   peca: 'Contrarrazões de Apelação', prazo: 15, descr: 'Apresentar contrarrazões à apelação nos autos.' },
-  { palavras: ['agravo','agravado','agravante'],                 peca: 'Resposta ao Agravo',   prazo: 15, descr: 'Apresentar resposta/contrarrazões ao agravo interposto.' },
-  { palavras: ['recurso','recorrer','recorrente'],               peca: 'Recurso',              prazo: 15, descr: 'Interpor recurso cabível contra a decisão.' },
-  { palavras: ['embargos de declaração','embargos decl'],       peca: 'Embargos de Declaração', prazo: 5, descr: 'Opor embargos de declaração para sanar omissão, contradição ou obscuridade.' },
-  { palavras: ['manifestação','manifeste','se manifestar','impugn'], peca: 'Manifestação/Impugnação', prazo: 15, descr: 'Apresentar manifestação nos autos sobre o ato intimado.' },
-  { palavras: ['réplica','impugnar a contestação'],              peca: 'Réplica',              prazo: 15, descr: 'Apresentar réplica à contestação apresentada pela parte contrária.' },
-  { palavras: ['audiência','designada','marcada','sessão de julgamento'], peca: 'Preparação para Audiência', prazo: 0, descr: 'Preparar memoriais, documentos e estratégia para a audiência/sessão.' },
-  { palavras: ['sentença','julgado','extinto','procedente','improcedente'], peca: 'Análise da Sentença / Recurso', prazo: 15, descr: 'Analisar a sentença e avaliar interposição de apelação ou embargos.' },
-  { palavras: ['despacho','providência','diligência','regularize'], peca: 'Petição de Cumprimento de Diligência', prazo: 5, descr: 'Apresentar petição cumprindo o despacho ou diligência determinada.' },
-  { palavras: ['inicial','petição inicial','distribuição'],      peca: 'Análise da Petição Inicial', prazo: 15, descr: 'Analisar a petição inicial distribuída contra o cliente.' },
-  { palavras: ['memorial','memoriais'],                          peca: 'Memoriais',            prazo: 10, descr: 'Apresentar memoriais finais reforçando a tese defensiva.' },
-  { palavras: ['execução','cumprimento de sentença','penhora'],  peca: 'Impugnação ao Cumprimento / Embargos à Execução', prazo: 15, descr: 'Impugnar o cumprimento de sentença ou opor embargos à execução.' },
-  { palavras: ['pad','processo administrativo','sindicância','comissão processante'], peca: 'Defesa Administrativa (PAD)', prazo: 10, descr: 'Elaborar defesa administrativa robusta no PAD/sindicância — tese de nulidade, proporcionalidade e contraditório.' },
-  { palavras: ['liminar','tutela','antecipada','urgência','cautelar'], peca: 'Petição de Tutela de Urgência', prazo: 5, descr: 'Requerer tutela de urgência/liminar para suspensão do ato impugnado.' },
-  { palavras: ['recurso administrativo','reconsideração'],       peca: 'Recurso Administrativo', prazo: 15, descr: 'Interpor recurso administrativo contra decisão desfavorável.' },
-];
-
-function sugerirPeca(texto, tipo) {
-  var t = ((texto || '') + ' ' + (tipo || '')).toLowerCase();
-  for (var i = 0; i < MAPA_PECAS.length; i++) {
-    var m = MAPA_PECAS[i];
-    for (var j = 0; j < m.palavras.length; j++) {
-      if (t.indexOf(m.palavras[j]) >= 0) return m;
-    }
-  }
-  return { peca: 'Manifestação / Petição', prazo: 15, descr: 'Verificar o teor da intimação e adotar as medidas processuais cabíveis no prazo legal.' };
-}
-
-function calcDataVencimento(dataPublicacao, prazoEmDias) {
-  if (!dataPublicacao) return null;
-  var d = new Date(dataPublicacao.split('T')[0] + 'T12:00:00');
-  d.setDate(d.getDate() + (prazoEmDias || 15));
-  return d;
-}
-
-function calcDataEvento(dataVencimento) {
-  // 2 dias antes do vencimento
-  var d = new Date(dataVencimento);
-  d.setDate(d.getDate() - 2);
-  return d;
-}
-
-function formatDateISO(d) {
-  return d.toISOString().split('T')[0];
-}
-
-// ---- LOG ----
-function logDejen(msg, tipo) {
-  var agora = new Date().toLocaleTimeString('pt-BR');
-  var prefix = tipo==='ok' ? '✅' : tipo==='err' ? '❌' : tipo==='warn' ? '⚠️' : 'ℹ️';
-  _dejenLog += '[' + agora + '] ' + prefix + ' ' + msg + '\n';
-  var el = document.getElementById('dj-log');
-  if (el) { el.textContent = _dejenLog; el.scrollTop = 9999; }
-}
-
-function setDejenStatus(txt, cor) {
-  var el = document.getElementById('dejen-status');
-  if (el) { el.textContent = txt; el.style.color = cor || 'var(--tw)'; }
-}
-
-// ---- INICIALIZAR (ao entrar na aba) ----
-function iniciarDEJEN() {
-  try {
-    var h = localStorage.getItem('dejen_historico_378037');
-    if (h) DEJEN_HISTORICO = JSON.parse(h);
-    var c = localStorage.getItem('dejen_comunicacoes_378037');
-    if (c) { DEJEN_COMUNICACOES = JSON.parse(c); renderDEJEN(); }
-    var t = localStorage.getItem('dejen_ultima_378037');
-    if (t) document.getElementById('dj-ultima').textContent = t;
-    var ag = localStorage.getItem('dejen_agendados_378037');
-    if (ag) DEJEN_AGENDADOS = JSON.parse(ag);
-    var agCount = Object.keys(DEJEN_AGENDADOS).length;
-    document.getElementById('dj-agendados').textContent = agCount;
-    // Verificar token salvo
-    var tok = localStorage.getItem('gcal_token_378037');
-    var exp = parseInt(localStorage.getItem('gcal_token_exp_378037') || '0');
-    if (tok && Date.now() < exp) {
-      GCAL_TOKEN = tok;
-      GCAL_TOKEN_EXPIRY = exp;
-      atualizarStatusCalendar(true);
-    }
-  } catch(e) {}
-}
-
-// ---- GOOGLE CALENDAR OAUTH ----
-function autorizarGoogleCalendar() {
-  if (!GCAL_CLIENT_ID) {
-    // Modo sem Client ID: usar link direto ao Google Calendar
-    toast('⚠️ Para integração automática, configure o Client ID do Google Cloud no código. Por ora, use o botão "Abrir no Google Agenda" em cada comunicação.', true);
-    return;
-  }
-  var redirectUri = encodeURIComponent(window.location.origin + window.location.pathname);
-  var url = 'https://accounts.google.com/o/oauth2/v2/auth' +
-    '?client_id=' + encodeURIComponent(GCAL_CLIENT_ID) +
-    '&redirect_uri=' + redirectUri +
-    '&response_type=token' +
-    '&scope=' + encodeURIComponent(GCAL_SCOPES) +
-    '&prompt=consent';
-  window.open(url, '_blank', 'width=500,height=600');
-}
-
-// Capturar token do hash da URL (retorno OAuth)
-(function capturarTokenOAuth() {
-  var hash = window.location.hash;
-  if (hash && hash.indexOf('access_token') >= 0) {
-    var params = {};
-    hash.substring(1).split('&').forEach(function(p) {
-      var kv = p.split('=');
-      params[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || '');
+// ========== GESTÃO FINANCEIRA ==========
+function iniciarFinanceiro() {
+  var anoAtual = new Date().getFullYear();
+  var anos = [anoAtual, anoAtual-1, anoAtual-2];
+  var selAno = document.getElementById('fin-ano');
+  if (selAno && !selAno.children.length) {
+    anos.forEach(function(a) {
+      var o = document.createElement('option');
+      o.value = a; o.textContent = a;
+      if (a === anoAtual) o.selected = true;
+      selAno.appendChild(o);
     });
-    if (params.access_token) {
-      GCAL_TOKEN = params.access_token;
-      var expiresIn = parseInt(params.expires_in || '3600') * 1000;
-      GCAL_TOKEN_EXPIRY = Date.now() + expiresIn;
-      try {
-        localStorage.setItem('gcal_token_378037', GCAL_TOKEN);
-        localStorage.setItem('gcal_token_exp_378037', String(GCAL_TOKEN_EXPIRY));
-      } catch(e) {}
-      history.replaceState(null, '', window.location.pathname);
-      atualizarStatusCalendar(true);
-      toast('✓ Google Agenda conectado com sucesso!');
-    }
   }
-})();
-
-function atualizarStatusCalendar(conectado) {
-  var el = document.getElementById('gcal-status');
-  var btn = document.getElementById('btn-gcal-auth');
-  if (conectado) {
-    if (el) { el.textContent = '📅 Agenda: conectada'; el.style.color = '#7ec492'; }
-    if (btn) { btn.textContent = '✓ Agenda conectada'; btn.style.opacity = '0.6'; }
-  } else {
-    if (el) { el.textContent = '📅 Agenda: desconectada'; el.style.color = 'var(--tw)'; }
-    if (btn) { btn.textContent = '🔐 Conectar Agenda'; btn.style.opacity = '1'; }
-  }
+  document.getElementById('fin-mes').value = new Date().getMonth() + 1;
+  renderFinanceiro();
 }
 
-function gcalConectado() {
-  return GCAL_TOKEN && Date.now() < GCAL_TOKEN_EXPIRY;
-}
+function renderFinanceiro() {
+  var mes = parseInt(document.getElementById('fin-mes').value);
+  var ano = parseInt(document.getElementById('fin-ano').value);
+  var meses = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var periodoLabel = meses[mes] + '/' + ano;
 
-// ---- CRIAR EVENTO NO GOOGLE CALENDAR ----
-async function criarEventoCalendar(comm) {
-  var texto  = comm.texto || comm.conteudo || comm.resumo || '';
-  var tipo   = comm.tipoComunicacao || comm.tipo || '';
-  var proc   = comm.numeroProcesso || comm.numero || comm.nup || '—';
-  var trib   = comm.tribunal || comm.siglaOrgao || comm.orgaoJulgador || '—';
-  var dataComm = comm.dataComunicacao || comm.dataPublicacao || comm.dataDisponibilizacao || '';
-  if (dataComm && dataComm.includes('T')) dataComm = dataComm.split('T')[0];
+  // ---- RESULTADO DO MÊS ----
+  // Contratos fechados no período
+  var contratos = DB.filter(function(c) { return pertencePeriodo(c.data, mes, ano, 'mes'); }).length;
+  setTxt('fin-r-contratos', contratos);
 
-  var sugestao = sugerirPeca(texto, tipo);
-  var dataVenc = calcDataVencimento(dataComm, sugestao.prazo);
-  if (!dataVenc) { logDejen('Sem data de comunicação para: ' + proc, 'warn'); return null; }
-  var dataEvt  = calcDataEvento(dataVenc);
-
-  // Descrição detalhada
-  var descricao =
-    '⚖️ GESTÃO JURÍDICA — DÉBORA CONSTANTINO\n' +
-    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' +
-    '📋 PEÇA JURÍDICA SUGERIDA:\n' +
-    sugestao.peca.toUpperCase() + '\n\n' +
-    '📌 ORIENTAÇÃO:\n' + sugestao.descr + '\n\n' +
-    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
-    '🔢 Processo: ' + proc + '\n' +
-    '🏛️ Tribunal/Órgão: ' + trib + '\n' +
-    '📅 Data da Publicação: ' + (dataComm || '—') + '\n' +
-    '⏰ Prazo: ' + sugestao.prazo + ' dias úteis\n' +
-    '📆 Vencimento estimado: ' + dataVenc.toLocaleDateString('pt-BR') + '\n' +
-    '🔔 ESTE EVENTO: 2 dias antes do vencimento\n\n' +
-    (texto ? '📝 Resumo da publicação:\n' + texto.substring(0, 500) + (texto.length > 500 ? '...' : '') + '\n\n' : '') +
-    '─────────────────────────────────\n' +
-    'OAB/SP 378.037 | Sistema de Gestão Jurídica';
-
-  var titulo = '⚖️ ' + sugestao.peca + ' — Proc. ' + proc.substring(0, 25) + (proc.length > 25 ? '...' : '') + ' [' + trib + ']';
-
-  var evento = {
-    summary: titulo,
-    description: descricao,
-    start: { date: formatDateISO(dataEvt) },
-    end:   { date: formatDateISO(dataEvt) },
-    reminders: {
-      useDefault: false,
-      overrides: [
-        { method: 'popup',  minutes: 480 },  // 8h antes (início do dia)
-        { method: 'popup',  minutes: 60  },   // 1h antes
-        { method: 'email',  minutes: 1440 }   // 1 dia antes (e-mail)
-      ]
-    },
-    colorId: sugestao.prazo <= 5 ? '11' : '9'  // 11=vermelho urgente, 9=azul
-  };
-
-  if (gcalConectado()) {
-    // Criar via API
-    try {
-      var resp = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Bearer ' + GCAL_TOKEN,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(evento)
-      });
-      if (resp.ok) {
-        var data = await resp.json();
-        logDejen('Evento criado: "' + titulo + '" em ' + formatDateISO(dataEvt), 'ok');
-        return data.id || 'criado';
+  // Total recebido (taxas + honorários pagos)
+  var totalRecebido = 0;
+  DB.forEach(function(c) {
+    ['taxa','hon'].forEach(function(tp) {
+      if (!c[tp]) return;
+      if (c[tp].mod === 'avista') {
+        if (c[tp].pago && pertencePeriodo(c.data, mes, ano, 'mes')) totalRecebido += parseMoeda(c[tp].valor);
       } else {
-        var err = await resp.json().catch(function(){ return {}; });
-        if (resp.status === 401) { GCAL_TOKEN = null; atualizarStatusCalendar(false); }
-        logDejen('Erro ao criar evento: HTTP ' + resp.status + ' — ' + (err.error && err.error.message ? err.error.message : ''), 'err');
-        return null;
+        var ps = c[tp].parcelas || [];
+        var vUnit = ps.length > 0 ? parseMoeda(c[tp].valor) / ps.length : 0;
+        ps.forEach(function(p) { if (p.pago && pertencePeriodo(p.data, mes, ano, 'mes')) totalRecebido += vUnit; });
       }
-    } catch(e) {
-      logDejen('Erro API Calendar: ' + e.message, 'err');
-      return null;
-    }
-  } else {
-    // Fallback: abrir Google Calendar no navegador com evento pré-preenchido
-    var dtStart = formatDateISO(dataEvt).replace(/-/g,'');
-    var gcalUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE' +
-      '&text=' + encodeURIComponent(titulo) +
-      '&dates=' + dtStart + '/' + dtStart +
-      '&details=' + encodeURIComponent(descricao.substring(0, 1500));
-    window.open(gcalUrl, '_blank');
-    logDejen('Evento aberto no Google Agenda (modo manual): ' + proc, 'ok');
-    return 'manual';
-  }
-}
-
-// ---- AGENDAR UMA COMUNICAÇÃO ----
-async function agendarComunicacao(idx) {
-  var comm = DEJEN_COMUNICACOES[idx];
-  if (!comm) return;
-  var chave = comm._chave || comm._hashId || idx;
-
-  if (DEJEN_AGENDADOS[chave]) {
-    if (!confirm('Este prazo já foi agendado. Criar outro evento mesmo assim?')) return;
-  }
-
-  var btn = document.getElementById('btn-ag-' + idx);
-  if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
-
-  var eventId = await criarEventoCalendar(comm);
-
-  if (eventId) {
-    DEJEN_AGENDADOS[chave] = eventId;
-    try { localStorage.setItem('dejen_agendados_378037', JSON.stringify(DEJEN_AGENDADOS)); } catch(e) {}
-    document.getElementById('dj-agendados').textContent = Object.keys(DEJEN_AGENDADOS).length;
-    comm._agendado = true;
-    if (btn) { btn.textContent = '✓ Agendado'; btn.style.color = '#7ec492'; btn.disabled = false; }
-    if (gcalConectado()) toast('✓ Evento criado no Google Agenda!');
-  } else {
-    if (btn) { btn.textContent = '📅 Agendar'; btn.disabled = false; }
-    toast('Falha ao criar evento. Veja o log.', true);
-  }
-}
-
-// ---- AGENDAR TODAS AS NOVIDADES ----
-async function agendarTodasNovidades() {
-  var novas = DEJEN_COMUNICACOES.filter(function(c) { return c._status === 'novo' && !c._agendado; });
-  if (!novas.length) { toast('Nenhuma novidade para agendar.', true); return; }
-
-  if (!gcalConectado() && !GCAL_CLIENT_ID) {
-    if (!confirm('Google Agenda não conectada. Deseja abrir ' + novas.length + ' evento(s) manualmente no navegador?')) return;
-  }
-
-  var btn = document.getElementById('btn-agendar-todas');
-  btn.disabled = true; btn.textContent = '⏳ Agendando...';
-  logDejen('Iniciando agendamento de ' + novas.length + ' comunicação(ões)...');
-
-  var sucesso = 0;
-  for (var i = 0; i < novas.length; i++) {
-    var comm = novas[i];
-    var chave = comm._chave || comm._hashId || i;
-    var eventId = await criarEventoCalendar(comm);
-    if (eventId) {
-      DEJEN_AGENDADOS[chave] = eventId;
-      comm._agendado = true;
-      sucesso++;
-    }
-    await new Promise(function(r){ setTimeout(r, 300); }); // evitar rate limit
-  }
-
-  try { localStorage.setItem('dejen_agendados_378037', JSON.stringify(DEJEN_AGENDADOS)); } catch(e) {}
-  document.getElementById('dj-agendados').textContent = Object.keys(DEJEN_AGENDADOS).length;
-  renderDEJEN();
-  btn.disabled = false; btn.textContent = '📅 Agendar Todas as Novidades';
-  toast('✓ ' + sucesso + ' de ' + novas.length + ' evento(s) agendado(s).');
-  logDejen('Agendamento concluído: ' + sucesso + '/' + novas.length, 'ok');
-}
-
-// ---- CONSULTAR DEJEN ----
-async function consultarDEJEN() {
-  if (DEJEN_EM_CONSULTA) { toast('Consulta em andamento...', true); return; }
-  DEJEN_EM_CONSULTA = true;
-  _dejenLog = '';
-  document.getElementById('dj-log').style.display = 'block';
-  document.getElementById('dj-log').textContent = '';
-  var btnConsultar = document.getElementById('btn-dejen-consultar');
-  btnConsultar.disabled = true; btnConsultar.textContent = '⏳ Consultando...';
-  setDejenStatus('🟡 Consultando DEJEN...', '#D4B84A');
-
-  logDejen('=== INÍCIO DA CONSULTA DEJEN ===');
-  logDejen('Advogada: ' + DEJEN_NOME_ALT + ' | OAB/SP: ' + DEJEN_OAB);
-
-  try {
-    logDejen('--- Etapa 1: Tribunais ---');
-    var tribunais = await consultarTribunaisDEJEN();
-
-    logDejen('--- Etapa 2: Busca por OAB ---');
-    var todasComm = [];
-    var r1 = await consultarComunicacoesDEJEN({ oab: DEJEN_OAB, oabUF: DEJEN_OAB_UF });
-    if (r1 && r1.length) { logDejen('OAB: ' + r1.length + ' resultado(s)', 'ok'); todasComm = todasComm.concat(r1); }
-    else logDejen('OAB: sem resultados', 'warn');
-
-    logDejen('--- Etapa 3: Busca por nome ---');
-    var r2 = await consultarComunicacoesDEJEN({ nome: DEJEN_NOME });
-    if (r2 && r2.length) {
-      r2.forEach(function(r) { if (!todasComm.find(function(x){ return x._hashId === r._hashId; })) todasComm.push(r); });
-      logDejen('Nome: +' + r2.length + ' resultado(s)', 'ok');
-    }
-
-    logDejen('Total único: ' + todasComm.length, todasComm.length ? 'ok' : 'warn');
-
-    logDejen('--- Etapa 4: Certidões ---');
-    var certCount = 0;
-    for (var i = 0; i < Math.min(todasComm.length, 20); i++) {
-      var comm = todasComm[i];
-      var hash = comm.hash || comm.hashComunicacao || comm.idHash || comm.id || null;
-      if (hash) {
-        var cert = await consultarCertidaoDEJEN(hash);
-        if (cert) { comm._certidao = cert; comm._certidaoStatus = 'Obtida'; certCount++; logDejen('Certidão: ' + hash.toString().substring(0,20) + '...', 'ok'); }
-        else comm._certidaoStatus = 'Indisponível';
-      } else { comm._certidaoStatus = 'Hash ausente'; }
-    }
-
-    logDejen('--- Etapa 5: Comparar com histórico e sugerir peças ---');
-    var novas = 0;
-    todasComm.forEach(function(c) {
-      var chave = c._hashId || c.hash || c.id || c.numeroProcesso || '';
-      c._status = DEJEN_HISTORICO.indexOf(chave) >= 0 ? 'reportado' : 'novo';
-      c._chave  = chave;
-      c._agendado = !!DEJEN_AGENDADOS[chave];
-      if (c._status === 'novo') novas++;
-      // Sugestão de peça
-      var s = sugerirPeca(c.texto || c.conteudo || c.resumo || '', c.tipoComunicacao || c.tipo || '');
-      c._pecaSugerida = s.peca;
-      c._prazoSugerido = s.prazo;
-      c._pecaDescr    = s.descr;
-      // Data de vencimento
-      var dataC = c.dataComunicacao || c.dataPublicacao || c.dataDisponibilizacao || '';
-      if (dataC && dataC.includes('T')) dataC = dataC.split('T')[0];
-      c._dataCommFmt = dataC;
-      if (dataC) {
-        var dv = calcDataVencimento(dataC, s.prazo);
-        c._dataVenc = dv ? dv.toLocaleDateString('pt-BR') : '—';
-        var de = dv ? calcDataEvento(dv) : null;
-        c._dataEvento = de ? de.toLocaleDateString('pt-BR') : '—';
-      } else { c._dataVenc = '—'; c._dataEvento = '—'; }
     });
+  });
+  setTxt('fin-r-recebido', 'R$ ' + fmtVal(totalRecebido));
 
-    // Atualizar histórico
-    todasComm.forEach(function(c) { if (c._chave && DEJEN_HISTORICO.indexOf(c._chave) < 0) DEJEN_HISTORICO.push(c._chave); });
-    DEJEN_COMUNICACOES = todasComm;
+  // ---- EQUIPE ----
+  var totalEquipe = 0;
+  var equipeHtml = '';
+  if (!(EQUIPE||[]).length) {
+    equipeHtml = '<div class="rel-vazio" style="padding:20px;text-align:center;color:var(--tw);">Nenhum colaborador cadastrado. Clique em "+ Colaborador" para adicionar.</div>';
+    document.getElementById('fin-equipe-total').style.display = 'none';
+  } else {
+    EQUIPE.forEach(function(e) {
+      // Comissão sobre taxas do período para este colaborador
+      var comTaxa = 0, comHon = 0;
+      if (e.comTaxa) {
+        var pctT = parseInt(e.comTaxa);
+        DB.forEach(function(c) {
+          if (!c.taxa) return;
+          if (c.taxa.mod === 'avista') {
+            if (c.taxa.pago && pertencePeriodo(c.data, mes, ano, 'mes')) comTaxa += parseMoeda(c.taxa.valor) * pctT / 100;
+          } else {
+            var ps = c.taxa.parcelas||[]; var vU = ps.length>0?parseMoeda(c.taxa.valor)/ps.length:0;
+            ps.forEach(function(p){ if(p.pago&&pertencePeriodo(p.data,mes,ano,'mes')) comTaxa+=vU*pctT/100; });
+          }
+        });
+      }
+      if (e.comHon) {
+        var pctH = parseInt(e.comHon);
+        DB.forEach(function(c) {
+          if (!c.hon) return;
+          if (c.hon.mod === 'avista') {
+            if (c.hon.pago && pertencePeriodo(c.data, mes, ano, 'mes')) comHon += parseMoeda(c.hon.valor) * pctH / 100;
+          } else {
+            var ps = c.hon.parcelas||[]; var vU = ps.length>0?parseMoeda(c.hon.valor)/ps.length:0;
+            ps.forEach(function(p){ if(p.pago&&pertencePeriodo(p.data,mes,ano,'mes')) comHon+=vU*pctH/100; });
+          }
+        });
+      }
+      var salario = parseMoeda(e.salario);
+      var ajuda = parseMoeda(e.ajuda);
+      var totalColab = salario + ajuda + comTaxa + comHon;
+      totalEquipe += totalColab;
 
-    try {
-      localStorage.setItem('dejen_historico_378037', JSON.stringify(DEJEN_HISTORICO));
-      localStorage.setItem('dejen_comunicacoes_378037', JSON.stringify(DEJEN_COMUNICACOES));
-      var agora = new Date().toLocaleString('pt-BR');
-      localStorage.setItem('dejen_ultima_378037', agora);
-      document.getElementById('dj-ultima').textContent = agora;
-    } catch(e) {}
-
-    if (tribunais.length) atualizarFiltroTribunaisDEJEN(tribunais);
-
-    document.getElementById('dj-total').textContent = todasComm.length;
-    document.getElementById('dj-novas').textContent = novas;
-    document.getElementById('dj-certidoes').textContent = certCount;
-    document.getElementById('dj-tribunais').textContent = DEJEN_TRIBUNAIS.length;
-
-    if (novas > 0) { document.getElementById('badge-dejen').style.display='inline'; document.getElementById('badge-dejen').textContent=novas; }
-
-    renderDEJEN();
-    logDejen('=== CONSULTA CONCLUÍDA: ' + todasComm.length + ' comm. | ' + novas + ' novas | ' + certCount + ' certidões ===', 'ok');
-    setDejenStatus('🟢 Concluída — ' + todasComm.length + ' comunicação(ões)', '#7ec492');
-    if (!todasComm.length) toast('Nenhuma comunicação localizada. Veja o log para detalhes.', true);
-    else toast('✓ DEJEN: ' + todasComm.length + ' comunicação(ões) — ' + novas + ' nova(s)');
-
-  } catch(e) {
-    logDejen('ERRO CRÍTICO: ' + e.message, 'err');
-    setDejenStatus('🔴 Erro na consulta', 'var(--rc)');
-    toast('Erro ao consultar DEJEN: ' + e.message, true);
-  } finally {
-    DEJEN_EM_CONSULTA = false;
-    btnConsultar.disabled = false; btnConsultar.textContent = '🔍 Consultar DEJEN';
+      equipeHtml += '<div class="fin-sub-card">' +
+        '<div class="fin-sub-card-hdr">' +
+          '<div><div class="fin-sub-card-nome">'+esc(e.nome)+'</div>' +
+          (e.cargo?'<div class="fin-sub-card-cargo">'+esc(e.cargo)+'</div>':'') +
+          '</div>' +
+          '<div style="display:flex;gap:6px;">' +
+            '<button class="btn-ic" onclick="abrirModalEquipe(''+e.id+'')" title="Editar">✏️</button>' +
+            '<button class="btn-ic x" onclick="excluirEquipe(''+e.id+'')" title="Excluir">🗑️</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="fin-grid">' +
+          '<div class="fin-item"><div class="lbl">Salário Fixo</div><div class="val">R$ '+fmtVal(salario)+'</div></div>' +
+          '<div class="fin-item"><div class="lbl">Ajuda de Custo</div><div class="val">R$ '+fmtVal(ajuda)+'</div></div>' +
+          '<div class="fin-item"><div class="lbl">Comissão s/ Taxas '+(e.comTaxa?'('+e.comTaxa+'%)'):'')+'</div><div class="val gasto">R$ '+fmtVal(comTaxa)+'</div></div>' +
+          '<div class="fin-item"><div class="lbl">Comissão s/ Honorários '+(e.comHon?'('+e.comHon+'%)'):'')+'</div><div class="val gasto">R$ '+fmtVal(comHon)+'</div></div>' +
+          '<div class="fin-item"><div class="lbl">Total '+periodoLabel+'</div><div class="val destaque">R$ '+fmtVal(totalColab)+'</div></div>' +
+        '</div>' +
+      '</div>';
+    });
+    document.getElementById('fin-equipe-total').style.display = 'flex';
+    setTxt('fin-equipe-total-val', 'R$ ' + fmtVal(totalEquipe));
   }
-}
+  document.getElementById('fin-equipe-lista').innerHTML = equipeHtml;
 
-async function consultarTribunaisDEJEN() {
-  try {
-    logDejen('GET ' + DEJEN_BASE_URL + '/api/v1/comunicacao/tribunal');
-    var resp = await fetch(DEJEN_BASE_URL + '/api/v1/comunicacao/tribunal', { headers: { 'Accept': 'application/json' } });
-    logDejen('HTTP ' + resp.status);
-    if (!resp.ok) { logDejen('Tribunais: HTTP ' + resp.status, 'err'); return []; }
-    var data = await resp.json();
-    var lista = Array.isArray(data) ? data : (data.conteudo || data.data || data.tribunais || []);
-    DEJEN_TRIBUNAIS = lista;
-    logDejen(lista.length + ' tribunal(is) carregado(s)', 'ok');
-    return lista;
-  } catch(e) { logDejen('Tribunais: ' + e.message, 'err'); return []; }
-}
+  // ---- DESPESAS FIXAS ----
+  var despFixas = (DESPESAS||[]).filter(function(d) { return d.tipo === 'fixa' && parseInt(d.mes) === mes && parseInt(d.ano) === ano; });
+  var totalFixas = despFixas.reduce(function(s,d){ return s + parseMoeda(d.valor); }, 0);
+  var fixasHtml = '';
+  if (!despFixas.length) {
+    fixasHtml = '<div class="rel-vazio" style="padding:20px;text-align:center;color:var(--tw);">Nenhuma despesa fixa em '+periodoLabel+'. Clique em "+ Despesa Fixa" para adicionar.</div>';
+    document.getElementById('fin-despesas-fixas-total').style.display = 'none';
+  } else {
+    fixasHtml = '<div class="tbl-box"><div class="tbl-sc"><table><thead><tr><th>Descrição</th><th>Categoria</th><th>Valor</th><th>Obs.</th><th>Ações</th></tr></thead><tbody>';
+    despFixas.forEach(function(d) {
+      fixasHtml += '<tr>' +
+        '<td style="font-weight:600;color:var(--tp)">'+esc(d.nome)+'</td>' +
+        '<td><span class="desp-chip fixa">'+esc(d.categoria||'Fixa')+'</span></td>' +
+        '<td style="color:var(--ch);font-weight:600">R$ '+fmtVal(parseMoeda(d.valor))+'</td>' +
+        '<td style="font-size:11px;color:var(--tw)">'+esc(d.obs||'—')+'</td>' +
+        '<td><div class="acoes">' +
+          '<button class="btn-ic" onclick="abrirModalDespesaEdit(''+d.id+'')" title="Editar">✏️</button>' +
+          '<button class="btn-ic x" onclick="excluirDespesa(''+d.id+'')" title="Excluir">🗑️</button>' +
+        '</div></td>' +
+      '</tr>';
+    });
+    fixasHtml += '</tbody></table></div></div>';
+    document.getElementById('fin-despesas-fixas-total').style.display = 'flex';
+    setTxt('fin-despesas-fixas-total-val', 'R$ ' + fmtVal(totalFixas));
+  }
+  document.getElementById('fin-despesas-fixas-lista').innerHTML = fixasHtml;
 
-async function consultarComunicacoesDEJEN(params) {
-  try {
-    var url = new URL(DEJEN_BASE_URL + '/api/v1/comunicacao');
-    if (params.oab)   url.searchParams.set('numeroOAB', params.oab);
-    if (params.oabUF) url.searchParams.set('siglaUFOAB', params.oabUF);
-    if (params.nome)  url.searchParams.set('nome', params.nome);
-    url.searchParams.set('pagina', '1');
-    url.searchParams.set('tamanhoPagina', '100');
-    logDejen('GET ' + url.toString());
-    var resp = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
-    logDejen('HTTP ' + resp.status);
-    if (resp.status === 401 || resp.status === 403) { logDejen('Autenticação necessária (HTTP ' + resp.status + ')', 'err'); return []; }
-    if (!resp.ok) { logDejen('HTTP ' + resp.status, 'err'); return []; }
-    var data = await resp.json();
-    var lista = Array.isArray(data) ? data : (data.conteudo || data.content || data.data || data.itens || []);
-    lista.forEach(function(item, idx) { item._hashId = item.hash || item.hashComunicacao || item.idHash || item.id || ('sem-hash-'+idx); });
-    var totalPags = data.totalPages || data.totalPaginas || 1;
-    for (var p = 2; p <= Math.min(totalPags, 10); p++) {
-      url.searchParams.set('pagina', String(p));
-      var r2 = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
-      if (!r2.ok) break;
-      var d2 = await r2.json();
-      var l2 = Array.isArray(d2) ? d2 : (d2.conteudo || d2.content || d2.data || d2.itens || []);
-      l2.forEach(function(item, idx) { item._hashId = item.hash || item.id || ('p'+p+'-'+idx); lista.push(item); });
+  // ---- DESPESAS VARIÁVEIS ----
+  var despVar = (DESPESAS||[]).filter(function(d) { return d.tipo === 'variavel' && parseInt(d.mes) === mes && parseInt(d.ano) === ano; });
+  var totalVar = despVar.reduce(function(s,d){ return s + parseMoeda(d.valor); }, 0);
+  var varHtml = '';
+  if (!despVar.length) {
+    varHtml = '<div class="rel-vazio" style="padding:20px;text-align:center;color:var(--tw);">Nenhuma despesa variável em '+periodoLabel+'. Clique em "+ Despesa Variável".</div>';
+    document.getElementById('fin-despesas-var-total').style.display = 'none';
+  } else {
+    varHtml = '<div class="tbl-box"><div class="tbl-sc"><table><thead><tr><th>Descrição</th><th>Categoria</th><th>Valor</th><th>Obs.</th><th>Ações</th></tr></thead><tbody>';
+    despVar.forEach(function(d) {
+      varHtml += '<tr>' +
+        '<td style="font-weight:600;color:var(--tp)">'+esc(d.nome)+'</td>' +
+        '<td><span class="desp-chip variavel">'+esc(d.categoria||'Variável')+'</span></td>' +
+        '<td style="color:#e89090;font-weight:600">R$ '+fmtVal(parseMoeda(d.valor))+'</td>' +
+        '<td style="font-size:11px;color:var(--tw)">'+esc(d.obs||'—')+'</td>' +
+        '<td><div class="acoes">' +
+          '<button class="btn-ic" onclick="abrirModalDespesaEdit(''+d.id+'')" title="Editar">✏️</button>' +
+          '<button class="btn-ic x" onclick="excluirDespesa(''+d.id+'')" title="Excluir">🗑️</button>' +
+        '</div></td>' +
+      '</tr>';
+    });
+    varHtml += '</tbody></table></div></div>';
+    document.getElementById('fin-despesas-var-total').style.display = 'flex';
+    setTxt('fin-despesas-var-total-val', 'R$ ' + fmtVal(totalVar));
+  }
+  document.getElementById('fin-despesas-var-lista').innerHTML = varHtml;
+
+  // ---- COMISSÕES SOBRE HONORÁRIOS (TABELA) ----
+  var comHonRegistros = [];
+  DB.forEach(function(c) {
+    if (!c.hon || !c.comissaoHonPct) return;
+    var pctH = parseInt(c.comissaoHonPct);
+    if (c.hon.mod === 'avista') {
+      if (c.hon.pago && pertencePeriodo(c.data, mes, ano, 'mes')) {
+        var v = parseMoeda(c.hon.valor);
+        comHonRegistros.push({ nome:c.nome, tipo:c.tipo, base:v, mod:'À vista', data:c.data, pct:pctH, com:v*pctH/100 });
+      }
+    } else {
+      var ps = c.hon.parcelas||[]; var vU = ps.length>0?parseMoeda(c.hon.valor)/ps.length:0;
+      ps.forEach(function(p,i) {
+        if (p.pago && pertencePeriodo(p.data, mes, ano, 'mes')) {
+          comHonRegistros.push({ nome:c.nome, tipo:c.tipo, base:vU, mod:'Parc.'+(i+1)+'ª', data:p.data, pct:pctH, com:vU*pctH/100 });
+        }
+      });
     }
-    return lista;
-  } catch(e) { logDejen('Comunicações: ' + e.message, 'err'); return []; }
-}
+  });
+  var totalComHon = comHonRegistros.reduce(function(s,r){ return s+r.com; }, 0);
+  var comHonHtml = '';
+  if (!comHonRegistros.length) {
+    comHonHtml = '<tr><td colspan="7" class="rel-vazio">Nenhuma comissão sobre honorários em '+periodoLabel+'</td></tr>';
+    document.getElementById('fin-com-hon-total').style.display = 'none';
+  } else {
+    comHonRegistros.forEach(function(r) {
+      comHonHtml += '<tr>' +
+        '<td style="font-weight:600;color:var(--tp)">'+esc(r.nome)+'</td>' +
+        '<td><span class="bgt">'+esc(r.tipo||'')+'</span></td>' +
+        '<td style="color:var(--ch);font-weight:600">R$ '+fmtVal(r.base)+'</td>' +
+        '<td style="color:var(--tw);font-size:11px">'+r.mod+'</td>' +
+        '<td style="color:var(--tw);font-size:11px">'+fmtData(r.data)+'</td>' +
+        '<td style="color:var(--tw)">'+r.pct+'%</td>' +
+        '<td style="color:#e89090;font-weight:600">R$ '+fmtVal(r.com)+'</td>' +
+      '</tr>';
+    });
+    document.getElementById('fin-com-hon-total').style.display = 'flex';
+    setTxt('fin-com-hon-total-val', 'R$ ' + fmtVal(totalComHon));
+  }
+  document.getElementById('fin-tbody-com-hon').innerHTML = comHonHtml;
 
-async function consultarCertidaoDEJEN(hash) {
-  try {
-    var resp = await fetch(DEJEN_BASE_URL + '/api/v1/comunicacao/' + encodeURIComponent(hash) + '/certidao', { headers: { 'Accept': 'application/json,application/pdf,text/html' } });
-    if (!resp.ok) return null;
-    var ct = resp.headers.get('content-type') || '';
-    return ct.includes('application/json') ? JSON.stringify(await resp.json()) : await resp.text();
-  } catch(e) { return null; }
-}
-
-function atualizarFiltroTribunaisDEJEN(tribunais) {
-  var sel = document.getElementById('dj-filtro-tribunal');
-  sel.innerHTML = '<option value="">Todos os tribunais</option>';
-  var vistos = [];
-  var adicionarOpt = function(val, nome) {
-    if (val && vistos.indexOf(val) < 0) {
-      vistos.push(val);
-      var o = document.createElement('option'); o.value = val; o.textContent = nome || val; sel.appendChild(o);
+  // ---- RESULTADO LÍQUIDO ----
+  var totalGastos = totalEquipe + totalFixas + totalVar;
+  var liquido = totalRecebido - totalGastos;
+  var totalComissoesMes = 0;
+  DB.forEach(function(c) {
+    // comissão taxa
+    if (c.taxa && c.comissaoPct) {
+      var pT = parseInt(c.comissaoPct);
+      if (c.taxa.mod==='avista') { if(c.taxa.pago&&pertencePeriodo(c.data,mes,ano,'mes')) totalComissoesMes+=parseMoeda(c.taxa.valor)*pT/100; }
+      else { var ps=c.taxa.parcelas||[]; var vU=ps.length>0?parseMoeda(c.taxa.valor)/ps.length:0; ps.forEach(function(p){ if(p.pago&&pertencePeriodo(p.data,mes,ano,'mes')) totalComissoesMes+=vU*pT/100; }); }
     }
-  };
-  (tribunais || []).forEach(function(t) { adicionarOpt(t.sigla || t.codigo || t.id || '', t.nome || t.sigla || ''); });
-  DEJEN_COMUNICACOES.forEach(function(c) { adicionarOpt(c.tribunal || c.siglaOrgao || c.orgaoJulgador || '', ''); });
+    // comissão honorários
+    if (c.hon && c.comissaoHonPct) {
+      var pH = parseInt(c.comissaoHonPct);
+      if (c.hon.mod==='avista') { if(c.hon.pago&&pertencePeriodo(c.data,mes,ano,'mes')) totalComissoesMes+=parseMoeda(c.hon.valor)*pH/100; }
+      else { var ps=c.hon.parcelas||[]; var vU=ps.length>0?parseMoeda(c.hon.valor)/ps.length:0; ps.forEach(function(p){ if(p.pago&&pertencePeriodo(p.data,mes,ano,'mes')) totalComissoesMes+=vU*pH/100; }); }
+    }
+  });
+  setTxt('fin-r-gastos', 'R$ ' + fmtVal(totalGastos));
+  var liqEl = document.getElementById('fin-r-liquido');
+  if (liqEl) { liqEl.textContent = 'R$ ' + fmtVal(liquido); liqEl.className = 'val ' + (liquido >= 0 ? 'luc' : 'gas'); }
+  setTxt('fin-r-comissoes', 'R$ ' + fmtVal(totalComissoesMes));
 }
 
-function filtrarDEJEN() { renderDEJEN(); }
-
-// ---- RENDER PRINCIPAL ----
-function renderDEJEN() {
-  var fStatus   = document.getElementById('dj-filtro-status').value;
-  var fTribunal = document.getElementById('dj-filtro-tribunal').value;
-  var lista = DEJEN_COMUNICACOES.filter(function(c) {
-    var okS = !fStatus   || c._status === fStatus;
-    var trib = c.tribunal || c.siglaOrgao || c.orgaoJulgador || '';
-    var okT = !fTribunal || trib === fTribunal;
-    return okS && okT;
-  });
-  document.getElementById('dj-cnt').textContent = lista.length + ' registro' + (lista.length!==1?'s':'');
-  var container = document.getElementById('dj-lista');
-
-  if (!DEJEN_COMUNICACOES.length) {
-    container.innerHTML = '<div class="vazio" style="padding:60px 40px;"><div class="vazio-ic">📡</div><div style="font-family:\'Playfair Display\',serif;font-size:15px;opacity:.55;margin-bottom:5px;">Nenhuma consulta realizada</div><div class="vazio-s">Clique em "Consultar DEJEN" para buscar publicações e intimações.</div></div>';
-    return;
+// ---- Equipe CRUD ----
+function abrirModalEquipe(id) {
+  editEquipeId = id;
+  ['eq-nome','eq-cargo','eq-salario','eq-ajuda','eq-inicio','eq-obs'].forEach(function(f){ setVal(f,''); });
+  setVal('eq-com-taxa',''); setVal('eq-com-hon','');
+  if (id) {
+    var e = (EQUIPE||[]).find(function(x){ return x.id===id; });
+    if (!e) return;
+    document.getElementById('eq-mo-tit').textContent = 'Editar Colaborador';
+    setVal('eq-nome',e.nome||''); setVal('eq-cargo',e.cargo||'');
+    setVal('eq-salario',e.salario||''); setVal('eq-ajuda',e.ajuda||'');
+    setVal('eq-com-taxa',e.comTaxa||''); setVal('eq-com-hon',e.comHon||'');
+    setVal('eq-inicio',e.inicio||''); setVal('eq-obs',e.obs||'');
+  } else {
+    document.getElementById('eq-mo-tit').textContent = 'Novo Colaborador';
+    setVal('eq-inicio', new Date().toISOString().split('T')[0]);
   }
-  if (!lista.length) {
-    container.innerHTML = '<div class="vazio" style="padding:40px;"><div class="vazio-ic">🔎</div><div style="font-family:\'Playfair Display\',serif;opacity:.55;">Nenhum resultado para este filtro</div></div>';
-    return;
-  }
-
-  var urgCorMap = { 5: '#e89090', 10: '#D4B84A', 15: 'var(--ch)' };
-
-  var html = '';
-  lista.forEach(function(c, idx) {
-    var isNovo   = c._status !== 'reportado';
-    var isAgend  = !!c._agendado;
-    var processo = c.numeroProcesso || c.numero || c.nup || '—';
-    var tribunal = c.tribunal || c.siglaOrgao || c.orgaoJulgador || c.nomeOrgao || '—';
-    var tipo     = c.tipoComunicacao || c.tipo || '—';
-    var dataComm = c._dataCommFmt || '—';
-    var resumo   = (c.texto || c.conteudo || c.resumo || '').substring(0, 300);
-    var hash     = c.hash || c.hashComunicacao || c.id || '—';
-    var certSt   = c._certidaoStatus || 'Não consultada';
-    var peca     = c._pecaSugerida || '—';
-    var prazo    = c._prazoSugerido || 15;
-    var descPeca = c._pecaDescr || '';
-    var dtVenc   = c._dataVenc || '—';
-    var dtEvt    = c._dataEvento || '—';
-    var urgCor   = urgCorMap[prazo] || 'var(--ch)';
-    var link     = c.link || c.url || '';
-
-    // Prazo urgente (≤5 dias)
-    var urgBanner = prazo <= 5 ?
-      '<div style="background:rgba(192,80,74,.15);border:1px solid rgba(192,80,74,.4);border-radius:5px;padding:5px 10px;font-size:10px;font-weight:700;color:#e89090;margin-bottom:8px;">🚨 PRAZO CURTO — ' + prazo + ' DIAS</div>' : '';
-
-    html +=
-    '<div style="border-bottom:1px solid var(--bd);padding:18px 22px;background:' + (isNovo ? 'rgba(63,103,73,.04)' : 'transparent') + ';">' +
-      urgBanner +
-
-      // Linha 1: badges + processo + tribunal
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:12px;">' +
-        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
-          (isNovo ? '<span style="background:rgba(63,103,73,.2);color:#7ec492;border:1px solid rgba(86,120,90,.35);padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;">🆕 NOVO</span>' :
-                    '<span style="background:rgba(180,138,74,.1);color:var(--tw);border:1px solid var(--bd);padding:3px 9px;border-radius:20px;font-size:10px;">✓ reportado</span>') +
-          (isAgend ? '<span style="background:rgba(26,115,232,.15);color:#7aadff;border:1px solid rgba(26,115,232,.3);padding:3px 9px;border-radius:20px;font-size:10px;font-weight:600;">📅 Agendado</span>' : '') +
-          '<span style="font-family:\'Playfair Display\',serif;font-size:13px;color:var(--tp);">Proc. ' + esc(processo) + '</span>' +
-          '<span style="font-size:10px;color:var(--ch);background:rgba(180,138,74,.1);padding:2px 8px;border-radius:10px;">' + esc(tribunal) + '</span>' +
-        '</div>' +
-        '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">' +
-          (link ? '<a href="' + esc(link) + '" target="_blank" class="btn-o" style="font-size:10px;padding:4px 10px;text-decoration:none;">🔗 Certidão</a>' : '') +
-          '<button class="btn-v" id="btn-ag-' + idx + '" onclick="agendarComunicacao(' + idx + ')" style="font-size:11px;padding:6px 14px;' + (isAgend?'opacity:.6':'') + '">' +
-            (isAgend ? '✓ Agendado' : '📅 Agendar') +
-          '</button>' +
-        '</div>' +
-      '</div>' +
-
-      // BLOCO PEÇA SUGERIDA
-      '<div style="background:linear-gradient(135deg,rgba(63,103,73,.12),rgba(180,138,74,.08));border:1px solid rgba(180,138,74,.25);border-radius:8px;padding:12px 15px;margin-bottom:12px;">' +
-        '<div style="font-size:9px;color:var(--ch);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:6px;">⚖️ Peça Jurídica Sugerida</div>' +
-        '<div style="font-size:14px;font-family:\'Playfair Display\',serif;color:var(--tp);font-weight:700;margin-bottom:4px;">' + esc(peca) + '</div>' +
-        '<div style="font-size:11px;color:var(--ts);line-height:1.55;margin-bottom:8px;">' + esc(descPeca) + '</div>' +
-        '<div style="display:flex;gap:16px;flex-wrap:wrap;">' +
-          '<div><div style="font-size:9px;color:var(--tw);text-transform:uppercase;letter-spacing:.8px;">Prazo</div>' +
-            '<div style="font-size:12px;font-weight:700;color:' + urgCor + ';">' + prazo + ' dias úteis</div></div>' +
-          '<div><div style="font-size:9px;color:var(--tw);text-transform:uppercase;letter-spacing:.8px;">Vencimento estimado</div>' +
-            '<div style="font-size:12px;font-weight:700;color:var(--ch);">' + esc(dtVenc) + '</div></div>' +
-          '<div><div style="font-size:9px;color:var(--tw);text-transform:uppercase;letter-spacing:.8px;">Evento na Agenda</div>' +
-            '<div style="font-size:12px;font-weight:700;color:#7aadff;">📅 ' + esc(dtEvt) + '</div></div>' +
-        '</div>' +
-      '</div>' +
-
-      // Detalhes da comunicação
-      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:10px;">' +
-        '<div><div style="font-size:9px;color:var(--tw);text-transform:uppercase;letter-spacing:.8px;">Tipo</div><div style="font-size:11px;color:var(--ts);margin-top:2px;">' + esc(tipo) + '</div></div>' +
-        '<div><div style="font-size:9px;color:var(--tw);text-transform:uppercase;letter-spacing:.8px;">Publicação</div><div style="font-size:11px;color:var(--ts);margin-top:2px;">' + (dataComm !== '—' ? fmtData(dataComm) : '—') + '</div></div>' +
-        '<div><div style="font-size:9px;color:var(--tw);text-transform:uppercase;letter-spacing:.8px;">Certidão</div><div style="font-size:11px;color:' + (certSt==='Obtida'?'#7ec492':'var(--tw)') + ';margin-top:2px;">' + esc(certSt) + '</div></div>' +
-        '<div><div style="font-size:9px;color:var(--tw);text-transform:uppercase;letter-spacing:.8px;">Hash</div><div style="font-size:10px;color:var(--tw);margin-top:2px;font-family:monospace;word-break:break-all;">' + esc(String(hash).substring(0,28)) + '</div></div>' +
-      '</div>' +
-
-      // Resumo
-      (resumo ? '<div style="background:var(--fi);border:1px solid var(--bd);border-radius:6px;padding:10px 13px;font-size:11px;color:var(--tw);line-height:1.6;">' + esc(resumo) + (resumo.length >= 300 ? '...' : '') + '</div>' : '') +
-    '</div>';
-  });
-
-  container.innerHTML = html;
-  atualizarFiltroTribunaisDEJEN(DEJEN_TRIBUNAIS);
+  document.getElementById('ov-equipe').style.display = 'block';
 }
 
-function exportDejenCSV() {
-  if (!DEJEN_COMUNICACOES.length) { toast('Nenhuma comunicação para exportar', true); return; }
-  var h = ['Status','Nº Processo','Tribunal','Tipo','Data Publicação','Vencimento','Evento Agenda','Peça Sugerida','Prazo (dias)','Certidão','Hash','Resumo'];
-  var rows = DEJEN_COMUNICACOES.map(function(c) {
-    return [
-      c._status==='novo'?'Novo':'Reportado',
-      c.numeroProcesso||c.numero||c.nup||'',
-      c.tribunal||c.siglaOrgao||c.orgaoJulgador||'',
-      c.tipoComunicacao||c.tipo||'',
-      c._dataCommFmt||'',
-      c._dataVenc||'',
-      c._dataEvento||'',
-      c._pecaSugerida||'',
-      c._prazoSugerido||'',
-      c._certidaoStatus||'',
-      c.hash||c.hashComunicacao||c.id||'',
-      (c.texto||c.conteudo||c.resumo||'').replace(/\n/g,' ').substring(0,500)
-    ];
-  });
-  var csv = [h].concat(rows).map(function(r){ return r.map(function(v){ return '"'+(v||'').toString().replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
+function salvarEquipe() {
+  var nome = getVal('eq-nome');
+  if (!nome) { toast('Informe o nome do colaborador', true); return; }
+  var obj = { nome:nome, cargo:getVal('eq-cargo'), salario:getVal('eq-salario'),
+    ajuda:getVal('eq-ajuda'), comTaxa:getVal('eq-com-taxa'), comHon:getVal('eq-com-hon'),
+    inicio:getVal('eq-inicio'), obs:getVal('eq-obs') };
+  if (editEquipeId) { obj.id = editEquipeId; window._fbSaveEquipe(obj); toast('✓ Colaborador atualizado'); }
+  else { window._fbSaveEquipe(obj); toast('✓ Colaborador cadastrado'); }
+  document.getElementById('ov-equipe').style.display = 'none';
+  editEquipeId = null;
+  renderFinanceiro();
+}
+
+function excluirEquipe(id) {
+  if (!confirm('Excluir este colaborador?')) return;
+  window._fbDeleteEquipe(id); toast('Colaborador removido');
+}
+
+// ---- Despesas CRUD ----
+function abrirModalDespesa(tipo) {
+  editDespesaId = null;
+  ['desp-nome','desp-valor','desp-categoria','desp-obs'].forEach(function(f){ setVal(f,''); });
+  document.getElementById('desp-tipo').value = tipo;
+  document.getElementById('desp-mo-tit').textContent = tipo === 'fixa' ? 'Nova Despesa Fixa' : 'Nova Despesa Variável';
+  document.getElementById('desp-mo-sub').textContent = tipo === 'fixa' ? 'Despesa recorrente (aluguel, assinaturas...)' : 'Despesa pontual do período';
+  var hoje = new Date();
+  document.getElementById('desp-mes').value = hoje.getMonth() + 1;
+  setVal('desp-ano', hoje.getFullYear());
+  document.getElementById('ov-despesa').style.display = 'block';
+}
+
+function abrirModalDespesaEdit(id) {
+  var d = (DESPESAS||[]).find(function(x){ return x.id===id; });
+  if (!d) return;
+  editDespesaId = id;
+  document.getElementById('desp-tipo').value = d.tipo;
+  document.getElementById('desp-mo-tit').textContent = d.tipo === 'fixa' ? 'Editar Despesa Fixa' : 'Editar Despesa Variável';
+  document.getElementById('desp-mo-sub').textContent = '';
+  setVal('desp-nome',d.nome||''); setVal('desp-valor',d.valor||'');
+  document.getElementById('desp-mes').value = d.mes || new Date().getMonth()+1;
+  setVal('desp-ano',d.ano||new Date().getFullYear()); setVal('desp-categoria',d.categoria||''); setVal('desp-obs',d.obs||'');
+  document.getElementById('ov-despesa').style.display = 'block';
+}
+
+function salvarDespesa() {
+  var nome = getVal('desp-nome'), valor = getVal('desp-valor');
+  if (!nome) { toast('Informe a descrição da despesa', true); return; }
+  if (!valor) { toast('Informe o valor da despesa', true); return; }
+  var obj = { tipo: document.getElementById('desp-tipo').value,
+    nome:nome, valor:valor, mes:parseInt(document.getElementById('desp-mes').value),
+    ano:parseInt(getVal('desp-ano')), categoria:getVal('desp-categoria'), obs:getVal('desp-obs') };
+  if (editDespesaId) { obj.id = editDespesaId; window._fbSaveDespesa(obj); toast('✓ Despesa atualizada'); }
+  else { window._fbSaveDespesa(obj); toast('✓ Despesa registrada'); }
+  document.getElementById('ov-despesa').style.display = 'none';
+  editDespesaId = null;
+  renderFinanceiro();
+}
+
+function excluirDespesa(id) {
+  if (!confirm('Excluir esta despesa?')) return;
+  window._fbDeleteDespesa(id); toast('Despesa removida');
+  renderFinanceiro();
+}
+
+function exportFinanceiroCSV() {
+  var mes = parseInt(document.getElementById('fin-mes').value);
+  var ano = parseInt(document.getElementById('fin-ano').value);
+  var meses = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  var periodo = meses[mes]+'-'+ano;
+  var linhas = [['Tipo','Descrição','Categoria/Natureza','Valor','Mês','Obs']];
+  // Equipe
+  (EQUIPE||[]).forEach(function(e) { linhas.push(['Equipe',e.nome,e.cargo||'',e.salario||'0',periodo,e.obs||'']); });
+  // Despesas fixas
+  (DESPESAS||[]).filter(function(d){ return d.tipo==='fixa'&&parseInt(d.mes)===mes&&parseInt(d.ano)===ano; })
+    .forEach(function(d){ linhas.push(['Despesa Fixa',d.nome,d.categoria||'',d.valor,periodo,d.obs||'']); });
+  // Despesas variáveis
+  (DESPESAS||[]).filter(function(d){ return d.tipo==='variavel'&&parseInt(d.mes)===mes&&parseInt(d.ano)===ano; })
+    .forEach(function(d){ linhas.push(['Despesa Variável',d.nome,d.categoria||'',d.valor,periodo,d.obs||'']); });
+  var csv = linhas.map(function(r){ return r.map(function(v){ return '"'+(v||'').toString().replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
   var blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
   var url = URL.createObjectURL(blob);
-  var a = document.createElement('a'); a.href=url; a.download='dejen-378037.csv'; a.click(); URL.revokeObjectURL(url);
-  toast('✓ CSV DEJEN exportado');
+  var a = document.createElement('a'); a.href=url; a.download='financeiro-'+periodo+'.csv'; a.click(); URL.revokeObjectURL(url);
+  toast('✓ Financeiro exportado');
 }
-
-function limparHistoricoDejen() {
-  if (!confirm('Limpar histórico DEJEN? Todas as comunicações aparecerão como "novas" na próxima consulta.')) return;
-  DEJEN_HISTORICO = []; DEJEN_COMUNICACOES = []; DEJEN_AGENDADOS = {};
-  try {
-    ['dejen_historico_378037','dejen_comunicacoes_378037','dejen_ultima_378037','dejen_agendados_378037'].forEach(function(k){ localStorage.removeItem(k); });
-  } catch(e) {}
-  ['dj-total','dj-novas','dj-certidoes','dj-agendados'].forEach(function(id){ document.getElementById(id).textContent='0'; });
-  document.getElementById('dj-ultima').textContent = '—';
-  document.getElementById('badge-dejen').style.display = 'none';
-  renderDEJEN();
-  toast('✓ Histórico DEJEN limpo');
-}
-// ========== FIM DEJEN ==========
 
 // ========== INIT ==========
 document.addEventListener('keydown', function(e){ 
-  if(e.key==='Escape'){
+  if(e.key==='Escape'){ 
     fecharModal(); 
     document.getElementById('conf-ov').classList.remove('on');
     document.getElementById('ov-det').style.display='none';
+    document.getElementById('ov-equipe').style.display='none';
+    document.getElementById('ov-despesa').style.display='none';
   }
 });
 // Dados carregados pelo Firebase listener em tempo real (ver módulo acima)
