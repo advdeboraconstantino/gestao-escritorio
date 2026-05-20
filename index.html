@@ -3291,8 +3291,8 @@ function renderFinanceiro() {
         '<div class="fin-grid">' +
           '<div class="fin-item"><div class="lbl">Salário Fixo</div><div class="val">R$ '+fmtVal(salario)+'</div></div>' +
           '<div class="fin-item"><div class="lbl">Ajuda de Custo</div><div class="val">R$ '+fmtVal(ajuda)+'</div></div>' +
-          '<div class="fin-item"><div class="lbl">Comissão s/ Taxas '+(e.comTaxa?'('+e.comTaxa+'%)'):'')+'</div><div class="val gasto">R$ '+fmtVal(comTaxa)+'</div></div>' +
-          '<div class="fin-item"><div class="lbl">Comissão s/ Honorários '+(e.comHon?'('+e.comHon+'%)'):'')+'</div><div class="val gasto">R$ '+fmtVal(comHon)+'</div></div>' +
+          '<div class="fin-item"><div class="lbl">Comissão s/ Taxas '+(e.comTaxa?' ('+e.comTaxa+'%)':'')+'</div><div class="val gasto">R$ '+fmtVal(comTaxa)+'</div></div>' +
+          '<div class="fin-item"><div class="lbl">Comissão s/ Honorários '+(e.comHon?' ('+e.comHon+'%)':'')+'</div><div class="val gasto">R$ '+fmtVal(comHon)+'</div></div>' +
           '<div class="fin-item"><div class="lbl">Total '+periodoLabel+'</div><div class="val destaque">R$ '+fmtVal(totalColab)+'</div></div>' +
         '</div>' +
       '</div>';
