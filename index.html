@@ -953,7 +953,7 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
   <div class="rel-sec">
     <div class="rel-sec-tit">⚖️ Honorários Iniciais Recebidos</div>
     <div class="tbl-box"><div class="tbl-sc"><table>
-      <thead><tr><th>Cliente</th><th>Tipo</th><th>Valor Total Hon.</th><th>Modalidade</th><th>Parcela / Data Pgto</th><th>Valor Pago</th></tr></thead>
+      <thead><tr><th>Cliente</th><th>Tipo</th><th>Valor Total Hon.</th><th>Modalidade</th><th>Parcela / Data Pgto</th><th>Valor Pago</th><th>Comissão Devida</th></tr></thead>
       <tbody id="rel-tbody-hon"></tbody>
     </table></div></div>
   </div>
@@ -962,7 +962,7 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
   <div class="rel-sec">
     <div class="rel-sec-tit">🏷️ Comissões Devidas ao Setor Comercial</div>
     <div class="tbl-box"><div class="tbl-sc"><table>
-      <thead><tr><th>Cliente</th><th>Tipo</th><th>Base Paga (Taxa)</th><th>% Comissão</th><th>Valor Comissão</th></tr></thead>
+      <thead><tr><th>Cliente</th><th>Tipo</th><th>Origem</th><th>Base Paga</th><th>% Comissão</th><th>Valor Comissão</th></tr></thead>
       <tbody id="rel-tbody-com"></tbody>
     </table></div></div>
   </div>
@@ -1089,7 +1089,7 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
       <div class="chk-row"><input type="checkbox" id="ck-hon" onchange="toggleHon()"><label for="ck-hon">Honorários iniciais foram cobrados</label></div>
       <div id="grp-hon" style="display:none;">
         <div class="gr gr3">
-          <div class="fg"><label class="fl">Valor (R$)</label><input class="fi" id="f-hon-val" placeholder="0,00" oninput="fmtMoeda(this)"></div>
+          <div class="fg"><label class="fl">Valor (R$)</label><input class="fi" id="f-hon-val" placeholder="0,00" oninput="fmtMoeda(this);calcComissaoHon()"></div>
           <div class="fg"><label class="fl">Modalidade</label>
             <select class="fi" id="f-hon-mod" onchange="toggleHonParc()">
               <option value="avista">À vista</option>
@@ -1097,7 +1097,7 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
             </select>
           </div>
           <div class="fg"><label class="fl">Situação</label>
-            <select class="fi" id="f-hon-sit">
+            <select class="fi" id="f-hon-sit" onchange="calcComissaoHon()">
               <option value="nao">Não pago</option>
               <option value="sim">Pago</option>
             </select>
@@ -1108,6 +1108,20 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
             <input type="number" class="fi" id="f-hon-np" min="1" max="60" placeholder="Ex.: 6" oninput="gerarParc('hon')">
           </div>
           <div class="parc-box" id="hon-parc"></div>
+        </div>
+        <div class="gr gr2" style="margin-top:10px;">
+          <div class="fg"><label class="fl">Comissão do Setor Comercial</label>
+            <select class="fi" id="f-comissao-hon-pct" onchange="calcComissaoHon()">
+              <option value="">Sem comissão</option>
+              <option value="20">20%</option>
+              <option value="30">30%</option>
+              <option value="40">40%</option>
+              <option value="50">50%</option>
+            </select>
+          </div>
+          <div class="fg"><label class="fl">Comissão Calculada (Hon.)</label>
+            <div class="fi" id="f-comissao-hon-calc" style="background:rgba(0,0,0,.2);color:var(--ch);cursor:default;display:flex;align-items:center;">R$ 0,00</div>
+          </div>
         </div>
       </div>
 
@@ -1145,7 +1159,7 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
         </div>
       </div>
 
-      <div class="sec">Comissão do Setor Comercial</div>
+      <div class="sec">Comissão do Setor Comercial — Taxas</div>
       <div style="font-size:11px;color:var(--tw);margin-bottom:10px;">Calculada sobre o valor das taxas efetivamente pagas</div>
       <div class="gr gr2">
         <div class="fg"><label class="fl">Percentual de Comissão</label>
@@ -1354,6 +1368,7 @@ function abrirModal(id) {
       document.getElementById('grp-exito-custom').style.display = 'none';
     }
     setVal('f-comissao-pct', c.comissaoPct || '');
+    setVal('f-comissao-hon-pct', c.comissaoHonPct || '');
     toggleProtocolado();
 
     // Taxa
@@ -1423,9 +1438,12 @@ function limparForm() {
   setVal('f-exito-pct','');
   setVal('f-exito-custom','');
   setVal('f-comissao-pct','');
+  setVal('f-comissao-hon-pct','');
   document.getElementById('grp-exito').style.display = 'none';
   document.getElementById('grp-exito-custom').style.display = 'none';
   document.getElementById('f-comissao-calc').textContent = 'R$ 0,00';
+  var elHonCalc = document.getElementById('f-comissao-hon-calc');
+  if (elHonCalc) elHonCalc.textContent = 'R$ 0,00';
 }
 
 function moAba(n) {
@@ -1492,6 +1510,30 @@ function calcComissao() {
   document.getElementById('f-comissao-calc').textContent = 'R$ ' + fmtVal(comissao);
 }
 
+function calcComissaoHon() {
+  var pct = parseInt((document.getElementById('f-comissao-hon-pct')||{}).value) || 0;
+  var el = document.getElementById('f-comissao-hon-calc');
+  if (!el) return;
+  if (!pct) { el.textContent = 'R$ 0,00'; return; }
+  var base = 0;
+  if (document.getElementById('ck-hon') && document.getElementById('ck-hon').checked) {
+    var mod = document.getElementById('f-hon-mod').value;
+    var sit = document.getElementById('f-hon-sit').value;
+    var valHon = parseMoeda(document.getElementById('f-hon-val').value);
+    if (mod === 'avista') {
+      if (sit === 'sim') base += valHon;
+    } else {
+      var np = parseInt(document.getElementById('f-hon-np').value) || 0;
+      var vUnit = np > 0 ? valHon / np : 0;
+      for (var i = 0; i < np; i++) {
+        var ck = document.getElementById('hon-pg-'+i);
+        if (ck && ck.checked) base += vUnit;
+      }
+    }
+  }
+  el.textContent = 'R$ ' + fmtVal(base * pct / 100);
+}
+
 // ========== PARCELAS ==========
 function gerarParc(tipo) {
   var n = parseInt(document.getElementById('f-'+tipo+'-np').value) || 0;
@@ -1510,7 +1552,7 @@ function gerarParc(tipo) {
       '<input type="date" class="parc-d" id="'+tipo+'-d-'+i+'" value="'+(ex.data||'')+'">' +
       '<span class="parc-vl">R$ '+fmtVal(vUnit)+'</span>' +
       '<div class="parc-pg'+(ex.pago?' pago':'')+'" id="'+tipo+'-pg-wrap-'+i+'">' +
-        '<input type="checkbox" id="'+tipo+'-pg-'+i+'" '+(ex.pago?'checked':'')+' onchange="document.getElementById(\''+tipo+'-pg-wrap-'+i+'\').className=\'parc-pg\'+(this.checked?\' pago\':\'\')">' +
+        '<input type="checkbox" id="'+tipo+'-pg-'+i+'" '+(ex.pago?'checked':'')+' onchange="document.getElementById(\''+tipo+'-pg-wrap-'+i+'\').className=\'parc-pg\'+(this.checked?\' pago\':\'\')'+(tipo==='hon'?';calcComissaoHon()':tipo==='taxa'?';calcComissao()':'')+'">' +
         '<label for="'+tipo+'-pg-'+i+'">Pago</label>' +
       '</div>';
     box.appendChild(row);
@@ -1531,7 +1573,7 @@ function carregarParc(tipo, parcelas, valorTotal) {
       '<input type="date" class="parc-d" id="'+tipo+'-d-'+i+'" value="'+(p.data||'')+'">' +
       '<span class="parc-vl">R$ '+fmtVal(vUnit)+'</span>' +
       '<div class="parc-pg'+(p.pago?' pago':'')+'" id="'+tipo+'-pg-wrap-'+i+'">' +
-        '<input type="checkbox" id="'+tipo+'-pg-'+i+'" '+(p.pago?'checked':'')+' onchange="document.getElementById(\''+tipo+'-pg-wrap-'+i+'\').className=\'parc-pg\'+(this.checked?\' pago\':\'\')">' +
+        '<input type="checkbox" id="'+tipo+'-pg-'+i+'" '+(p.pago?'checked':'')+' onchange="document.getElementById(\''+tipo+'-pg-wrap-'+i+'\').className=\'parc-pg\'+(this.checked?\' pago\':\'\')'+(tipo==='hon'?';calcComissaoHon()':tipo==='taxa'?';calcComissao()':'')+'">' +
         '<label for="'+tipo+'-pg-'+i+'">Pago</label>' +
       '</div>';
     box.appendChild(row);
@@ -1594,6 +1636,7 @@ function salvar() {
     pagamento: getVal('f-pagamento'),
     exitoPct: getVal('f-exito-pct') === 'outro' ? getVal('f-exito-custom') : getVal('f-exito-pct'),
     comissaoPct: getVal('f-comissao-pct'),
+    comissaoHonPct: getVal('f-comissao-hon-pct'),
     email: getVal('f-email'), whats: getVal('f-whats'),
     cpf: getVal('f-cpf'), orgao: getVal('f-orgao'),
     taxa: taxa, hon: hon
@@ -2098,24 +2141,30 @@ function renderRelatorios() {
 
   // ---- HONORÁRIOS RECEBIDOS ----
   var totalHon = 0;
+  var totalComissoesHon = 0;
   var htmlHon = '';
   var registrosHon = [];
 
   DB.forEach(function(c) {
     if (!c.hon) return;
+    var comHonPct = parseInt(c.comissaoHonPct) || 0;
     if (c.hon.mod === 'avista') {
       if (c.hon.pago && pertencePeriodo(c.data, mes, ano, modo)) {
         var val = parseMoeda(c.hon.valor);
+        var com = val * comHonPct / 100;
         totalHon += val;
-        registrosHon.push({ nome:c.nome, tipo:c.tipo, total:c.hon.valor, mod:'À vista', parcela:'—', data:c.data, val:val });
+        totalComissoesHon += com;
+        registrosHon.push({ nome:c.nome, tipo:c.tipo, total:c.hon.valor, mod:'À vista', parcela:'—', data:c.data, val:val, com:com, comPct:comHonPct });
       }
     } else {
       var ps = c.hon.parcelas || [];
       var vUnit = ps.length > 0 ? parseMoeda(c.hon.valor) / ps.length : 0;
       ps.forEach(function(p, i) {
         if (p.pago && pertencePeriodo(p.data, mes, ano, modo)) {
+          var com = vUnit * comHonPct / 100;
           totalHon += vUnit;
-          registrosHon.push({ nome:c.nome, tipo:c.tipo, total:c.hon.valor, mod:'Parcelado', parcela:(i+1)+'ª', data:p.data, val:vUnit });
+          totalComissoesHon += com;
+          registrosHon.push({ nome:c.nome, tipo:c.tipo, total:c.hon.valor, mod:'Parcelado', parcela:(i+1)+'ª', data:p.data, val:vUnit, com:com, comPct:comHonPct });
         }
       });
     }
@@ -2133,21 +2182,22 @@ function renderRelatorios() {
         '<td style="color:var(--tw);font-size:11px">'+r.mod+'</td>' +
         '<td style="color:var(--tw);font-size:11px">'+r.parcela+' '+fmtData(r.data)+'</td>' +
         '<td style="color:var(--ch);font-weight:600">R$ '+fmtVal(r.val)+'</td>' +
+        '<td style="color:'+(r.com>0?'#e89090':'var(--tw)')+'">'+( r.comPct ? r.comPct+'% = R$ '+fmtVal(r.com) : '—')+'</td>' +
       '</tr>';
     });
-    htmlHon += '<tr style="background:rgba(63,103,73,.1)"><td colspan="5" style="text-align:right;font-size:10px;color:var(--ch);letter-spacing:.5px;">TOTAL</td><td style="font-weight:600;color:var(--ch)">R$ '+fmtVal(totalHon)+'</td></tr>';
-  } else { htmlHon = '<tr><td colspan="6" class="rel-vazio">Nenhum honorário recebido em '+periodoLabel+'</td></tr>'; }
+    htmlHon += '<tr style="background:rgba(63,103,73,.1)"><td colspan="5" style="text-align:right;font-size:10px;color:var(--ch);letter-spacing:.5px;">TOTAL</td><td style="font-weight:600;color:var(--ch)">R$ '+fmtVal(totalHon)+'</td><td style="color:#e89090;font-weight:600">R$ '+fmtVal(totalComissoesHon)+'</td></tr>';
+  } else { htmlHon = '<tr><td colspan="7" class="rel-vazio">Nenhum honorário recebido em '+periodoLabel+'</td></tr>'; }
   document.getElementById('rel-tbody-hon').innerHTML = htmlHon;
 
-  // ---- COMISSÕES ----
+  // ---- COMISSÕES (TAXAS + HONORÁRIOS) ----
   var htmlCom = '';
   var registrosCom = [];
 
+  // Comissões sobre taxas
   DB.forEach(function(c) {
     if (!c.taxa || !c.comissaoPct) return;
     var comPct = parseInt(c.comissaoPct);
     var basePaga = 0;
-
     if (c.taxa.mod === 'avista') {
       if (c.taxa.pago && pertencePeriodo(c.data, mes, ano, modo)) basePaga = parseMoeda(c.taxa.valor);
     } else {
@@ -2155,13 +2205,30 @@ function renderRelatorios() {
       var vUnit = ps.length > 0 ? parseMoeda(c.taxa.valor) / ps.length : 0;
       ps.forEach(function(p) { if (p.pago && pertencePeriodo(p.data, mes, ano, modo)) basePaga += vUnit; });
     }
-
     if (basePaga > 0) {
-      registrosCom.push({ nome:c.nome, tipo:c.tipo, base:basePaga, pct:comPct, com:basePaga*comPct/100 });
+      registrosCom.push({ nome:c.nome, tipo:c.tipo, origem:'Taxa Administrativa', base:basePaga, pct:comPct, com:basePaga*comPct/100 });
     }
   });
 
-  document.getElementById('rc-com').textContent = 'R$ ' + fmtVal(totalComissoes);
+  // Comissões sobre honorários iniciais
+  DB.forEach(function(c) {
+    if (!c.hon || !c.comissaoHonPct) return;
+    var comPct = parseInt(c.comissaoHonPct);
+    var basePaga = 0;
+    if (c.hon.mod === 'avista') {
+      if (c.hon.pago && pertencePeriodo(c.data, mes, ano, modo)) basePaga = parseMoeda(c.hon.valor);
+    } else {
+      var ps = c.hon.parcelas || [];
+      var vUnit = ps.length > 0 ? parseMoeda(c.hon.valor) / ps.length : 0;
+      ps.forEach(function(p) { if (p.pago && pertencePeriodo(p.data, mes, ano, modo)) basePaga += vUnit; });
+    }
+    if (basePaga > 0) {
+      registrosCom.push({ nome:c.nome, tipo:c.tipo, origem:'Honorários Iniciais', base:basePaga, pct:comPct, com:basePaga*comPct/100 });
+    }
+  });
+
+  var totalComGeral = registrosCom.reduce(function(s,r){ return s+r.com; }, 0);
+  document.getElementById('rc-com').textContent = 'R$ ' + fmtVal(totalComGeral);
   document.getElementById('rc-com-s').textContent = periodoLabel;
 
   if (registrosCom.length) {
@@ -2169,14 +2236,14 @@ function renderRelatorios() {
       htmlCom += '<tr>' +
         '<td style="font-weight:600;color:var(--tp)">'+esc(r.nome)+'</td>' +
         '<td><span class="bgt">'+esc(r.tipo||'')+'</span></td>' +
+        '<td style="font-size:11px;color:var(--tw)">'+esc(r.origem)+'</td>' +
         '<td style="color:var(--ch);font-weight:600">R$ '+fmtVal(r.base)+'</td>' +
         '<td style="color:var(--tw)">'+r.pct+'%</td>' +
         '<td style="color:#e89090;font-weight:600">R$ '+fmtVal(r.com)+'</td>' +
       '</tr>';
     });
-    var totalCom = registrosCom.reduce(function(s,r){ return s+r.com; },0);
-    htmlCom += '<tr style="background:rgba(139,58,58,.1)"><td colspan="4" style="text-align:right;font-size:10px;color:#e89090;letter-spacing:.5px;">TOTAL COMISSÕES</td><td style="font-weight:600;color:#e89090">R$ '+fmtVal(totalCom)+'</td></tr>';
-  } else { htmlCom = '<tr><td colspan="5" class="rel-vazio">Nenhuma comissão devida em '+periodoLabel+'</td></tr>'; }
+    htmlCom += '<tr style="background:rgba(139,58,58,.1)"><td colspan="5" style="text-align:right;font-size:10px;color:#e89090;letter-spacing:.5px;">TOTAL COMISSÕES</td><td style="font-weight:600;color:#e89090">R$ '+fmtVal(totalComGeral)+'</td></tr>';
+  } else { htmlCom = '<tr><td colspan="6" class="rel-vazio">Nenhuma comissão devida em '+periodoLabel+'</td></tr>'; }
   document.getElementById('rel-tbody-com').innerHTML = htmlCom;
 }
 
