@@ -27,7 +27,6 @@
   const indicacoesRef = collection(db, "indicacoes");
   const padRef = collection(db, "pad");
   const atendRef = collection(db, "atendimentos");
-  const delegRef = collection(db, "delegacoes");
 
   // Expor funções globais para o código legado
   window._fbSave = async function(obj) {
@@ -96,15 +95,6 @@
   window._fbDeleteAtend = async function(id) {
     try { await deleteDoc(doc(db, "atendimentos", id)); } catch(e) { console.error(e); }
   };
-  window._fbSaveDelegacao = async function(obj) {
-    try {
-      if (obj.id && typeof obj.id === 'string') { await setDoc(doc(db, "delegacoes", obj.id), obj); }
-      else { const ref = await addDoc(delegRef, obj); return ref.id; }
-    } catch(e) { console.error(e); }
-  };
-  window._fbDeleteDelegacao = async function(id) {
-    try { await deleteDoc(doc(db, "delegacoes", id)); } catch(e) { console.error(e); }
-  };
 
   window._fbListen = function(callback) {
     return onSnapshot(colRef, function(snapshot) {
@@ -152,12 +142,6 @@
     onSnapshot(atendRef, function(snap) {
       window.ATENDIMENTOS = [];
       snap.forEach(function(d){ window.ATENDIMENTOS.push(Object.assign({id:d.id}, d.data())); });
-      if (document.getElementById('pg-atendimentos').classList.contains('on')) renderAtendimentos();
-    });
-    onSnapshot(delegRef, function(snap) {
-      window.DELEGACOES = [];
-      snap.forEach(function(d){ window.DELEGACOES.push(Object.assign({id:d.id}, d.data())); });
-      renderTabela();
       if (document.getElementById('pg-atendimentos').classList.contains('on')) renderAtendimentos();
     });
   });
@@ -259,20 +243,6 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
 .bgp.no{background:rgba(180,138,74,.12);color:var(--ch);border:1px solid rgba(180,138,74,.24);}
 .bgp.vn{background:rgba(139,58,58,.2);color:#e89090;border:1px solid rgba(192,80,74,.3);}
 .acoes{display:flex;gap:4px;}
-/* DELEGAÇÃO */
-.badge-deleg{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:10px;font-size:9px;font-weight:700;background:rgba(180,100,30,.22);color:#e8a060;border:1px solid rgba(180,100,30,.35);white-space:nowrap;margin-left:4px;}
-.badge-deleg.ok{background:rgba(63,103,73,.18);color:#7ec492;border-color:rgba(86,120,90,.3);}
-#ov-deleg{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:600;display:none;overflow-y:auto;padding:20px;}
-.deleg-hist-item{padding:10px 14px;border:1px solid var(--bd);border-radius:7px;margin-bottom:8px;font-size:12px;}
-.deleg-hist-item .dh-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
-.deleg-hist-item .dh-membro{font-weight:600;color:var(--ch);}
-.deleg-hist-item .dh-status{font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;}
-.deleg-hist-item .dh-status.pend{background:rgba(180,100,30,.2);color:#e8a060;}
-.deleg-hist-item .dh-status.conc{background:rgba(63,103,73,.2);color:#7ec492;}
-.deleg-equipe-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--bd);border-radius:6px;margin-bottom:6px;}
-.deleg-equipe-item input{flex:1;background:transparent;border:none;color:var(--tp);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;}
-.deleg-equipe-item input::placeholder{color:var(--tw);}
-.btn-del-eq{background:none;border:none;color:var(--rc);cursor:pointer;font-size:15px;padding:0 4px;}
 
 /* VAZIO */
 .vazio{text-align:center;padding:48px;}
@@ -705,7 +675,7 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
     <div class="tbl-bar"><div class="tbl-tit">Atendimentos sem Processo</div><div class="tbl-cnt" id="at-cnt">0 registros</div></div>
     <div class="tbl-sc"><table>
       <thead><tr>
-        <th>Cliente</th><th>Data / Horário</th><th>Tipo</th><th>Situação</th>
+        <th>Cliente</th><th>Data</th><th>Tipo</th><th>Situação</th>
         <th>Localização dos Docs</th><th>Detalhe</th><th>Obs.</th><th>Ações</th>
       </tr></thead>
       <tbody id="at-tbody"></tbody>
@@ -725,17 +695,6 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
       <div class="gr gr2" style="margin-bottom:13px;">
         <div class="fg"><label class="fl">Nome do Cliente *</label><input class="fi" id="at-nome" placeholder="Nome completo"></div>
         <div class="fg"><label class="fl">Data do Atendimento *</label><input type="date" class="fi" id="at-data"></div>
-      </div>
-      <div class="gr gr2" style="margin-bottom:13px;">
-        <div class="fg"><label class="fl">Horário do Atendimento</label><input type="time" class="fi" id="at-hora" placeholder="09:00"></div>
-        <div class="fg"><label class="fl">Duração (minutos)</label>
-          <select class="fi" id="at-duracao">
-            <option value="30">30 minutos</option>
-            <option value="60" selected>1 hora</option>
-            <option value="90">1h30</option>
-            <option value="120">2 horas</option>
-          </select>
-        </div>
       </div>
       <div class="gr gr2" style="margin-bottom:13px;">
         <div class="fg"><label class="fl">Tipo *</label>
@@ -782,8 +741,7 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
     </div>
     <div class="mo-foot">
       <button class="btn-o" onclick="document.getElementById('ov-atend').style.display='none'">Cancelar</button>
-      <button class="btn-o" onclick="salvarAtend(true)" style="background:var(--ch);color:#fff;border-color:var(--ch);">📅 Salvar e Agendar</button>
-      <button class="btn-v" onclick="salvarAtend()">&#10003; Salvar Atendimento</button>
+      <button class="btn-v" onclick="salvarAtend()">✓ Salvar Atendimento</button>
     </div>
   </div>
 </div>
@@ -1231,6 +1189,10 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
       <div class="det-cont" id="det-cont"></div>
       <div id="det-procs"></div>
     </div>
+    <div class="mo-foot" style="justify-content:space-between;">
+      <button class="btn-v" id="det-btn-addproc" onclick="" style="background:var(--do);border-color:var(--do);">➕ Adicionar Processo</button>
+      <button class="btn-o" onclick="document.getElementById('ov-det').style.display='none'">Fechar</button>
+    </div>
   </div>
 </div>
 
@@ -1316,92 +1278,6 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
   <span>Débora Constantino</span> | Escritório especializado nos direitos dos servidores públicos | (12) 99639-2975
 </footer>
 
-<!-- ===== MODAL DELEGAÇÃO ===== -->
-<div id="ov-deleg" onclick="if(event.target===this)fecharDeleg()">
-  <div class="modal" style="max-width:620px;">
-    <div class="mo-head">
-      <div>
-        <div class="mo-tit" id="deleg-titulo">Delegar Atividade</div>
-        <div class="mo-sub" id="deleg-subtitulo">Atribua uma tarefa a um membro da equipe</div>
-      </div>
-      <button class="mo-cls" onclick="fecharDeleg()">&#10005;</button>
-    </div>
-    <div style="padding:20px 26px;">
-
-      <!-- NOVA TAREFA -->
-      <div class="sec">Nova Tarefa</div>
-      <div class="gr gr2" style="margin-bottom:13px;">
-        <div class="fg">
-          <label class="fl">Membro da Equipe *</label>
-          <select class="fi" id="deleg-membro" onchange="atualizarEmailMembro()">
-            <option value="">Selecione...</option>
-          </select>
-        </div>
-        <div class="fg">
-          <label class="fl">E-mail do Membro</label>
-          <input type="email" class="fi" id="deleg-email" placeholder="email@escritorio.com">
-        </div>
-      </div>
-      <div class="gr" style="margin-bottom:13px;">
-        <div class="fg">
-          <label class="fl">Tipo de Tarefa *</label>
-          <select class="fi" id="deleg-tipo">
-            <option value="">Selecione o tipo...</option>
-            <option value="Protocolar documento">Protocolar documento</option>
-            <option value="Contatar cliente">Contatar cliente</option>
-            <option value="Organizar documentação">Organizar documentação</option>
-            <option value="Preparar petição">Preparar petição</option>
-            <option value="Acompanhar processo">Acompanhar processo</option>
-            <option value="Agendar audiência">Agendar audiência</option>
-            <option value="Atualizar andamento">Atualizar andamento</option>
-            <option value="Enviar correspondência">Enviar correspondência</option>
-            <option value="Revisar prazo">Revisar prazo</option>
-            <option value="Outro">Outro (descrever abaixo)</option>
-          </select>
-        </div>
-      </div>
-      <div class="gr gr2" style="margin-bottom:13px;">
-        <div class="fg">
-          <label class="fl">Prazo para Conclusão</label>
-          <input type="date" class="fi" id="deleg-prazo">
-        </div>
-        <div class="fg">
-          <label class="fl">Prioridade</label>
-          <select class="fi" id="deleg-prior">
-            <option value="Normal">Normal</option>
-            <option value="Alta">Alta &#128308;</option>
-            <option value="Urgente">Urgente &#9888;&#65039;</option>
-          </select>
-        </div>
-      </div>
-      <div class="gr" style="margin-bottom:13px;">
-        <div class="fg">
-          <label class="fl">Descrição / Instrução Detalhada</label>
-          <textarea class="fi" id="deleg-desc" rows="3" placeholder="Descreva a tarefa com detalhes suficientes para execução..." style="resize:vertical;min-height:72px;"></textarea>
-        </div>
-      </div>
-      <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
-        <button class="btn-v" onclick="salvarDelegacao(false)">&#10003; Salvar Tarefa</button>
-        <button class="btn-o" onclick="salvarDelegacao(true)" style="background:rgba(66,133,244,.12);color:#7aabf4;border-color:rgba(66,133,244,.3);">&#128231; Salvar e Enviar E-mail</button>
-      </div>
-
-      <!-- HISTÓRICO DE TAREFAS -->
-      <div class="sec" style="margin-bottom:12px;">Tarefas Delegadas para Este Registro</div>
-      <div id="deleg-hist-lista">
-        <div style="text-align:center;padding:22px;color:var(--tw);font-size:12px;">Nenhuma tarefa delegada ainda.</div>
-      </div>
-
-      <!-- GERENCIAR EQUIPE -->
-      <details style="margin-top:18px;">
-        <summary style="cursor:pointer;font-size:11px;color:var(--ch);text-transform:uppercase;letter-spacing:1px;padding:8px 0;user-select:none;">&#9881;&#65039; Gerenciar Equipe (membros e e-mails)</summary>
-        <div style="margin-top:12px;" id="deleg-equipe-lista"></div>
-        <button class="btn-o" onclick="adicionarMembroEquipe()" style="margin-top:8px;font-size:11px;">+ Adicionar Membro</button>
-        <button class="btn-v" onclick="salvarEquipe()" style="margin-top:8px;font-size:11px;margin-left:8px;">&#10003; Salvar Equipe</button>
-      </details>
-    </div>
-  </div>
-</div>
-
 <script>
 // ========== BANCO DE DADOS (FIREBASE) ==========
 var DB = [];
@@ -1410,7 +1286,6 @@ var PARCEIROS = [];
 var INDICACOES = [];
 var PAD = [];
 var ATENDIMENTOS = [];
-var DELEGACOES = [];
 var editId = null;
 var delId = null;
 var editPrazoId = null;
@@ -1517,6 +1392,33 @@ function abrirModal(id) {
 function fecharModal() {
   document.getElementById('overlay').classList.remove('on');
   editId = null;
+  // Restaurar campo nome (pode ter sido bloqueado por adicionarProcesso)
+  var fNome = document.getElementById('f-nome');
+  fNome.readOnly = false;
+  fNome.style.opacity = '';
+  fNome.style.cursor = '';
+}
+
+// ========== ADICIONAR PROCESSO A CLIENTE EXISTENTE ==========
+function adicionarProcesso(nome, email, whats, cpf, orgao) {
+  editId = null;
+  moAba(0);
+  limparForm();
+  document.getElementById('mo-tit').textContent = 'Novo Processo';
+  document.getElementById('mo-sub').textContent = nome;
+  setVal('f-nome', nome);
+  setVal('f-email', email || '');
+  setVal('f-whats', whats || '');
+  setVal('f-cpf', cpf || '');
+  setVal('f-orgao', orgao || '');
+  var hoje = new Date();
+  setVal('f-data', hoje.toISOString().split('T')[0]);
+  // Bloquear nome para não alterar vínculo
+  var fNome = document.getElementById('f-nome');
+  fNome.readOnly = true;
+  fNome.style.opacity = '0.6';
+  fNome.style.cursor = 'not-allowed';
+  document.getElementById('overlay').classList.add('on');
 }
 
 function overlayClick(e) {
@@ -1828,7 +1730,6 @@ function renderTabela() {
           '<span style="cursor:pointer;text-decoration:underline dotted;color:var(--ch)" onclick="abrirDetalhe(\''+c.id+'\')">'+esc(c.nome)+'</span>' +
           (c.orgao ? '<span class="sub">'+esc(c.orgao)+'</span>' : '') +
           (qtdProc > 1 ? '<span class="sub" style="color:var(--do)">'+qtdProc+' processos</span>' : '') +
-          (temTarefaPendente('cliente',c.id) ? '<span class="badge-deleg">&#128203; Tarefa pendente</span>' : '') +
           alertaHtml +
         '</td>' +
         '<td style="font-size:11px;color:var(--tw);white-space:nowrap">'+fmtData(c.data)+'</td>' +
@@ -1844,11 +1745,12 @@ function renderTabela() {
         '<td style="min-width:180px;">' + buildAndamentoCell(c) + '</td>' +
         '<td style="min-width:120px;">'+exitoHtml+comissaoHtml+'</td>' +
         '<td><div class="acoes">' +
-          '<button class="btn-ic" title="Ver detalhes" onclick="abrirDetalhe(\''+c.id+'\')">&#128065;</button>' +
-          '<button class="btn-ic" title="Editar" onclick="abrirModal(\''+c.id+'\')">&#9999;&#65039;</button>' +
-          '<button class="btn-ic" title="Delegar atividade" onclick="abrirDeleg(\'cliente\',\''+c.id+'\',\''+esc(c.nome||'').replace(/'/g,"\\'")+'\')">&#128203;</button>' +
-          '<button class="btn-ic" title="Alternar status" onclick="toggleStatus(\''+c.id+'\')">&#128260;</button>' +
-          '<button class="btn-ic x" title="Excluir" onclick="pedirDel(\''+c.id+'\')">&#128465;&#65039;</button>' +
+          '<button class="btn-ic" title="Ver detalhes" onclick="abrirDetalhe(\''+c.id+'\')">👁</button>' +
+          '<button class="btn-ic" title="Editar" onclick="abrirModal(\''+c.id+'\')">✏️</button>' +
+          '<button class="btn-ic" title="Adicionar novo processo a este cliente" onclick="adicionarProcesso(\''+c.nome.replace(/'/g,"\\'")+'\',' +
+            '\''+( c.email||'').replace(/'/g,"\\'")+'\',\''+( c.whats||'').replace(/'/g,"\\'")+'\',\''+( c.cpf||'').replace(/'/g,"\\'")+'\',\''+( c.orgao||'').replace(/'/g,"\\'")+'\')">➕</button>' +
+          '<button class="btn-ic" title="Alternar status" onclick="toggleStatus(\''+c.id+'\')">🔄</button>' +
+          '<button class="btn-ic x" title="Excluir" onclick="pedirDel(\''+c.id+'\')">🗑️</button>' +
         '</div></td>' +
       '</tr>';
     });
@@ -1889,6 +1791,12 @@ function abrirDetalhe(id) {
   });
   document.getElementById('det-procs').innerHTML = html;
   document.getElementById('ov-det').style.display = 'block';
+  // Vincular botão de adicionar processo
+  var btnAdd = document.getElementById('det-btn-addproc');
+  btnAdd.onclick = function() {
+    document.getElementById('ov-det').style.display = 'none';
+    adicionarProcesso(c.nome, c.email||'', c.whats||'', c.cpf||'', c.orgao||'');
+  };
 }
 
 // ========== RECEBIMENTOS ==========
@@ -2882,9 +2790,8 @@ function renderPAD() {
       '<td style="font-size:11px;color:var(--tw)">'+fmtData(p.data)+'</td>'+
       '<td style="font-size:11px;color:var(--tw);max-width:140px;overflow:hidden;text-overflow:ellipsis">'+esc(p.obs||'')+'</td>'+
       '<td><div class="acoes">'+
-        '<button class="btn-ic" title="Editar" onclick="abrirModalPAD(\''+p.id+'\')">&#9999;&#65039;</button>'+
-        '<button class="btn-ic" title="Delegar atividade" onclick="abrirDeleg(\'pad\',\''+p.id+'\',\''+esc(p.nome||'').replace(/'/g,"\\'")+'\')">&#128203;</button>'+
-        '<button class="btn-ic x" title="Excluir" onclick="excluirPAD(\''+p.id+'\')">&#128465;&#65039;</button>'+
+        '<button class="btn-ic" title="Editar" onclick="abrirModalPAD(\''+p.id+'\')">✏️</button>'+
+        '<button class="btn-ic x" title="Excluir" onclick="excluirPAD(\''+p.id+'\')">🗑️</button>'+
       '</div></td>'+
     '</tr>';
   }).join('');
@@ -2907,14 +2814,13 @@ function exportPADcsv() {
 // ========== ATENDIMENTOS ==========
 function abrirModalAtend(id) {
   editAtendId = id;
-  ['at-nome','at-data','at-hora','at-assunto','at-doc-det','at-whats','at-email','at-obs'].forEach(function(f){ setVal(f,''); });
-  setVal('at-tipo','Parecer'); setVal('at-situacao','Pendente'); setVal('at-doc-local',''); setVal('at-duracao','60');
+  ['at-nome','at-data','at-assunto','at-doc-det','at-whats','at-email','at-obs'].forEach(function(f){ setVal(f,''); });
+  setVal('at-tipo','Parecer'); setVal('at-situacao','Pendente'); setVal('at-doc-local','');
   if (id) {
     var a=(ATENDIMENTOS||[]).find(function(x){ return x.id===id; });
     if (!a) return;
     document.getElementById('at-mo-tit').textContent='Editar Atendimento';
     setVal('at-nome',a.nome||''); setVal('at-data',a.data||'');
-    setVal('at-hora',a.hora||''); setVal('at-duracao',a.duracao||'60');
     setVal('at-tipo',a.tipo||'Parecer'); setVal('at-situacao',a.situacao||'Pendente');
     setVal('at-assunto',a.assunto||''); setVal('at-doc-local',a.docLocal||'');
     setVal('at-doc-det',a.docDet||''); setVal('at-whats',a.whats||'');
@@ -2928,63 +2834,19 @@ function abrirModalAtend(id) {
 
 function toggleAtendDocDetalhe() { /* always visible */ }
 
-function salvarAtend(agendar) {
+function salvarAtend() {
   var nome=getVal('at-nome');
   if (!nome) { toast('Informe o nome do cliente',true); return; }
   var obj={
-    nome:nome, data:getVal('at-data'), hora:getVal('at-hora'), duracao:getVal('at-duracao'),
-    tipo:getVal('at-tipo'), situacao:getVal('at-situacao'), assunto:getVal('at-assunto'),
+    nome:nome, data:getVal('at-data'), tipo:getVal('at-tipo'),
+    situacao:getVal('at-situacao'), assunto:getVal('at-assunto'),
     docLocal:getVal('at-doc-local'), docDet:getVal('at-doc-det'),
+    contato:getVal('at-whats'), docLocal:getVal('at-doc-local'), docDet:getVal('at-doc-det'),
     whats:getVal('at-whats'), email:getVal('at-email'), obs:getVal('at-obs')
   };
-  if (editAtendId) { obj.id=editAtendId; window._fbSaveAtend(obj); toast('&#10003; Atendimento atualizado'); }
-  else { window._fbSaveAtend(obj); toast('&#10003; Atendimento cadastrado'); }
+  if (editAtendId) { obj.id=editAtendId; window._fbSaveAtend(obj); toast('✓ Atendimento atualizado'); }
+  else { window._fbSaveAtend(obj); toast('✓ Atendimento cadastrado'); }
   document.getElementById('ov-atend').style.display='none'; editAtendId=null;
-  if (agendar) agendarAtendGoogleCalendar(obj);
-}
-
-function agendarAtendGoogleCalendar(a) {
-  var data = a.data || new Date().toISOString().split('T')[0];
-  var hora = a.hora || '09:00';
-  var durMin = parseInt(a.duracao||'60');
-
-  // Montar datas no formato YYYYMMDDTHHmmss
-  var partsD = data.split('-');
-  var partsH = hora.split(':');
-  var ano=partsD[0], mes=partsD[1], dia=partsD[2];
-  var hh=partsH[0]||'09', mm=partsH[1]||'00';
-
-  var dtInicio = ano+mes+dia+'T'+hh+mm+'00';
-
-  // Calcular hora fim
-  var totalMin = parseInt(hh)*60 + parseInt(mm) + durMin;
-  var hFim = String(Math.floor(totalMin/60)%24).padStart(2,'0');
-  var mFim = String(totalMin%60).padStart(2,'0');
-  var dtFim = ano+mes+dia+'T'+hFim+mFim+'00';
-
-  var titulo = encodeURIComponent('Atendimento: '+a.nome+' — '+(a.tipo||''));
-  var detalhes = encodeURIComponent(
-    'Cliente: '+(a.nome||'')+'\n'+
-    'Tipo: '+(a.tipo||'')+'\n'+
-    'Situação: '+(a.situacao||'')+'\n'+
-    (a.assunto ? 'Assunto: '+a.assunto+'\n' : '')+
-    (a.obs ? 'Obs: '+a.obs : '')
-  );
-  var local = encodeURIComponent('Escritório Débora Constantino');
-
-  var url = 'https://calendar.google.com/calendar/render?action=TEMPLATE'+
-    '&text='+titulo+
-    '&dates='+dtInicio+'/'+dtFim+
-    '&details='+detalhes+
-    '&location='+local+
-    '&sf=true&output=xml';
-
-  window.open(url, '_blank');
-}
-
-function agendarAtendById(id) {
-  var a = (ATENDIMENTOS||[]).find(function(x){ return x.id===id; });
-  if (a) agendarAtendGoogleCalendar(a);
 }
 
 function renderAtendimentos() {
@@ -3022,17 +2884,15 @@ function renderAtendimentos() {
         (a.whats?'<a href="https://wa.me/55'+a.whats.replace(/\D/g,'')+'" target="_blank" style="font-size:10px;color:var(--ch)">📱 '+esc(a.whats)+'</a> ':'')+
         (a.email?'<a href="mailto:'+esc(a.email)+'" style="font-size:10px;color:var(--tw)">✉️ '+esc(a.email)+'</a>':'')+
       '</td>'+
-      '<td style="font-size:11px;color:var(--tw);white-space:nowrap">'+fmtData(a.data)+(a.hora?'<br><span style="color:var(--ch);font-weight:600">&#128337; '+a.hora+'</span>':'')+'</td>'+
+      '<td style="font-size:11px;color:var(--tw);white-space:nowrap">'+fmtData(a.data)+'</td>'+
       '<td><span class="bgt">'+esc(a.tipo||'')+'</span></td>'+
       '<td><span style="font-size:11px;font-weight:600;color:'+(sitCores[a.situacao]||'var(--tw)')+'">'+esc(a.situacao||'')+'</span></td>'+
       '<td>'+docHtml+'</td>'+
       '<td style="font-size:11px;color:var(--ts);max-width:160px;overflow:hidden;text-overflow:ellipsis">'+esc(a.assunto||'')+'</td>'+
       '<td style="font-size:11px;color:var(--tw)">'+esc(a.obs||'')+'</td>'+
       '<td><div class="acoes">'+
-        '<button class="btn-ic" title="Editar" onclick="abrirModalAtend(\''+a.id+'\')">&#9999;&#65039;</button>'+
-        '<button class="btn-ic" title="Delegar atividade" onclick="abrirDeleg(\'atendimento\',\''+a.id+'\',\''+esc(a.nome||'').replace(/'/g,"\\'")+'\')">&#128203;</button>'+
-        '<button class="btn-ic" title="Agendar no Google Agenda" onclick="agendarAtendById(\''+a.id+'\')" style="color:#4285F4">&#128197;</button>'+
-        '<button class="btn-ic x" title="Excluir" onclick="excluirAtend(\''+a.id+'\')">&#128465;&#65039;</button>'+
+        '<button class="btn-ic" title="Editar" onclick="abrirModalAtend(\''+a.id+'\')">✏️</button>'+
+        '<button class="btn-ic x" title="Excluir" onclick="excluirAtend(\''+a.id+'\')">🗑️</button>'+
       '</div></td>'+
     '</tr>';
   }).join('');
@@ -3050,227 +2910,6 @@ function exportAtendCSV() {
   var blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
   var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download='atendimentos.csv'; a.click(); URL.revokeObjectURL(url);
   toast('✓ CSV exportado');
-}
-
-// ========== DELEGAÇÃO DE ATIVIDADES ==========
-var _delegContextTipo = '';
-var _delegContextId = '';
-var _delegContextNome = '';
-
-// Equipe padrão — editável pelo usuário no modal
-var EQUIPE_DEFAULT = [
-  {nome:'Secretária', email:''},
-  {nome:'Estagiário(a)', email:''},
-  {nome:'Advogado Associado', email:''}
-];
-
-function getEquipe() {
-  try {
-    var s = localStorage.getItem('deleg_equipe');
-    if (s) return JSON.parse(s);
-  } catch(e) {}
-  return JSON.parse(JSON.stringify(EQUIPE_DEFAULT));
-}
-
-function salvarEquipe() {
-  var items = document.querySelectorAll('.deleg-equipe-item');
-  var eq = [];
-  items.forEach(function(item) {
-    var inputs = item.querySelectorAll('input');
-    var nome = inputs[0] ? inputs[0].value.trim() : '';
-    var email = inputs[1] ? inputs[1].value.trim() : '';
-    if (nome) eq.push({nome:nome, email:email});
-  });
-  try { localStorage.setItem('deleg_equipe', JSON.stringify(eq)); } catch(e) {}
-  popularSelectMembro();
-  toast('&#10003; Equipe salva!');
-}
-
-function popularSelectMembro() {
-  var eq = getEquipe();
-  var sel = document.getElementById('deleg-membro');
-  if (!sel) return;
-  sel.innerHTML = '<option value="">Selecione...</option>';
-  eq.forEach(function(m, i) {
-    var opt = document.createElement('option');
-    opt.value = m.nome;
-    opt.dataset.email = m.email || '';
-    opt.textContent = m.nome + (m.email ? ' — '+m.email : '');
-    sel.appendChild(opt);
-  });
-}
-
-function atualizarEmailMembro() {
-  var sel = document.getElementById('deleg-membro');
-  var opt = sel.options[sel.selectedIndex];
-  if (opt && opt.dataset.email) {
-    document.getElementById('deleg-email').value = opt.dataset.email;
-  } else {
-    document.getElementById('deleg-email').value = '';
-  }
-}
-
-function renderEquipeEditor() {
-  var eq = getEquipe();
-  var div = document.getElementById('deleg-equipe-lista');
-  if (!div) return;
-  div.innerHTML = eq.map(function(m, i) {
-    return '<div class="deleg-equipe-item">'+
-      '<span style="font-size:16px;">&#128100;</span>'+
-      '<input type="text" placeholder="Nome do membro" value="'+esc(m.nome||'')+'" data-idx="'+i+'" data-field="nome">'+
-      '<input type="email" placeholder="email@escritorio.com" value="'+esc(m.email||'')+'" data-idx="'+i+'" data-field="email" style="color:var(--tw);">'+
-      '<button class="btn-del-eq" onclick="removerMembroEquipe('+i+')">&#128465;</button>'+
-    '</div>';
-  }).join('');
-}
-
-function adicionarMembroEquipe() {
-  var eq = getEquipe();
-  eq.push({nome:'', email:''});
-  try { localStorage.setItem('deleg_equipe', JSON.stringify(eq)); } catch(e) {}
-  renderEquipeEditor();
-}
-
-function removerMembroEquipe(idx) {
-  var eq = getEquipe();
-  eq.splice(idx, 1);
-  try { localStorage.setItem('deleg_equipe', JSON.stringify(eq)); } catch(e) {}
-  renderEquipeEditor();
-}
-
-function abrirDeleg(tipo, id, nome) {
-  _delegContextTipo = tipo;
-  _delegContextId = id;
-  _delegContextNome = nome;
-  document.getElementById('deleg-titulo').textContent = 'Delegar Atividade';
-  var labelTipo = tipo === 'cliente' ? 'Cliente' : tipo === 'atendimento' ? 'Atendimento' : 'PAD';
-  document.getElementById('deleg-subtitulo').textContent = labelTipo+': '+nome;
-  // Limpar campos
-  document.getElementById('deleg-membro').value = '';
-  document.getElementById('deleg-email').value = '';
-  document.getElementById('deleg-tipo').value = '';
-  document.getElementById('deleg-prior').value = 'Normal';
-  document.getElementById('deleg-desc').value = '';
-  // Prazo padrão: 3 dias
-  var d = new Date(); d.setDate(d.getDate()+3);
-  document.getElementById('deleg-prazo').value = d.toISOString().split('T')[0];
-  popularSelectMembro();
-  renderEquipeEditor();
-  renderDelegHist();
-  document.getElementById('ov-deleg').style.display = 'block';
-}
-
-function fecharDeleg() {
-  document.getElementById('ov-deleg').style.display = 'none';
-}
-
-function renderDelegHist() {
-  var lista = (DELEGACOES||[]).filter(function(d) {
-    return d.refTipo === _delegContextTipo && d.refId === _delegContextId;
-  });
-  lista.sort(function(a,b){ return (b.criadoEm||'') > (a.criadoEm||'') ? 1 : -1; });
-  var div = document.getElementById('deleg-hist-lista');
-  if (!div) return;
-  if (!lista.length) {
-    div.innerHTML = '<div style="text-align:center;padding:22px;color:var(--tw);font-size:12px;">Nenhuma tarefa delegada ainda.</div>';
-    return;
-  }
-  var priorCor = {Normal:'var(--ch)', Alta:'#e8a060', Urgente:'#e88080'};
-  div.innerHTML = lista.map(function(d) {
-    var conc = d.status === 'Concluída';
-    return '<div class="deleg-hist-item">'+
-      '<div class="dh-head">'+
-        '<span class="dh-membro">&#128100; '+esc(d.membro||'')+'</span>'+
-        '<div style="display:flex;gap:6px;align-items:center;">'+
-          (d.prioridade && d.prioridade!=='Normal' ? '<span style="font-size:10px;font-weight:700;color:'+priorCor[d.prioridade]+'">'+esc(d.prioridade)+'</span>' : '')+
-          '<span class="dh-status '+(conc?'conc':'pend')+'">'+esc(d.status||'Pendente')+'</span>'+
-          (!conc ? '<button class="btn-ic" title="Marcar como concluída" onclick="concluirDelegacao(\''+d.id+'\')" style="font-size:10px;height:22px;padding:0 7px;width:auto;">&#10003; Concluir</button>' : '')+
-          '<button class="btn-ic x" title="Excluir" onclick="excluirDelegacao(\''+d.id+'\')" style="font-size:10px;height:22px;width:22px;">&#128465;</button>'+
-        '</div>'+
-      '</div>'+
-      '<div style="font-size:12px;color:var(--ts);margin-bottom:3px;"><strong>'+esc(d.tipo||'')+'</strong>'+
-        (d.prazo ? ' <span style="color:var(--tw);">— Prazo: '+fmtData(d.prazo)+'</span>' : '')+
-      '</div>'+
-      (d.desc ? '<div style="font-size:11px;color:var(--tw);">'+esc(d.desc)+'</div>' : '')+
-      '<div style="font-size:10px;color:var(--tw);margin-top:4px;">Delegado em: '+fmtData((d.criadoEm||'').split('T')[0])+'</div>'+
-    '</div>';
-  }).join('');
-}
-
-function salvarDelegacao(enviarEmail) {
-  var membro = document.getElementById('deleg-membro').value;
-  var tipo = document.getElementById('deleg-tipo').value;
-  if (!membro) { toast('Selecione um membro da equipe', true); return; }
-  if (!tipo) { toast('Selecione o tipo de tarefa', true); return; }
-  var email = document.getElementById('deleg-email').value;
-  var prazo = document.getElementById('deleg-prazo').value;
-  var prior = document.getElementById('deleg-prior').value;
-  var desc = document.getElementById('deleg-desc').value;
-  var obj = {
-    refTipo: _delegContextTipo,
-    refId: _delegContextId,
-    refNome: _delegContextNome,
-    membro: membro,
-    emailMembro: email,
-    tipo: tipo,
-    prioridade: prior,
-    prazo: prazo,
-    desc: desc,
-    status: 'Pendente',
-    criadoEm: new Date().toISOString()
-  };
-  window._fbSaveDelegacao(obj);
-  toast('&#10003; Tarefa delegada para '+membro);
-  if (enviarEmail && email) {
-    enviarEmailDelegacao(obj);
-  } else if (enviarEmail && !email) {
-    toast('&#9888; Tarefa salva — e-mail não enviado: nenhum e-mail cadastrado para este membro', true);
-  }
-  // Limpar campos
-  document.getElementById('deleg-membro').value = '';
-  document.getElementById('deleg-email').value = '';
-  document.getElementById('deleg-tipo').value = '';
-  document.getElementById('deleg-desc').value = '';
-}
-
-function enviarEmailDelegacao(obj) {
-  var assunto = encodeURIComponent('[Escritório Débora Constantino] Tarefa Delegada: '+obj.tipo);
-  var priorLabel = obj.prioridade !== 'Normal' ? ' | PRIORIDADE: '+obj.prioridade.toUpperCase() : '';
-  var corpo = encodeURIComponent(
-    'Olá, '+obj.membro+'!\n\n'+
-    'Você recebeu uma nova tarefa delegada pelo escritório Débora Constantino.\n\n'+
-    '-------------------------------------------\n'+
-    'TAREFA: '+obj.tipo+'\n'+
-    'REFERÊNCIA: '+obj.refNome+'\n'+
-    'PRIORIDADE: '+obj.prioridade+'\n'+
-    (obj.prazo ? 'PRAZO: '+obj.prazo+'\n' : '')+
-    (obj.desc ? '\nDESCRIÇÃO:\n'+obj.desc+'\n' : '')+
-    '-------------------------------------------\n\n'+
-    'Acesse o sistema para mais detalhes:\nhttps://advdeboraconstantino.github.io/gestao-escritorio/\n\n'+
-    'Débora Constantino | Advogada\nOAB/SP 378.037 | (12) 99639-2975'+
-    priorLabel
-  );
-  window.open('mailto:'+encodeURIComponent(obj.emailMembro)+'?subject='+assunto+'&body='+corpo, '_blank');
-}
-
-function concluirDelegacao(id) {
-  var d = (DELEGACOES||[]).find(function(x){ return x.id===id; });
-  if (!d) return;
-  d.status = 'Concluída';
-  window._fbSaveDelegacao(d);
-  toast('&#10003; Tarefa marcada como concluída');
-}
-
-function excluirDelegacao(id) {
-  if (!confirm('Excluir esta tarefa delegada?')) return;
-  window._fbDeleteDelegacao(id);
-  toast('Tarefa removida');
-}
-
-function temTarefaPendente(tipo, id) {
-  return (DELEGACOES||[]).some(function(d) {
-    return d.refTipo===tipo && d.refId===id && d.status==='Pendente';
-  });
 }
 
 // ========== INIT ==========
