@@ -27,6 +27,7 @@
   const indicacoesRef = collection(db, "indicacoes");
   const padRef = collection(db, "pad");
   const atendRef = collection(db, "atendimentos");
+  const oabsRef = collection(db, "oabs_monitoradas");
 
   // Expor funções globais para o código legado
   window._fbSave = async function(obj) {
@@ -95,6 +96,15 @@
   window._fbDeleteAtend = async function(id) {
     try { await deleteDoc(doc(db, "atendimentos", id)); } catch(e) { console.error(e); }
   };
+  window._fbSaveOab = async function(obj) {
+    try {
+      if (obj.id && typeof obj.id === 'string') { await setDoc(doc(db, "oabs_monitoradas", obj.id), obj); }
+      else { const ref = await addDoc(oabsRef, obj); return ref.id; }
+    } catch(e) { console.error(e); }
+  };
+  window._fbDeleteOab = async function(id) {
+    try { await deleteDoc(doc(db, "oabs_monitoradas", id)); } catch(e) { console.error(e); }
+  };
 
   window._fbListen = function(callback) {
     return onSnapshot(colRef, function(snapshot) {
@@ -123,6 +133,21 @@
     window._fbListenPrazos(function(dados) {
       window.PRAZOS = dados;
       atualizarBadgePrazos();
+      window._prazosLoaded = true;
+      if (typeof tentarAutoCheckDJEN === 'function') tentarAutoCheckDJEN();
+    });
+    onSnapshot(oabsRef, function(snap) {
+      window.OABS_MONITORADAS = [];
+      snap.forEach(function(d){ window.OABS_MONITORADAS.push(Object.assign({id:d.id}, d.data())); });
+      if (!window._oabsSeedChecked) {
+        window._oabsSeedChecked = true;
+        if (window.OABS_MONITORADAS.length === 0) {
+          window._fbSaveOab({ numero: '378037', uf: 'SP', nome: 'Débora Constantino' });
+        }
+      }
+      window._oabsLoaded = true;
+      if (typeof tentarAutoCheckDJEN === 'function') tentarAutoCheckDJEN();
+      if (typeof renderOabsLista === 'function') renderOabsLista();
     });
     onSnapshot(parceirosRef, function(snap) {
       window.PARCEIROS = [];
@@ -159,7 +184,7 @@
 body{background:var(--fp);color:var(--tp);font-family:'DM Sans',sans-serif;min-height:100vh;font-size:14px;}
 
 /* HEADER */
-.hdr{background:var(--fs);border-bottom:2px solid var(--do);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;}
+.hdr{background:var(--fs);border-bottom:2px solid var(--do);padding:14px 28px;display:flex;align-items:center;justify-content:flex-end;}
 .hdr-esq{display:flex;align-items:center;gap:12px;}
 .hdr-ic{width:40px;height:40px;background:linear-gradient(135deg,var(--vi),var(--vm));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;}
 .hdr-nome{font-family:'Playfair Display',serif;font-size:18px;color:var(--tp);}
@@ -169,12 +194,50 @@ body{background:var(--fp);color:var(--tp);font-family:'DM Sans',sans-serif;min-h
 .stat-n{font-family:'Playfair Display',serif;font-size:20px;color:var(--do);display:block;}
 .stat-l{font-size:9px;color:var(--tw);text-transform:uppercase;letter-spacing:1px;}
 
-/* ABAS */
+/* ABAS (legado, mantido por compatibilidade) */
 .abas{background:var(--fs);border-bottom:1px solid var(--bd);padding:0 28px;display:flex;gap:2px;overflow-x:auto;}
 .aba{padding:11px 18px;font-size:12px;font-weight:500;color:var(--tw);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;transition:all .2s;white-space:nowrap;display:flex;align-items:center;gap:6px;}
 .aba:hover{color:var(--ch);}
 .aba.on{color:var(--ch);border-bottom-color:var(--do);}
-.abadge{background:var(--rc);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;}
+.abadge{background:var(--rc);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;flex-shrink:0;}
+
+/* ===== APP SHELL / SIDEBAR (DASHBOARD) ===== */
+.app-shell{display:flex;align-items:stretch;min-height:100vh;}
+.sidebar{width:236px;flex-shrink:0;background:var(--fs);border-right:1px solid var(--bd);display:flex;flex-direction:column;position:sticky;top:0;align-self:flex-start;height:100vh;overflow-y:auto;z-index:50;}
+.side-brand{display:flex;align-items:center;gap:11px;padding:18px 16px;border-bottom:1px solid var(--bd);flex-shrink:0;}
+.side-brand-ic{width:38px;height:38px;background:linear-gradient(135deg,var(--vi),var(--vm));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.side-brand-tx{min-width:0;}
+.side-brand-nome{font-family:'Playfair Display',serif;font-size:14.5px;color:var(--tp);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.side-brand-sub{font-size:9px;color:var(--ch);letter-spacing:1px;text-transform:uppercase;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.side-status{font-size:10px;color:var(--tw);padding:9px 16px;border-bottom:1px solid var(--bd);flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.side-nav{flex:1;padding:8px 0;display:flex;flex-direction:column;gap:1px;overflow-y:auto;}
+.side-item{position:relative;display:flex;align-items:center;gap:11px;padding:10px 16px;font-size:12.5px;font-weight:500;font-family:'DM Sans',sans-serif;color:var(--tw);background:none;border:none;border-left:3px solid transparent;cursor:pointer;transition:all .15s;text-align:left;width:100%;white-space:nowrap;}
+.side-item .ic{font-size:15px;width:18px;text-align:center;flex-shrink:0;}
+.side-item .lbl{flex:1;overflow:hidden;text-overflow:ellipsis;}
+.side-item:hover{color:var(--ch);background:rgba(180,138,74,.07);}
+.side-item.on{color:var(--tp);background:rgba(63,103,73,.16);border-left-color:var(--do);}
+.side-item .abadge{margin-left:auto;}
+.side-foot{padding:12px 16px;border-top:1px solid var(--bd);font-size:9px;color:var(--tw);letter-spacing:.4px;flex-shrink:0;}
+.main-wrap{flex:1;min-width:0;display:flex;flex-direction:column;}
+
+@media(max-width:960px){
+  .sidebar{width:204px;}
+  .side-item{padding:9px 14px;font-size:12px;}
+  .side-brand{padding:16px 14px;}
+}
+@media(max-width:640px){
+  .sidebar{width:172px;}
+  .side-brand-sub{display:none;}
+  .side-status{white-space:normal;}
+  .side-item{padding:8px 10px;font-size:11px;gap:8px;}
+  .side-item .ic{font-size:13px;width:16px;}
+  .side-foot{padding:10px 10px;font-size:8px;}
+}
+@media(max-width:420px){
+  .sidebar{width:140px;}
+  .side-brand-nome{font-size:12.5px;}
+  .side-item{padding:8px 8px;font-size:10px;}
+}
 
 /* PÁGINA */
 .pg{display:none;max-width:1380px;margin:0 auto;padding:26px;}
@@ -400,16 +463,34 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
 </head>
 <body>
 
-<!-- HEADER -->
-<header class="hdr">
-  <div class="hdr-esq">
-    <div class="hdr-ic">⚖️</div>
-    <div>
-      <div class="hdr-nome">Débora Constantino</div>
-      <div class="hdr-sub">Gestão de Clientes e Processos</div>
-      <div id="status-fb" style="font-size:10px;color:var(--tw);margin-top:2px;">🔴 Aguardando conexão...</div>
+<div class="app-shell">
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="side-brand">
+    <div class="side-brand-ic">⚖️</div>
+    <div class="side-brand-tx">
+      <div class="side-brand-nome">Débora Constantino</div>
+      <div class="side-brand-sub">Gestão Jurídica</div>
     </div>
   </div>
+  <div class="side-status" id="status-fb">🔴 Aguardando conexão...</div>
+  <nav class="side-nav">
+    <button class="side-item on" onclick="mudarAba('clientes',this)"><span class="ic">⚖️</span><span class="lbl">Clientes &amp; Processos</span></button>
+    <button class="side-item" onclick="mudarAba('recebimentos',this)"><span class="ic">💰</span><span class="lbl">Previsão de Recebimentos</span></button>
+    <button class="side-item" onclick="mudarAba('prazos',this)"><span class="ic">⏱️</span><span class="lbl">Prazos &amp; Intimações</span><span class="abadge" id="badge-prazos">0</span></button>
+    <button class="side-item" onclick="mudarAba('djen',this)"><span class="ic">📨</span><span class="lbl">DJEN — Publicações</span><span class="abadge" id="badge-djen" style="display:none;">0</span></button>
+    <button class="side-item" onclick="mudarAba('pad',this)"><span class="ic">📁</span><span class="lbl">PAD</span></button>
+    <button class="side-item" onclick="mudarAba('atendimentos',this)"><span class="ic">📝</span><span class="lbl">Atendimentos</span></button>
+    <button class="side-item" onclick="mudarAba('parceiros',this)"><span class="ic">🤝</span><span class="lbl">Advogados Parceiros</span></button>
+    <button class="side-item" onclick="mudarAba('relatorios',this)"><span class="ic">📊</span><span class="lbl">Relatórios Financeiros</span></button>
+    <button class="side-item" onclick="mudarAba('alertas',this)"><span class="ic">🔔</span><span class="lbl">Alertas</span><span class="abadge" id="badge-n">0</span></button>
+  </nav>
+  <div class="side-foot">OAB/SP 378.037</div>
+</aside>
+
+<div class="main-wrap">
+<!-- HEADER -->
+<header class="hdr">
   <div class="hdr-stats">
     <div class="stat"><span class="stat-n" id="h-tot">0</span><span class="stat-l">Clientes</span></div>
     <div class="stat"><span class="stat-n" id="h-pro">0</span><span class="stat-l">Protocolados</span></div>
@@ -419,17 +500,6 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
   </div>
 </header>
 
-<!-- ABAS -->
-<nav class="abas">
-  <button class="aba on" onclick="mudarAba('clientes',this)">⚖️ Clientes &amp; Processos</button>
-  <button class="aba" onclick="mudarAba('recebimentos',this)">💰 Previsão de Recebimentos</button>
-  <button class="aba" onclick="mudarAba('prazos',this)">⏱️ Prazos &amp; Intimações <span class="abadge" id="badge-prazos">0</span></button>
-  <button class="aba" onclick="mudarAba('pad',this)">📁 PAD</button>
-  <button class="aba" onclick="mudarAba('atendimentos',this)">📝 Atendimentos</button>
-  <button class="aba" onclick="mudarAba('parceiros',this)">🤝 Advogados Parceiros</button>
-  <button class="aba" onclick="mudarAba('relatorios',this)">📊 Relatórios Financeiros</button>
-  <button class="aba" onclick="mudarAba('alertas',this)">🔔 Alertas <span class="abadge" id="badge-n">0</span></button>
-</nav>
 
 <!-- ===== PÁGINA: CLIENTES ===== -->
 <div class="pg on" id="pg-clientes">
@@ -533,6 +603,94 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
   </div>
 
   <div id="prazos-lista"></div>
+</div>
+
+<!-- ===== PÁGINA: DJEN — PUBLICAÇÕES ===== -->
+<div class="pg" id="pg-djen">
+  <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+    <div class="card"><div class="card-l">Última Consulta</div><div class="card-v" id="dj-ultima" style="font-size:14px;">—</div><div class="card-s">data e hora</div></div>
+    <div class="card"><div class="card-l">Publicações no Período</div><div class="card-v" id="dj-tot">0</div><div class="card-s">encontradas na última busca</div></div>
+    <div class="card"><div class="card-l">Ainda Não Importadas</div><div class="card-v" id="dj-pend" style="color:#D4B84A">0</div><div class="card-s">aguardando virar prazo</div></div>
+  </div>
+
+  <!-- OABs MONITORADAS -->
+  <div class="tbl-box" style="margin-bottom:16px;">
+    <div class="tbl-bar">
+      <div class="tbl-tit">OABs Monitoradas</div>
+      <button class="btn-o" onclick="toggleFormOab()">+ Adicionar OAB</button>
+    </div>
+    <div id="form-oab" style="display:none;padding:16px 20px;border-bottom:1px solid var(--bd);">
+      <div class="gr gr3">
+        <div class="fg"><label class="fl">Nº OAB</label><input class="fi" id="novo-oab-num" placeholder="Ex.: 378037"></div>
+        <div class="fg"><label class="fl">UF</label>
+          <select class="fi" id="novo-oab-uf">
+            <option value="SP" selected>SP</option>
+            <option value="RJ">RJ</option>
+            <option value="MG">MG</option>
+            <option value="PR">PR</option>
+            <option value="SC">SC</option>
+            <option value="RS">RS</option>
+            <option value="BA">BA</option>
+            <option value="GO">GO</option>
+            <option value="DF">DF</option>
+            <option value="ES">ES</option>
+            <option value="MT">MT</option>
+            <option value="MS">MS</option>
+            <option value="PE">PE</option>
+            <option value="CE">CE</option>
+            <option value="PA">PA</option>
+            <option value="AM">AM</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Nome do Advogado(a)</label><input class="fi" id="novo-oab-nome" placeholder="Ex.: Débora Constantino"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn-v" onclick="salvarOab()">✓ Salvar OAB</button>
+        <button class="btn-o" onclick="toggleFormOab()">Cancelar</button>
+      </div>
+    </div>
+    <div id="oabs-lista" style="padding:16px 20px;"></div>
+  </div>
+
+  <div class="toolbar">
+    <div class="tb-l">
+      <span style="font-size:11px;color:var(--tw);">Período</span>
+      <input type="date" class="fi" id="dj-data-ini" style="width:150px;">
+      <span style="color:var(--tw);font-size:11px;">até</span>
+      <input type="date" class="fi" id="dj-data-fim" style="width:150px;">
+    </div>
+    <button class="btn-v" onclick="buscarDJEN()" id="dj-btn-buscar">🔍 Buscar no DJEN</button>
+  </div>
+
+  <!-- CONFIGURAÇÃO DA IA -->
+  <div class="tbl-box" style="margin-bottom:16px;">
+    <div class="tbl-bar">
+      <div class="tbl-tit">🤖 Análise por IA das Publicações</div>
+      <button class="btn-o" onclick="toggleConfigIA()">🔑 Configurar chave da IA</button>
+    </div>
+    <div id="config-ia" style="display:none;padding:16px 20px;border-bottom:1px solid var(--bd);">
+      <div class="gr gr2">
+        <div class="fg"><label class="fl">Chave de API da Anthropic (Claude)</label><input type="password" class="fi" id="ia-api-key" placeholder="sk-ant-..."></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button class="btn-v" onclick="salvarChaveIA()">✓ Salvar chave</button>
+        <button class="btn-o" onclick="toggleConfigIA()">Cancelar</button>
+      </div>
+      <div style="margin-top:10px;font-size:10.5px;color:var(--tw);line-height:1.6;">
+        A chave fica salva apenas neste navegador (não é enviada para o Firebase nem para o GitHub). Gere a sua em <a href="https://console.anthropic.com" target="_blank" style="color:var(--ch)">console.anthropic.com</a>. Cada consulta à IA usa alguns centavos de crédito da sua conta Anthropic.
+      </div>
+    </div>
+    <div style="padding:12px 20px;font-size:10.5px;color:var(--tw);" id="ia-status">🔴 Chave da IA não configurada neste navegador</div>
+  </div>
+
+  <div class="tbl-box">
+    <div class="tbl-bar"><div class="tbl-tit">Publicações — Diário de Justiça Eletrônico Nacional</div><div class="tbl-cnt" id="dj-cnt">Nenhuma consulta realizada ainda</div></div>
+    <div id="dj-lista" style="padding:14px 20px;"></div>
+  </div>
+
+  <div style="margin-top:14px;font-size:10.5px;color:var(--tw);line-height:1.6;">
+    ℹ️ Consulta feita diretamente na API pública do CNJ/PJe (comunicaapi.pje.jus.br), que reúne as publicações do Diário de Justiça Eletrônico Nacional de todos os tribunais do país, para todas as OABs monitoradas acima. O sistema faz uma checagem automática ao ser aberto (uma vez por dia). Para conferência oficial de prazos, utilize sempre o portal <a href="https://comunica.pje.jus.br/consulta" target="_blank" style="color:var(--ch)">comunica.pje.jus.br</a>.
+  </div>
 </div>
 
 <!-- ===== PÁGINA: PAD ===== -->
@@ -945,16 +1103,17 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
   <div class="rel-sec">
     <div class="rel-sec-tit">⚖️ Honorários Iniciais Recebidos</div>
     <div class="tbl-box"><div class="tbl-sc"><table>
-      <thead><tr><th>Cliente</th><th>Tipo</th><th>Valor Total Hon.</th><th>Modalidade</th><th>Parcela / Data Pgto</th><th>Valor Pago</th></tr></thead>
+      <thead><tr><th>Cliente</th><th>Tipo</th><th>Valor Total Hon.</th><th>Modalidade</th><th>Parcela / Data Pgto</th><th>Valor Pago</th><th>Comissão Devida</th></tr></thead>
       <tbody id="rel-tbody-hon"></tbody>
     </table></div></div>
   </div>
 
   <!-- COMISSÕES -->
   <div class="rel-sec">
-    <div class="rel-sec-tit">🏷️ Comissões Devidas ao Setor Comercial</div>
+    <div class="rel-sec-tit">🏷️ Comissões Devidas por Colaborador</div>
+    <div class="cards" id="rel-resumo-colab" style="margin-bottom:14px;"></div>
     <div class="tbl-box"><div class="tbl-sc"><table>
-      <thead><tr><th>Cliente</th><th>Tipo</th><th>Base Paga (Taxa)</th><th>% Comissão</th><th>Valor Comissão</th></tr></thead>
+      <thead><tr><th>Colaborador</th><th>Cliente</th><th>Tipo</th><th>Origem</th><th>Base Paga</th><th>% Comissão</th><th>Valor Comissão</th></tr></thead>
       <tbody id="rel-tbody-com"></tbody>
     </table></div></div>
   </div>
@@ -965,6 +1124,9 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
 <div class="pg" id="pg-alertas">
   <div id="alertas-full"></div>
 </div>
+
+</div><!-- /main-wrap -->
+</div><!-- /app-shell -->
 
 <!-- ===== OVERLAY / MODAL CADASTRO ===== -->
 <div id="overlay" onclick="overlayClick(event)">
@@ -1081,7 +1243,7 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
       <div class="chk-row"><input type="checkbox" id="ck-hon" onchange="toggleHon()"><label for="ck-hon">Honorários iniciais foram cobrados</label></div>
       <div id="grp-hon" style="display:none;">
         <div class="gr gr3">
-          <div class="fg"><label class="fl">Valor (R$)</label><input class="fi" id="f-hon-val" placeholder="0,00" oninput="fmtMoeda(this)"></div>
+          <div class="fg"><label class="fl">Valor (R$)</label><input class="fi" id="f-hon-val" placeholder="0,00" oninput="fmtMoeda(this);calcComissao()"></div>
           <div class="fg"><label class="fl">Modalidade</label>
             <select class="fi" id="f-hon-mod" onchange="toggleHonParc()">
               <option value="avista">À vista</option>
@@ -1089,7 +1251,7 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
             </select>
           </div>
           <div class="fg"><label class="fl">Situação</label>
-            <select class="fi" id="f-hon-sit">
+            <select class="fi" id="f-hon-sit" onchange="calcComissao()">
               <option value="nao">Não pago</option>
               <option value="sim">Pago</option>
             </select>
@@ -1137,22 +1299,35 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
         </div>
       </div>
 
-      <div class="sec">Comissão do Setor Comercial</div>
-      <div style="font-size:11px;color:var(--tw);margin-bottom:10px;">Calculada sobre o valor das taxas efetivamente pagas</div>
+      <div class="sec">Comissão sobre Taxa Administrativa</div>
+      <div style="font-size:11px;color:var(--tw);margin-bottom:10px;">O percentual total é calculado sobre o valor da taxa efetivamente paga, e depois dividido entre os colaboradores abaixo.</div>
       <div class="gr gr2">
-        <div class="fg"><label class="fl">Percentual de Comissão</label>
-          <select class="fi" id="f-comissao-pct" onchange="calcComissao()">
-            <option value="">Sem comissão</option>
-            <option value="20">20%</option>
-            <option value="30">30%</option>
-            <option value="40">40%</option>
-            <option value="50">50%</option>
-          </select>
-        </div>
-        <div class="fg"><label class="fl">Comissão Calculada</label>
-          <div class="fi" id="f-comissao-calc" style="background:rgba(0,0,0,.2);color:var(--ch);cursor:default;display:flex;align-items:center;">R$ 0,00</div>
-        </div>
+        <div class="fg"><label class="fl">Percentual Total da Comissão</label><input type="number" class="fi" id="f-comissao-taxa-pct" min="0" max="100" step="1" placeholder="Ex.: 20" oninput="calcComissao()"></div>
+        <div class="fg"><label class="fl">Valor Total da Comissão</label><div class="fi" id="f-comissao-taxa-total" style="background:rgba(0,0,0,.2);color:var(--ch);cursor:default;display:flex;align-items:center;">R$ 0,00</div></div>
       </div>
+      <div style="font-size:11px;color:var(--tw);margin:12px 0 8px;">Divisão entre colaboradores (percentual sobre o valor total da comissão acima)</div>
+      <div id="comissao-taxa-rows"></div>
+      <div id="comissao-taxa-aviso" style="display:none;font-size:10.5px;color:#D4B84A;margin-bottom:8px;"></div>
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="btn-o" onclick="adicionarComissaoRow('taxa')">+ Adicionar colaborador</button>
+        <button type="button" class="btn-o" onclick="dividirIgualComissao('taxa')">⚖️ Dividir igualmente</button>
+      </div>
+
+      <div class="sec" style="margin-top:24px;">Comissão sobre Honorários Iniciais</div>
+      <div style="font-size:11px;color:var(--tw);margin-bottom:10px;">O percentual total é calculado sobre o valor dos honorários iniciais efetivamente pagos, e depois dividido entre os colaboradores abaixo.</div>
+      <div class="gr gr2">
+        <div class="fg"><label class="fl">Percentual Total da Comissão</label><input type="number" class="fi" id="f-comissao-hon-pct" min="0" max="100" step="1" placeholder="Ex.: 20" oninput="calcComissao()"></div>
+        <div class="fg"><label class="fl">Valor Total da Comissão</label><div class="fi" id="f-comissao-hon-total" style="background:rgba(0,0,0,.2);color:var(--ch);cursor:default;display:flex;align-items:center;">R$ 0,00</div></div>
+      </div>
+      <div style="font-size:11px;color:var(--tw);margin:12px 0 8px;">Divisão entre colaboradores (percentual sobre o valor total da comissão acima)</div>
+      <div id="comissao-hon-rows"></div>
+      <div id="comissao-hon-aviso" style="display:none;font-size:10.5px;color:#D4B84A;margin-bottom:8px;"></div>
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="btn-o" onclick="adicionarComissaoRow('hon')">+ Adicionar colaborador</button>
+        <button type="button" class="btn-o" onclick="dividirIgualComissao('hon')">⚖️ Dividir igualmente</button>
+      </div>
+
+      <datalist id="colaboradores-dl"></datalist>
     </div>
 
     <!-- PAINEL 2: CONTATO -->
@@ -1188,10 +1363,6 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
     <div style="padding:20px 26px;">
       <div class="det-cont" id="det-cont"></div>
       <div id="det-procs"></div>
-    </div>
-    <div class="mo-foot" style="justify-content:space-between;">
-      <button class="btn-v" id="det-btn-addproc" onclick="" style="background:var(--do);border-color:var(--do);">➕ Adicionar Processo</button>
-      <button class="btn-o" onclick="document.getElementById('ov-det').style.display='none'">Fechar</button>
     </div>
   </div>
 </div>
@@ -1244,6 +1415,7 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
             <option>Audiência</option>
             <option>Apresentação de documentos</option>
             <option>Cumprimento de diligência</option>
+            <option>Publicação DJEN</option>
             <option>Outros</option>
           </select>
         </div>
@@ -1301,7 +1473,7 @@ function saveDB() { }
 // ========== ABAS PRINCIPAIS ==========
 function mudarAba(id, btn) {
   document.querySelectorAll('.pg').forEach(function(p){ p.classList.remove('on'); });
-  document.querySelectorAll('.aba').forEach(function(b){ b.classList.remove('on'); });
+  document.querySelectorAll('.side-item').forEach(function(b){ b.classList.remove('on'); });
   document.getElementById('pg-'+id).classList.add('on');
   btn.classList.add('on');
   if (id === 'recebimentos') renderRecebimentos();
@@ -1311,6 +1483,17 @@ function mudarAba(id, btn) {
   if (id === 'parceiros') renderParceiros();
   if (id === 'pad') renderPAD();
   if (id === 'atendimentos') renderAtendimentos();
+  if (id === 'djen') {
+    renderDJENlista();
+    renderOabsLista();
+    atualizarStatusIA();
+    var lu = localStorage.getItem('dj-ultima-consulta');
+    if (lu) setTxt('dj-ultima', new Date(lu).toLocaleString('pt-BR'));
+    if (!getVal('dj-data-ini')) {
+      var hj = new Date().toISOString().split('T')[0];
+      setVal('dj-data-ini', hj); setVal('dj-data-fim', hj);
+    }
+  }
 }
 
 // ========== MODAL ==========
@@ -1349,7 +1532,6 @@ function abrirModal(id) {
       setVal('f-exito-pct', exitoVal);
       document.getElementById('grp-exito-custom').style.display = 'none';
     }
-    setVal('f-comissao-pct', c.comissaoPct || '');
     toggleProtocolado();
 
     // Taxa
@@ -1378,6 +1560,15 @@ function abrirModal(id) {
         carregarParc('hon', c.hon.parcelas || [], c.hon.valor);
       }
     }
+    // Comissões por colaborador (com migração automática de formatos antigos)
+    var infoTaxaEdit = comissaoInfo(c, 'Taxa');
+    var infoHonEdit = comissaoInfo(c, 'Hon');
+    setVal('f-comissao-taxa-pct', infoTaxaEdit.pctTotal);
+    setVal('f-comissao-hon-pct', infoHonEdit.pctTotal);
+    window._comissaoTaxaRows = infoTaxaEdit.colaboradores;
+    window._comissaoHonRows = infoHonEdit.colaboradores;
+    renderComissaoRows('taxa');
+    renderComissaoRows('hon');
   } else {
     document.getElementById('mo-tit').textContent = 'Novo Cliente';
     document.getElementById('mo-sub').textContent = 'Preencha os dados do contrato';
@@ -1392,33 +1583,6 @@ function abrirModal(id) {
 function fecharModal() {
   document.getElementById('overlay').classList.remove('on');
   editId = null;
-  // Restaurar campo nome (pode ter sido bloqueado por adicionarProcesso)
-  var fNome = document.getElementById('f-nome');
-  fNome.readOnly = false;
-  fNome.style.opacity = '';
-  fNome.style.cursor = '';
-}
-
-// ========== ADICIONAR PROCESSO A CLIENTE EXISTENTE ==========
-function adicionarProcesso(nome, email, whats, cpf, orgao) {
-  editId = null;
-  moAba(0);
-  limparForm();
-  document.getElementById('mo-tit').textContent = 'Novo Processo';
-  document.getElementById('mo-sub').textContent = nome;
-  setVal('f-nome', nome);
-  setVal('f-email', email || '');
-  setVal('f-whats', whats || '');
-  setVal('f-cpf', cpf || '');
-  setVal('f-orgao', orgao || '');
-  var hoje = new Date();
-  setVal('f-data', hoje.toISOString().split('T')[0]);
-  // Bloquear nome para não alterar vínculo
-  var fNome = document.getElementById('f-nome');
-  fNome.readOnly = true;
-  fNome.style.opacity = '0.6';
-  fNome.style.cursor = 'not-allowed';
-  document.getElementById('overlay').classList.add('on');
 }
 
 function overlayClick(e) {
@@ -1445,10 +1609,15 @@ function limparForm() {
   setVal('f-hon-sit','nao');
   setVal('f-exito-pct','');
   setVal('f-exito-custom','');
-  setVal('f-comissao-pct','');
   document.getElementById('grp-exito').style.display = 'none';
   document.getElementById('grp-exito-custom').style.display = 'none';
-  document.getElementById('f-comissao-calc').textContent = 'R$ 0,00';
+  setVal('f-comissao-taxa-pct', '');
+  setVal('f-comissao-hon-pct', '');
+  window._comissaoTaxaRows = [];
+  window._comissaoHonRows = [];
+  renderComissaoRows('taxa');
+  renderComissaoRows('hon');
+  atualizarColaboradoresDatalist();
 }
 
 function moAba(n) {
@@ -1491,28 +1660,140 @@ function toggleExito() {
     document.getElementById('grp-exito-custom').style.display = 'none';
   }
 }
-function calcComissao() {
-  var pct = parseInt(document.getElementById('f-comissao-pct').value) || 0;
-  if (!pct) { document.getElementById('f-comissao-calc').textContent = 'R$ 0,00'; return; }
-  // Calcular base: soma das taxas pagas (à vista paga, ou parcelas marcadas como pagas)
+function baseTaxaPaga() {
+  var ckTaxa = document.getElementById('ck-taxa');
+  if (!ckTaxa || !ckTaxa.checked) return 0;
+  var mod = document.getElementById('f-taxa-mod').value;
+  var sit = document.getElementById('f-taxa-sit').value;
+  var valTaxa = parseMoeda(document.getElementById('f-taxa-val').value);
+  if (mod === 'avista') return sit === 'sim' ? valTaxa : 0;
+  var np = parseInt(document.getElementById('f-taxa-np').value) || 0;
+  var vUnit = np > 0 ? valTaxa / np : 0;
   var base = 0;
-  if (document.getElementById('ck-taxa').checked) {
-    var mod = document.getElementById('f-taxa-mod').value;
-    var sit = document.getElementById('f-taxa-sit').value;
-    var valTaxa = parseMoeda(document.getElementById('f-taxa-val').value);
-    if (mod === 'avista') {
-      if (sit === 'sim') base += valTaxa;
+  for (var i = 0; i < np; i++) {
+    var ck = document.getElementById('taxa-pg-'+i);
+    if (ck && ck.checked) base += vUnit;
+  }
+  return base;
+}
+
+function baseHonPaga() {
+  var ckHon = document.getElementById('ck-hon');
+  if (!ckHon || !ckHon.checked) return 0;
+  var mod = document.getElementById('f-hon-mod').value;
+  var sit = document.getElementById('f-hon-sit').value;
+  var valHon = parseMoeda(document.getElementById('f-hon-val').value);
+  if (mod === 'avista') return sit === 'sim' ? valHon : 0;
+  var np = parseInt(document.getElementById('f-hon-np').value) || 0;
+  var vUnit = np > 0 ? valHon / np : 0;
+  var base = 0;
+  for (var i = 0; i < np; i++) {
+    var ck = document.getElementById('hon-pg-'+i);
+    if (ck && ck.checked) base += vUnit;
+  }
+  return base;
+}
+
+function comissaoArrName(tipo) { return '_comissao' + (tipo === 'taxa' ? 'Taxa' : 'Hon') + 'Rows'; }
+
+function poolComissao(tipo) {
+  var base = tipo === 'taxa' ? baseTaxaPaga() : baseHonPaga();
+  var pctTotal = parseFloat(getVal('f-comissao-'+tipo+'-pct')) || 0;
+  return base * pctTotal / 100;
+}
+
+function renderComissaoRows(tipo) {
+  var rows = window[comissaoArrName(tipo)] || [];
+  var cont = document.getElementById('comissao-'+tipo+'-rows');
+  if (!cont) return;
+  if (!rows.length) {
+    cont.innerHTML = '<div style="font-size:11px;color:var(--tw);margin-bottom:8px;">Nenhum colaborador adicionado ainda.</div>';
+    atualizarComissaoValores(tipo);
+    return;
+  }
+  cont.innerHTML = rows.map(function(r, idx) {
+    return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">' +
+      '<input class="fi" style="flex:2;" list="colaboradores-dl" placeholder="Nome do colaborador" value="'+esc(r.colaborador||'')+'" oninput="atualizarComissaoRow(\''+tipo+'\','+idx+',\'colaborador\',this.value)">' +
+      '<input type="number" class="fi" style="flex:0 0 90px;" min="0" max="100" step="0.1" placeholder="% divisão" value="'+esc(r.pctDivisao||'')+'" oninput="atualizarComissaoRow(\''+tipo+'\','+idx+',\'pctDivisao\',this.value)">' +
+      '<span id="comissao-'+tipo+'-val-'+idx+'" style="font-size:11px;color:var(--tw);min-width:92px;text-align:right;">R$ 0,00</span>' +
+      '<button type="button" class="btn-ic x" title="Remover" onclick="removerComissaoRow(\''+tipo+'\','+idx+')">🗑️</button>' +
+    '</div>';
+  }).join('');
+  atualizarComissaoValores(tipo);
+}
+
+function adicionarComissaoRow(tipo) {
+  var arrName = comissaoArrName(tipo);
+  if (!window[arrName]) window[arrName] = [];
+  window[arrName].push({ colaborador: '', pctDivisao: '' });
+  dividirIgualComissao(tipo, true);
+}
+
+function dividirIgualComissao(tipo, silencioso) {
+  var arrName = comissaoArrName(tipo);
+  var rows = window[arrName] || [];
+  if (rows.length) {
+    var cada = Math.round((100 / rows.length) * 100) / 100;
+    rows.forEach(function(r){ r.pctDivisao = String(cada); });
+  }
+  renderComissaoRows(tipo);
+  if (!silencioso && rows.length) toast('Comissão dividida igualmente entre ' + rows.length + ' colaborador(es)');
+}
+
+function removerComissaoRow(tipo, idx) {
+  var arrName = comissaoArrName(tipo);
+  if (!window[arrName]) return;
+  window[arrName].splice(idx, 1);
+  renderComissaoRows(tipo);
+}
+
+function atualizarComissaoRow(tipo, idx, campo, valor) {
+  var arrName = comissaoArrName(tipo);
+  if (!window[arrName]) window[arrName] = [];
+  if (!window[arrName][idx]) window[arrName][idx] = { colaborador: '', pctDivisao: '' };
+  window[arrName][idx][campo] = valor;
+  atualizarComissaoValores(tipo);
+}
+
+function atualizarComissaoValores(tipo) {
+  var rows = window[comissaoArrName(tipo)] || [];
+  var pool = poolComissao(tipo);
+  var somaPct = 0;
+  rows.forEach(function(r, idx) {
+    var pd = parseFloat(r.pctDivisao) || 0;
+    somaPct += pd;
+    var val = pool * pd / 100;
+    var span = document.getElementById('comissao-'+tipo+'-val-'+idx);
+    if (span) span.textContent = 'R$ ' + fmtVal(val);
+  });
+  var totalEl = document.getElementById('f-comissao-'+tipo+'-total');
+  if (totalEl) totalEl.textContent = 'R$ ' + fmtVal(pool);
+  var avisoEl = document.getElementById('comissao-'+tipo+'-aviso');
+  if (avisoEl) {
+    if (rows.length && Math.abs(somaPct - 100) > 0.5) {
+      avisoEl.style.display = 'block';
+      avisoEl.textContent = '⚠️ A soma das divisões está em ' + somaPct.toFixed(1).replace('.', ',') + '%, não 100%. Ajuste ou clique em "Dividir igualmente".';
     } else {
-      var np = parseInt(document.getElementById('f-taxa-np').value) || 0;
-      var vUnit = np > 0 ? valTaxa / np : 0;
-      for (var i = 0; i < np; i++) {
-        var ck = document.getElementById('taxa-pg-'+i);
-        if (ck && ck.checked) base += vUnit;
-      }
+      avisoEl.style.display = 'none';
     }
   }
-  var comissao = base * pct / 100;
-  document.getElementById('f-comissao-calc').textContent = 'R$ ' + fmtVal(comissao);
+}
+
+function atualizarColaboradoresDatalist() {
+  var nomes = [];
+  (DB||[]).forEach(function(c) {
+    comissaoInfo(c, 'Taxa').colaboradores.forEach(function(r){ if (r.colaborador && nomes.indexOf(r.colaborador) < 0) nomes.push(r.colaborador); });
+    comissaoInfo(c, 'Hon').colaboradores.forEach(function(r){ if (r.colaborador && nomes.indexOf(r.colaborador) < 0) nomes.push(r.colaborador); });
+  });
+  nomes.sort();
+  var dl = document.getElementById('colaboradores-dl');
+  if (!dl) return;
+  dl.innerHTML = nomes.map(function(n){ return '<option value="'+esc(n)+'">'; }).join('');
+}
+
+function calcComissao() {
+  atualizarComissaoValores('taxa');
+  atualizarComissaoValores('hon');
 }
 
 // ========== PARCELAS ==========
@@ -1533,7 +1814,7 @@ function gerarParc(tipo) {
       '<input type="date" class="parc-d" id="'+tipo+'-d-'+i+'" value="'+(ex.data||'')+'">' +
       '<span class="parc-vl">R$ '+fmtVal(vUnit)+'</span>' +
       '<div class="parc-pg'+(ex.pago?' pago':'')+'" id="'+tipo+'-pg-wrap-'+i+'">' +
-        '<input type="checkbox" id="'+tipo+'-pg-'+i+'" '+(ex.pago?'checked':'')+' onchange="document.getElementById(\''+tipo+'-pg-wrap-'+i+'\').className=\'parc-pg\'+(this.checked?\' pago\':\'\')">' +
+        '<input type="checkbox" id="'+tipo+'-pg-'+i+'" '+(ex.pago?'checked':'')+' onchange="document.getElementById(\''+tipo+'-pg-wrap-'+i+'\').className=\'parc-pg\'+(this.checked?\' pago\':\'\');calcComissao()">' +
         '<label for="'+tipo+'-pg-'+i+'">Pago</label>' +
       '</div>';
     box.appendChild(row);
@@ -1554,7 +1835,7 @@ function carregarParc(tipo, parcelas, valorTotal) {
       '<input type="date" class="parc-d" id="'+tipo+'-d-'+i+'" value="'+(p.data||'')+'">' +
       '<span class="parc-vl">R$ '+fmtVal(vUnit)+'</span>' +
       '<div class="parc-pg'+(p.pago?' pago':'')+'" id="'+tipo+'-pg-wrap-'+i+'">' +
-        '<input type="checkbox" id="'+tipo+'-pg-'+i+'" '+(p.pago?'checked':'')+' onchange="document.getElementById(\''+tipo+'-pg-wrap-'+i+'\').className=\'parc-pg\'+(this.checked?\' pago\':\'\')">' +
+        '<input type="checkbox" id="'+tipo+'-pg-'+i+'" '+(p.pago?'checked':'')+' onchange="document.getElementById(\''+tipo+'-pg-wrap-'+i+'\').className=\'parc-pg\'+(this.checked?\' pago\':\'\');calcComissao()">' +
         '<label for="'+tipo+'-pg-'+i+'">Pago</label>' +
       '</div>';
     box.appendChild(row);
@@ -1616,7 +1897,14 @@ function salvar() {
     valor: valor, obs: getVal('f-obs'),
     pagamento: getVal('f-pagamento'),
     exitoPct: getVal('f-exito-pct') === 'outro' ? getVal('f-exito-custom') : getVal('f-exito-pct'),
-    comissaoPct: getVal('f-comissao-pct'),
+    comissaoTaxa: {
+      pctTotal: getVal('f-comissao-taxa-pct'),
+      colaboradores: (window._comissaoTaxaRows||[]).filter(function(r){ return r.colaborador && r.pctDivisao; })
+    },
+    comissaoHon: {
+      pctTotal: getVal('f-comissao-hon-pct'),
+      colaboradores: (window._comissaoHonRows||[]).filter(function(r){ return r.colaborador && r.pctDivisao; })
+    },
     email: getVal('f-email'), whats: getVal('f-whats'),
     cpf: getVal('f-cpf'), orgao: getVal('f-orgao'),
     taxa: taxa, hon: hon
@@ -1707,22 +1995,25 @@ function renderTabela() {
       }
 
       var comissaoHtml = '';
-      if (c.comissaoPct) {
-        // Calcular base paga da taxa
-        var basePaga = 0;
-        if (c.taxa) {
-          if (c.taxa.mod === 'avista') {
-            if (c.taxa.pago) basePaga += parseMoeda(c.taxa.valor);
-          } else {
-            var ps = c.taxa.parcelas || [];
-            var vU = ps.length > 0 ? parseMoeda(c.taxa.valor) / ps.length : 0;
-            ps.forEach(function(p){ if(p.pago) basePaga += vU; });
-          }
-        }
-        var comVal = basePaga * parseInt(c.comissaoPct) / 100;
-        comissaoHtml = '<div style="font-size:10px;color:var(--tw);margin-top:3px;">Comissão: '+c.comissaoPct+'%</div>' +
-          '<div style="font-size:11px;color:'+(comVal>0?'#e89090':'var(--tw)')+';">R$ '+fmtVal(comVal)+'</div>' +
-          (basePaga > 0 ? '<div style="font-size:9px;color:var(--tw);">base paga: R$'+fmtVal(basePaga)+'</div>' : '<div style="font-size:9px;color:var(--tw);">sem base paga ainda</div>');
+      var linhasCom = [];
+      var baseTaxaC = basePagaDe(c, 'taxa');
+      var baseHonC = basePagaDe(c, 'hon');
+      var infoTaxaRow = comissaoInfo(c, 'Taxa');
+      var infoHonRow = comissaoInfo(c, 'Hon');
+      var poolTaxaRow = baseTaxaC * (parseFloat(infoTaxaRow.pctTotal)||0) / 100;
+      var poolHonRow = baseHonC * (parseFloat(infoHonRow.pctTotal)||0) / 100;
+      infoTaxaRow.colaboradores.forEach(function(r){
+        var v = poolTaxaRow * (parseFloat(r.pctDivisao)||0) / 100;
+        linhasCom.push({ label: (r.colaborador||'—') + ' · taxa (' + (infoTaxaRow.pctTotal||0) + '% ÷ ' + (r.pctDivisao||0) + '%)', val: v });
+      });
+      infoHonRow.colaboradores.forEach(function(r){
+        var v = poolHonRow * (parseFloat(r.pctDivisao)||0) / 100;
+        linhasCom.push({ label: (r.colaborador||'—') + ' · hon. (' + (infoHonRow.pctTotal||0) + '% ÷ ' + (r.pctDivisao||0) + '%)', val: v });
+      });
+      if (linhasCom.length) {
+        comissaoHtml = linhasCom.map(function(l){
+          return '<div style="font-size:9.5px;color:var(--tw);margin-top:2px;">'+esc(l.label)+': <span style="color:'+(l.val>0?'#e89090':'var(--tw)')+'">R$ '+fmtVal(l.val)+'</span></div>';
+        }).join('');
       }
 
       html += '<tr>' +
@@ -1747,8 +2038,6 @@ function renderTabela() {
         '<td><div class="acoes">' +
           '<button class="btn-ic" title="Ver detalhes" onclick="abrirDetalhe(\''+c.id+'\')">👁</button>' +
           '<button class="btn-ic" title="Editar" onclick="abrirModal(\''+c.id+'\')">✏️</button>' +
-          '<button class="btn-ic" title="Adicionar novo processo a este cliente" onclick="adicionarProcesso(\''+c.nome.replace(/'/g,"\\'")+'\',' +
-            '\''+( c.email||'').replace(/'/g,"\\'")+'\',\''+( c.whats||'').replace(/'/g,"\\'")+'\',\''+( c.cpf||'').replace(/'/g,"\\'")+'\',\''+( c.orgao||'').replace(/'/g,"\\'")+'\')">➕</button>' +
           '<button class="btn-ic" title="Alternar status" onclick="toggleStatus(\''+c.id+'\')">🔄</button>' +
           '<button class="btn-ic x" title="Excluir" onclick="pedirDel(\''+c.id+'\')">🗑️</button>' +
         '</div></td>' +
@@ -1791,12 +2080,6 @@ function abrirDetalhe(id) {
   });
   document.getElementById('det-procs').innerHTML = html;
   document.getElementById('ov-det').style.display = 'block';
-  // Vincular botão de adicionar processo
-  var btnAdd = document.getElementById('det-btn-addproc');
-  btnAdd.onclick = function() {
-    document.getElementById('ov-det').style.display = 'none';
-    adicionarProcesso(c.nome, c.email||'', c.whats||'', c.cpf||'', c.orgao||'');
-  };
 }
 
 // ========== RECEBIMENTOS ==========
@@ -1999,6 +2282,47 @@ function fmtData(d){ if(!d)return''; var p=d.split('-'); return p.length===3?p[2
 function parseMoeda(v){ if(!v)return 0; return parseFloat((v||'').toString().replace(/\./g,'').replace(',','.'))||0; }
 function fmtVal(v){ return (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function fmtMoeda(el){ var v=el.value.replace(/\D/g,''); v=(parseInt(v||0)/100).toFixed(2); el.value=isNaN(v)?'':parseFloat(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function basePagaDe(c, tipo) {
+  var campo = c[tipo];
+  if (!campo) return 0;
+  if (campo.mod === 'avista') return campo.pago ? parseMoeda(campo.valor) : 0;
+  var ps = campo.parcelas || [];
+  var vU = ps.length > 0 ? parseMoeda(campo.valor) / ps.length : 0;
+  var base = 0;
+  ps.forEach(function(p){ if (p.pago) base += vU; });
+  return base;
+}
+
+// Converte qualquer formato antigo de comissão salvo no Firebase para o formato atual:
+// { pctTotal: 'XX', colaboradores: [{colaborador, pctDivisao}, ...] }
+function migrarComissao(campo, pctAntigo) {
+  if (campo && typeof campo === 'object' && !Array.isArray(campo)) {
+    return {
+      pctTotal: campo.pctTotal !== undefined && campo.pctTotal !== null ? String(campo.pctTotal) : '',
+      colaboradores: (campo.colaboradores||[]).map(function(r){ return { colaborador: r.colaborador||'', pctDivisao: (r.pctDivisao!==undefined&&r.pctDivisao!==null&&r.pctDivisao!=='') ? String(r.pctDivisao) : '' }; })
+    };
+  }
+  if (Array.isArray(campo) && campo.length) {
+    // Formato intermediário: cada colaborador com percentual próprio sobre a base (não sobre um pool)
+    var total = campo.reduce(function(s,r){ return s + (parseFloat(r.pct)||0); }, 0);
+    return {
+      pctTotal: total ? String(Math.round(total*100)/100) : '',
+      colaboradores: campo.map(function(r){ return { colaborador: r.colaborador||'', pctDivisao: total ? String(Math.round((parseFloat(r.pct)||0)/total*10000)/100) : '' }; })
+    };
+  }
+  if (pctAntigo) {
+    // Formato original: percentual único, sem nome de colaborador
+    return { pctTotal: String(pctAntigo), colaboradores: [{ colaborador: '', pctDivisao: '100' }] };
+  }
+  return { pctTotal: '', colaboradores: [] };
+}
+
+function comissaoInfo(c, tipo) {
+  var campo = tipo === 'Taxa' ? c.comissaoTaxa : c.comissaoHon;
+  var pctAntigo = tipo === 'Taxa' ? c.comissaoPct : null;
+  return migrarComissao(campo, pctAntigo);
+}
+
 function fmtTel(el){ var v=el.value.replace(/\D/g,'').substring(0,11); if(v.length<=10) v=v.replace(/(\d{2})(\d{4})(\d{0,4})/,'($1) $2-$3'); else v=v.replace(/(\d{2})(\d{5})(\d{0,4})/,'($1) $2-$3'); el.value=v; }
 function toast(msg,err){ var t=document.getElementById('toast'); t.textContent=msg; t.className='toast on'+(err?' err':''); setTimeout(function(){ t.className='toast'; },3000); }
 
@@ -2075,22 +2399,22 @@ function renderRelatorios() {
 
   // ---- TAXAS RECEBIDAS ----
   var totalTaxas = 0;
-  var totalComissoes = 0;
   var htmlTaxas = '';
   var registrosTaxas = [];
 
   DB.forEach(function(c) {
     if (!c.taxa) return;
-    var comPct = parseInt(c.comissaoPct) || 0;
+    var infoTaxaRel = comissaoInfo(c, 'Taxa');
+    var pctTotalTaxa = parseFloat(infoTaxaRel.pctTotal) || 0;
+    var nColabTaxa = infoTaxaRel.colaboradores.length;
 
     if (c.taxa.mod === 'avista') {
       // À vista: usa a data do contrato como referência de pagamento
       if (c.taxa.pago && pertencePeriodo(c.data, mes, ano, modo)) {
         var val = parseMoeda(c.taxa.valor);
-        var com = val * comPct / 100;
+        var comTot = val * pctTotalTaxa / 100;
         totalTaxas += val;
-        totalComissoes += com;
-        registrosTaxas.push({ nome:c.nome, tipo:c.tipo, total:c.taxa.valor, mod:'À vista', parcela:'—', data:c.data, val:val, com:com, comPct:comPct });
+        registrosTaxas.push({ nome:c.nome, tipo:c.tipo, total:c.taxa.valor, mod:'À vista', parcela:'—', data:c.data, val:val, com:comTot, nColab:nColabTaxa, pctTotal:pctTotalTaxa });
       }
     } else {
       // Parcelado: verifica cada parcela paga
@@ -2098,10 +2422,9 @@ function renderRelatorios() {
       var vUnit = ps.length > 0 ? parseMoeda(c.taxa.valor) / ps.length : 0;
       ps.forEach(function(p, i) {
         if (p.pago && pertencePeriodo(p.data, mes, ano, modo)) {
-          var com = vUnit * comPct / 100;
+          var comTot = vUnit * pctTotalTaxa / 100;
           totalTaxas += vUnit;
-          totalComissoes += com;
-          registrosTaxas.push({ nome:c.nome, tipo:c.tipo, total:c.taxa.valor, mod:'Parcelado', parcela:(i+1)+'ª', data:p.data, val:vUnit, com:com, comPct:comPct });
+          registrosTaxas.push({ nome:c.nome, tipo:c.tipo, total:c.taxa.valor, mod:'Parcelado', parcela:(i+1)+'ª', data:p.data, val:vUnit, com:comTot, nColab:nColabTaxa, pctTotal:pctTotalTaxa });
         }
       });
     }
@@ -2109,6 +2432,8 @@ function renderRelatorios() {
 
   document.getElementById('rc-taxas').textContent = 'R$ ' + fmtVal(totalTaxas);
   document.getElementById('rc-taxas-s').textContent = periodoLabel;
+
+  var totalComissoesTaxa = registrosTaxas.reduce(function(s,r){ return s+r.com; },0);
 
   if (registrosTaxas.length) {
     registrosTaxas.forEach(function(r) {
@@ -2119,11 +2444,11 @@ function renderRelatorios() {
         '<td style="color:var(--tw);font-size:11px">'+r.mod+'</td>' +
         '<td style="color:var(--tw);font-size:11px">'+r.parcela+' '+fmtData(r.data)+'</td>' +
         '<td style="color:var(--ch);font-weight:600">R$ '+fmtVal(r.val)+'</td>' +
-        '<td style="color:'+(r.com>0?'#e89090':'var(--tw)')+'">'+( r.comPct ? r.comPct+'% = R$ '+fmtVal(r.com) : '—')+'</td>' +
+        '<td style="color:'+(r.com>0?'#e89090':'var(--tw)')+'">'+( r.nColab ? 'R$ '+fmtVal(r.com)+' ('+r.pctTotal+'%, '+r.nColab+' colab.)' : '—')+'</td>' +
       '</tr>';
     });
     // Total
-    htmlTaxas += '<tr style="background:rgba(63,103,73,.1)"><td colspan="5" style="text-align:right;font-size:10px;color:var(--ch);letter-spacing:.5px;">TOTAL</td><td style="font-weight:600;color:var(--ch)">R$ '+fmtVal(totalTaxas)+'</td><td style="color:#e89090;font-weight:600">R$ '+fmtVal(totalComissoes)+'</td></tr>';
+    htmlTaxas += '<tr style="background:rgba(63,103,73,.1)"><td colspan="5" style="text-align:right;font-size:10px;color:var(--ch);letter-spacing:.5px;">TOTAL</td><td style="font-weight:600;color:var(--ch)">R$ '+fmtVal(totalTaxas)+'</td><td style="color:#e89090;font-weight:600">R$ '+fmtVal(totalComissoesTaxa)+'</td></tr>';
   } else { htmlTaxas = '<tr><td colspan="7" class="rel-vazio">Nenhuma taxa recebida em '+periodoLabel+'</td></tr>'; }
   document.getElementById('rel-tbody-taxas').innerHTML = htmlTaxas;
 
@@ -2134,19 +2459,24 @@ function renderRelatorios() {
 
   DB.forEach(function(c) {
     if (!c.hon) return;
+    var infoHonRel = comissaoInfo(c, 'Hon');
+    var pctTotalHon = parseFloat(infoHonRel.pctTotal) || 0;
+    var nColabHon = infoHonRel.colaboradores.length;
     if (c.hon.mod === 'avista') {
       if (c.hon.pago && pertencePeriodo(c.data, mes, ano, modo)) {
         var val = parseMoeda(c.hon.valor);
+        var comTot = val * pctTotalHon / 100;
         totalHon += val;
-        registrosHon.push({ nome:c.nome, tipo:c.tipo, total:c.hon.valor, mod:'À vista', parcela:'—', data:c.data, val:val });
+        registrosHon.push({ nome:c.nome, tipo:c.tipo, total:c.hon.valor, mod:'À vista', parcela:'—', data:c.data, val:val, com:comTot, nColab:nColabHon, pctTotal:pctTotalHon });
       }
     } else {
       var ps = c.hon.parcelas || [];
       var vUnit = ps.length > 0 ? parseMoeda(c.hon.valor) / ps.length : 0;
       ps.forEach(function(p, i) {
         if (p.pago && pertencePeriodo(p.data, mes, ano, modo)) {
+          var comTot = vUnit * pctTotalHon / 100;
           totalHon += vUnit;
-          registrosHon.push({ nome:c.nome, tipo:c.tipo, total:c.hon.valor, mod:'Parcelado', parcela:(i+1)+'ª', data:p.data, val:vUnit });
+          registrosHon.push({ nome:c.nome, tipo:c.tipo, total:c.hon.valor, mod:'Parcelado', parcela:(i+1)+'ª', data:p.data, val:vUnit, com:comTot, nColab:nColabHon, pctTotal:pctTotalHon });
         }
       });
     }
@@ -2154,6 +2484,8 @@ function renderRelatorios() {
 
   document.getElementById('rc-hon').textContent = 'R$ ' + fmtVal(totalHon);
   document.getElementById('rc-hon-s').textContent = periodoLabel;
+
+  var totalComissoesHon = registrosHon.reduce(function(s,r){ return s+r.com; },0);
 
   if (registrosHon.length) {
     registrosHon.forEach(function(r) {
@@ -2164,50 +2496,104 @@ function renderRelatorios() {
         '<td style="color:var(--tw);font-size:11px">'+r.mod+'</td>' +
         '<td style="color:var(--tw);font-size:11px">'+r.parcela+' '+fmtData(r.data)+'</td>' +
         '<td style="color:var(--ch);font-weight:600">R$ '+fmtVal(r.val)+'</td>' +
+        '<td style="color:'+(r.com>0?'#e89090':'var(--tw)')+'">'+( r.nColab ? 'R$ '+fmtVal(r.com)+' ('+r.pctTotal+'%, '+r.nColab+' colab.)' : '—')+'</td>' +
       '</tr>';
     });
-    htmlHon += '<tr style="background:rgba(63,103,73,.1)"><td colspan="5" style="text-align:right;font-size:10px;color:var(--ch);letter-spacing:.5px;">TOTAL</td><td style="font-weight:600;color:var(--ch)">R$ '+fmtVal(totalHon)+'</td></tr>';
-  } else { htmlHon = '<tr><td colspan="6" class="rel-vazio">Nenhum honorário recebido em '+periodoLabel+'</td></tr>'; }
+    htmlHon += '<tr style="background:rgba(63,103,73,.1)"><td colspan="5" style="text-align:right;font-size:10px;color:var(--ch);letter-spacing:.5px;">TOTAL</td><td style="font-weight:600;color:var(--ch)">R$ '+fmtVal(totalHon)+'</td><td style="color:#e89090;font-weight:600">R$ '+fmtVal(totalComissoesHon)+'</td></tr>';
+  } else { htmlHon = '<tr><td colspan="7" class="rel-vazio">Nenhum honorário recebido em '+periodoLabel+'</td></tr>'; }
   document.getElementById('rel-tbody-hon').innerHTML = htmlHon;
 
-  // ---- COMISSÕES ----
+  // ---- COMISSÕES POR COLABORADOR ----
   var htmlCom = '';
   var registrosCom = [];
 
   DB.forEach(function(c) {
-    if (!c.taxa || !c.comissaoPct) return;
-    var comPct = parseInt(c.comissaoPct);
-    var basePaga = 0;
-
-    if (c.taxa.mod === 'avista') {
-      if (c.taxa.pago && pertencePeriodo(c.data, mes, ano, modo)) basePaga = parseMoeda(c.taxa.valor);
-    } else {
-      var ps = c.taxa.parcelas || [];
-      var vUnit = ps.length > 0 ? parseMoeda(c.taxa.valor) / ps.length : 0;
-      ps.forEach(function(p) { if (p.pago && pertencePeriodo(p.data, mes, ano, modo)) basePaga += vUnit; });
+    var baseTaxaPeriodo = 0;
+    if (c.taxa) {
+      if (c.taxa.mod === 'avista') {
+        if (c.taxa.pago && pertencePeriodo(c.data, mes, ano, modo)) baseTaxaPeriodo = parseMoeda(c.taxa.valor);
+      } else {
+        var psT = c.taxa.parcelas || [];
+        var vUnitT = psT.length > 0 ? parseMoeda(c.taxa.valor) / psT.length : 0;
+        psT.forEach(function(p) { if (p.pago && pertencePeriodo(p.data, mes, ano, modo)) baseTaxaPeriodo += vUnitT; });
+      }
     }
+    var infoTaxaCom = comissaoInfo(c, 'Taxa');
+    var pctTotalTaxaCom = parseFloat(infoTaxaCom.pctTotal) || 0;
+    var poolTaxaCom = baseTaxaPeriodo * pctTotalTaxaCom / 100;
+    infoTaxaCom.colaboradores.forEach(function(r) {
+      if (!r.colaborador || !r.pctDivisao || baseTaxaPeriodo <= 0) return;
+      var pd = parseFloat(r.pctDivisao);
+      registrosCom.push({ colaborador:r.colaborador, nome:c.nome, tipo:c.tipo, origem:'Taxa', base:baseTaxaPeriodo, pctTotal:pctTotalTaxaCom, pctDivisao:pd, com:poolTaxaCom*pd/100 });
+    });
 
-    if (basePaga > 0) {
-      registrosCom.push({ nome:c.nome, tipo:c.tipo, base:basePaga, pct:comPct, com:basePaga*comPct/100 });
+    var baseHonPeriodo = 0;
+    if (c.hon) {
+      if (c.hon.mod === 'avista') {
+        if (c.hon.pago && pertencePeriodo(c.data, mes, ano, modo)) baseHonPeriodo = parseMoeda(c.hon.valor);
+      } else {
+        var psH = c.hon.parcelas || [];
+        var vUnitH = psH.length > 0 ? parseMoeda(c.hon.valor) / psH.length : 0;
+        psH.forEach(function(p) { if (p.pago && pertencePeriodo(p.data, mes, ano, modo)) baseHonPeriodo += vUnitH; });
+      }
     }
+    var infoHonCom = comissaoInfo(c, 'Hon');
+    var pctTotalHonCom = parseFloat(infoHonCom.pctTotal) || 0;
+    var poolHonCom = baseHonPeriodo * pctTotalHonCom / 100;
+    infoHonCom.colaboradores.forEach(function(r) {
+      if (!r.colaborador || !r.pctDivisao || baseHonPeriodo <= 0) return;
+      var pd = parseFloat(r.pctDivisao);
+      registrosCom.push({ colaborador:r.colaborador, nome:c.nome, tipo:c.tipo, origem:'Honorários', base:baseHonPeriodo, pctTotal:pctTotalHonCom, pctDivisao:pd, com:poolHonCom*pd/100 });
+    });
   });
 
-  document.getElementById('rc-com').textContent = 'R$ ' + fmtVal(totalComissoes);
+  var totalComGeral = registrosCom.reduce(function(s,r){ return s+r.com; },0);
+  document.getElementById('rc-com').textContent = 'R$ ' + fmtVal(totalComGeral);
   document.getElementById('rc-com-s').textContent = periodoLabel;
 
+  // Resumo por colaborador (cards)
+  var porColab = {};
+  registrosCom.forEach(function(r) {
+    if (!porColab[r.colaborador]) porColab[r.colaborador] = 0;
+    porColab[r.colaborador] += r.com;
+  });
+  var nomesColab = Object.keys(porColab).sort();
+  var resumoEl = document.getElementById('rel-resumo-colab');
+  if (nomesColab.length) {
+    resumoEl.innerHTML = nomesColab.map(function(n) {
+      return '<div class="rel-card lar"><div class="rel-card-l">'+esc(n)+'</div><div class="rel-card-v" style="font-size:18px;">R$ '+fmtVal(porColab[n])+'</div><div class="rel-card-s">a receber em '+periodoLabel+'</div></div>';
+    }).join('');
+  } else {
+    resumoEl.innerHTML = '';
+  }
+
+  // Tabela detalhada, agrupada por colaborador com subtotal
   if (registrosCom.length) {
-    registrosCom.forEach(function(r) {
+    registrosCom.sort(function(a,b){ return a.colaborador.localeCompare(b.colaborador) || a.nome.localeCompare(b.nome); });
+    var colabAtual = null;
+    var subtotal = 0;
+    registrosCom.forEach(function(r, idx) {
+      if (colabAtual !== null && r.colaborador !== colabAtual) {
+        htmlCom += '<tr style="background:rgba(180,138,74,.08)"><td colspan="6" style="text-align:right;font-size:10px;color:var(--ch);letter-spacing:.5px;">SUBTOTAL — '+esc(colabAtual)+'</td><td style="font-weight:600;color:var(--ch)">R$ '+fmtVal(subtotal)+'</td></tr>';
+        subtotal = 0;
+      }
+      colabAtual = r.colaborador;
+      subtotal += r.com;
       htmlCom += '<tr>' +
-        '<td style="font-weight:600;color:var(--tp)">'+esc(r.nome)+'</td>' +
+        '<td style="font-weight:600;color:var(--tp)">'+esc(r.colaborador)+'</td>' +
+        '<td style="color:var(--tw)">'+esc(r.nome)+'</td>' +
         '<td><span class="bgt">'+esc(r.tipo||'')+'</span></td>' +
+        '<td style="color:var(--tw);font-size:11px">'+esc(r.origem)+'</td>' +
         '<td style="color:var(--ch);font-weight:600">R$ '+fmtVal(r.base)+'</td>' +
-        '<td style="color:var(--tw)">'+r.pct+'%</td>' +
+        '<td style="color:var(--tw);font-size:11px">'+r.pctTotal+'% total ÷ '+r.pctDivisao+'%</td>' +
         '<td style="color:#e89090;font-weight:600">R$ '+fmtVal(r.com)+'</td>' +
       '</tr>';
+      if (idx === registrosCom.length - 1) {
+        htmlCom += '<tr style="background:rgba(180,138,74,.08)"><td colspan="6" style="text-align:right;font-size:10px;color:var(--ch);letter-spacing:.5px;">SUBTOTAL — '+esc(colabAtual)+'</td><td style="font-weight:600;color:var(--ch)">R$ '+fmtVal(subtotal)+'</td></tr>';
+      }
     });
-    var totalCom = registrosCom.reduce(function(s,r){ return s+r.com; },0);
-    htmlCom += '<tr style="background:rgba(139,58,58,.1)"><td colspan="4" style="text-align:right;font-size:10px;color:#e89090;letter-spacing:.5px;">TOTAL COMISSÕES</td><td style="font-weight:600;color:#e89090">R$ '+fmtVal(totalCom)+'</td></tr>';
-  } else { htmlCom = '<tr><td colspan="5" class="rel-vazio">Nenhuma comissão devida em '+periodoLabel+'</td></tr>'; }
+    htmlCom += '<tr style="background:rgba(139,58,58,.1)"><td colspan="6" style="text-align:right;font-size:10px;color:#e89090;letter-spacing:.5px;">TOTAL GERAL DE COMISSÕES</td><td style="font-weight:600;color:#e89090">R$ '+fmtVal(totalComGeral)+'</td></tr>';
+  } else { htmlCom = '<tr><td colspan="7" class="rel-vazio">Nenhuma comissão devida em '+periodoLabel+'</td></tr>'; }
   document.getElementById('rel-tbody-com').innerHTML = htmlCom;
 }
 
@@ -2218,33 +2604,52 @@ function exportRelCSV() {
   var meses = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   var periodo = modo === 'ano' ? ano : meses[mes]+'-'+ano;
 
-  var linhas = [['Relatório','Cliente','Tipo','Data','Valor','Modalidade','Parcela','Comissão %','Comissão R$']];
+  var linhas = [['Relatório','Cliente','Tipo','Colaborador','Origem','Data','Valor Base','Modalidade','Parcela','% Total Comissão','% Divisão Colaborador','Comissão R$']];
 
   // Contratos
   DB.filter(function(c){ return pertencePeriodo(c.data,mes,ano,modo); }).forEach(function(c) {
-    linhas.push(['Contrato',c.nome,c.tipo||'',fmtData(c.data),c.valor||'','','','','']);
+    linhas.push(['Contrato',c.nome,c.tipo||'','','',fmtData(c.data),c.valor||'','','','','','']);
   });
-  // Taxas
+  // Taxas (uma linha por colaborador que recebe comissão sobre o valor pago)
   DB.forEach(function(c) {
     if (!c.taxa) return;
-    var comPct = parseInt(c.comissaoPct)||0;
+    var infoTaxaCsv = comissaoInfo(c, 'Taxa');
+    var pctTotalCsv = parseFloat(infoTaxaCsv.pctTotal) || 0;
+    var colabs = infoTaxaCsv.colaboradores.length ? infoTaxaCsv.colaboradores : [{colaborador:'',pctDivisao:0}];
     if (c.taxa.mod==='avista') {
       if (c.taxa.pago && pertencePeriodo(c.data,mes,ano,modo)) {
-        var v=parseMoeda(c.taxa.valor); linhas.push(['Taxa',c.nome,c.tipo||'',fmtData(c.data),fmtVal(v),'À vista','',comPct+'%',fmtVal(v*comPct/100)]);
+        var v=parseMoeda(c.taxa.valor); var pool=v*pctTotalCsv/100;
+        colabs.forEach(function(r){ linhas.push(['Taxa',c.nome,c.tipo||'',r.colaborador||'','Taxa',fmtData(c.data),fmtVal(v),'À vista','',pctTotalCsv+'%',(r.pctDivisao||0)+'%',fmtVal(pool*(parseFloat(r.pctDivisao)||0)/100)]); });
       }
     } else {
       var ps=c.taxa.parcelas||[]; var vU=ps.length>0?parseMoeda(c.taxa.valor)/ps.length:0;
-      ps.forEach(function(p,i){ if(p.pago&&pertencePeriodo(p.data,mes,ano,modo)) linhas.push(['Taxa',c.nome,c.tipo||'',fmtData(p.data),fmtVal(vU),'Parcelado',(i+1)+'ª',comPct+'%',fmtVal(vU*comPct/100)]); });
+      ps.forEach(function(p,i){
+        if(p.pago&&pertencePeriodo(p.data,mes,ano,modo)) {
+          var pool=vU*pctTotalCsv/100;
+          colabs.forEach(function(r){ linhas.push(['Taxa',c.nome,c.tipo||'',r.colaborador||'','Taxa',fmtData(p.data),fmtVal(vU),'Parcelado',(i+1)+'ª',pctTotalCsv+'%',(r.pctDivisao||0)+'%',fmtVal(pool*(parseFloat(r.pctDivisao)||0)/100)]); });
+        }
+      });
     }
   });
-  // Honorários
+  // Honorários (uma linha por colaborador que recebe comissão sobre o valor pago)
   DB.forEach(function(c) {
     if (!c.hon) return;
+    var infoHonCsv = comissaoInfo(c, 'Hon');
+    var pctTotalHonCsv = parseFloat(infoHonCsv.pctTotal) || 0;
+    var colabs = infoHonCsv.colaboradores.length ? infoHonCsv.colaboradores : [{colaborador:'',pctDivisao:0}];
     if (c.hon.mod==='avista') {
-      if (c.hon.pago && pertencePeriodo(c.data,mes,ano,modo)) { var v=parseMoeda(c.hon.valor); linhas.push(['Honorários',c.nome,c.tipo||'',fmtData(c.data),fmtVal(v),'À vista','','','']); }
+      if (c.hon.pago && pertencePeriodo(c.data,mes,ano,modo)) {
+        var v=parseMoeda(c.hon.valor); var pool=v*pctTotalHonCsv/100;
+        colabs.forEach(function(r){ linhas.push(['Honorários',c.nome,c.tipo||'',r.colaborador||'','Honorários',fmtData(c.data),fmtVal(v),'À vista','',pctTotalHonCsv+'%',(r.pctDivisao||0)+'%',fmtVal(pool*(parseFloat(r.pctDivisao)||0)/100)]); });
+      }
     } else {
       var ps=c.hon.parcelas||[]; var vU=ps.length>0?parseMoeda(c.hon.valor)/ps.length:0;
-      ps.forEach(function(p,i){ if(p.pago&&pertencePeriodo(p.data,mes,ano,modo)) linhas.push(['Honorários',c.nome,c.tipo||'',fmtData(p.data),fmtVal(vU),'Parcelado',(i+1)+'ª','','']); });
+      ps.forEach(function(p,i){
+        if(p.pago&&pertencePeriodo(p.data,mes,ano,modo)) {
+          var pool=vU*pctTotalHonCsv/100;
+          colabs.forEach(function(r){ linhas.push(['Honorários',c.nome,c.tipo||'',r.colaborador||'','Honorários',fmtData(p.data),fmtVal(vU),'Parcelado',(i+1)+'ª',pctTotalHonCsv+'%',(r.pctDivisao||0)+'%',fmtVal(pool*(parseFloat(r.pctDivisao)||0)/100)]); });
+        }
+      });
     }
   });
 
@@ -2312,6 +2717,316 @@ function buscarAndamento(numproc) {
   });
 }
 
+// ========== DJEN — DIÁRIO DE JUSTIÇA ELETRÔNICO NACIONAL ==========
+var DJEN_URL = 'https://comunicaapi.pje.jus.br/api/v1/comunicacao';
+var DJEN_RESULTADOS = [];
+
+function normalizarDJEN(item) {
+  return {
+    id: String(item.id || item.hash || item.numero_comunicacao || ((item.numero_processo||'')+'-'+(item.data_publicacao||item.data_disponibilizacao||''))),
+    hash: item.hash || '',
+    numproc: item.numero_processo || item.numeroprocesso || item.numeroProcesso || '',
+    texto: item.texto || item.conteudo || '',
+    data: item.data_disponibilizacao || item.dataDisponibilizacao || item.data_publicacao || item.datadisponibilizacao || '',
+    orgao: item.nome_orgao || item.nomeOrgao || item.orgao || item.siglaTribunal || item.sigla_tribunal || ''
+  };
+}
+
+async function tentarFetchDJEN(url) {
+  // Tenta acesso direto e, em caso de bloqueio de CORS, usa proxies públicos como alternativa
+  var tentativas = [
+    url,
+    'https://corsproxy.io/?url=' + encodeURIComponent(url),
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent(url)
+  ];
+  var ultimoErro = null;
+  for (var i = 0; i < tentativas.length; i++) {
+    try {
+      var r = await fetch(tentativas[i]);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      var data = await r.json();
+      return data;
+    } catch (e) { ultimoErro = e; }
+  }
+  throw ultimoErro || new Error('Falha ao consultar o DJEN');
+}
+
+// ---- OABs monitoradas ----
+function renderOabsLista() {
+  var cont = document.getElementById('oabs-lista');
+  if (!cont) return;
+  var lista = window.OABS_MONITORADAS || [];
+  if (!lista.length) {
+    cont.innerHTML = '<div style="font-size:11px;color:var(--tw);">Nenhuma OAB cadastrada ainda. Clique em "+ Adicionar OAB".</div>';
+    return;
+  }
+  cont.innerHTML = lista.map(function(o) {
+    return '<span class="bgt" style="margin:0 6px 8px 0;display:inline-flex;align-items:center;gap:8px;padding:7px 12px;font-size:11px;">' +
+      '<strong>' + esc(o.numero) + '/' + esc(o.uf) + '</strong>' + (o.nome ? ' — ' + esc(o.nome) : '') +
+      ' <button class="btn-ic x" style="width:18px;height:18px;font-size:10px;padding:0;" title="Remover do monitoramento" onclick="removerOab(\'' + o.id + '\')">✕</button>' +
+    '</span>';
+  }).join('');
+}
+
+function toggleFormOab() {
+  var el = document.getElementById('form-oab');
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function salvarOab() {
+  var num = (document.getElementById('novo-oab-num').value || '').replace(/\D/g,'');
+  var uf = document.getElementById('novo-oab-uf').value;
+  var nome = (document.getElementById('novo-oab-nome').value || '').trim();
+  if (!num) { toast('Informe o número da OAB', true); return; }
+  var jaExiste = (window.OABS_MONITORADAS||[]).some(function(o){ return o.numero === num && o.uf === uf; });
+  if (jaExiste) { toast('Essa OAB já está sendo monitorada', true); return; }
+  window._fbSaveOab({ numero: num, uf: uf, nome: nome });
+  document.getElementById('novo-oab-num').value = '';
+  document.getElementById('novo-oab-nome').value = '';
+  toggleFormOab();
+  toast('✓ OAB adicionada ao monitoramento');
+}
+
+function removerOab(id) {
+  window._fbDeleteOab(id);
+  toast('OAB removida do monitoramento');
+}
+
+// ---- Configuração da IA ----
+function toggleConfigIA() {
+  var el = document.getElementById('config-ia');
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function salvarChaveIA() {
+  var key = (document.getElementById('ia-api-key').value || '').trim();
+  if (!key) { toast('Cole a chave de API antes de salvar', true); return; }
+  localStorage.setItem('anthropic-api-key', key);
+  document.getElementById('ia-api-key').value = '';
+  toggleConfigIA();
+  atualizarStatusIA();
+  toast('✓ Chave da IA salva neste navegador');
+}
+
+function atualizarStatusIA() {
+  var el = document.getElementById('ia-status');
+  if (!el) return;
+  var key = localStorage.getItem('anthropic-api-key');
+  el.textContent = key ? '🟢 Chave da IA configurada neste navegador' : '🔴 Chave da IA não configurada neste navegador';
+}
+
+async function analisarComIA(idx) {
+  var it = DJEN_RESULTADOS[idx];
+  if (!it) return;
+  var apiKey = localStorage.getItem('anthropic-api-key');
+  if (!apiKey) { toast('Configure a chave da IA antes de analisar', true); toggleConfigIA(); return; }
+
+  var btn = document.getElementById('ia-btn-' + idx);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Analisando...'; }
+
+  try {
+    var prompt = 'Você apoia um escritório especializado em Direito dos Servidores Públicos, Direito Administrativo e Direito Constitucional. ' +
+      'Leia a publicação do Diário de Justiça Eletrônico Nacional abaixo e responda SOMENTE com um JSON válido, sem texto antes ou depois, exatamente neste formato: ' +
+      '{"temPrazo": true ou false, "prazoDias": número de dias do prazo mencionado no texto ou null se não houver, "tipoPeca": "nome da peça processual cabível (ex.: Contestação, Recurso de Apelação, Manifestação, Cumprimento de Sentença, Embargos de Declaração)" ou null se não exigir providência, "explicacao": "explicação curta, em linguagem simples e didática, do que essa publicação significa e o que precisa ser feito, para quem não é da área jurídica entender"}' +
+      '\n\nPublicação:\n' + (it.texto || '').substring(0, 3000);
+
+    var resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-5',
+        max_tokens: 500,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    if (!resp.ok) {
+      var errBody = await resp.text();
+      throw new Error('HTTP ' + resp.status + ': ' + errBody.substring(0,200));
+    }
+    var data = await resp.json();
+    var textoResp = (data.content || []).filter(function(b){ return b.type === 'text'; }).map(function(b){ return b.text; }).join('');
+    var limpo = textoResp.replace(/```json|```/g,'').trim();
+    var json = JSON.parse(limpo);
+    it.iaAnalise = json;
+    renderDJENlista();
+    toast('✓ Análise da IA concluída');
+  } catch (e) {
+    console.error('Erro na análise de IA:', e);
+    toast('Não foi possível analisar com IA agora. Confira a chave e tente novamente.', true);
+    if (btn) { btn.disabled = false; btn.textContent = '🤖 Analisar com IA'; }
+  }
+}
+
+// ---- Busca no DJEN (todas as OABs monitoradas) ----
+async function buscarDJEN(silencioso) {
+  var oabs = window.OABS_MONITORADAS || [];
+  var ini = getVal('dj-data-ini');
+  var fim = getVal('dj-data-fim');
+  if (!oabs.length) { if (!silencioso) toast('Cadastre ao menos uma OAB para monitorar', true); return; }
+  var hoje = new Date().toISOString().split('T')[0];
+  if (!ini) ini = fim || hoje;
+  if (!fim) fim = ini;
+
+  var btn = document.getElementById('dj-btn-buscar');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Consultando...'; }
+
+  var todosResultados = [];
+  var falhas = 0;
+  for (var i = 0; i < oabs.length; i++) {
+    var oab = oabs[i];
+    var params = new URLSearchParams({
+      numeroOab: oab.numero, ufOab: oab.uf,
+      dataDisponibilizacaoInicio: ini, dataDisponibilizacaoFim: fim,
+      itensPorPagina: '100', pagina: '1'
+    });
+    var url = DJEN_URL + '?' + params.toString();
+    try {
+      var data = await tentarFetchDJEN(url);
+      console.log('DJEN resposta (' + oab.numero + '/' + oab.uf + '):', data);
+      var items = data.items || data.result || data.data || [];
+      items.map(normalizarDJEN).forEach(function(it) {
+        it.oabNumero = oab.numero; it.oabUf = oab.uf; it.oabNome = oab.nome || '';
+        todosResultados.push(it);
+      });
+    } catch (e) {
+      console.error('Erro DJEN para OAB ' + oab.numero + '/' + oab.uf + ':', e);
+      falhas++;
+    }
+  }
+
+  if (falhas === oabs.length) {
+    var cntElErr = document.getElementById('dj-cnt');
+    if (cntElErr) cntElErr.textContent = 'Não foi possível consultar agora';
+    if (!silencioso) toast('DJEN indisponível agora — tente novamente ou use comunica.pje.jus.br', true);
+    if (btn) { btn.disabled = false; btn.textContent = '🔍 Buscar no DJEN'; }
+    return;
+  }
+
+  // Remover duplicados (a mesma publicação pode retornar por mais de uma OAB monitorada)
+  var vistos = {};
+  DJEN_RESULTADOS = todosResultados.filter(function(it) {
+    if (vistos[it.id]) return false;
+    vistos[it.id] = true;
+    return true;
+  });
+
+  localStorage.setItem('dj-ultima-consulta', new Date().toISOString());
+  renderDJENlista();
+  setTxt('dj-ultima', new Date().toLocaleString('pt-BR'));
+  var pend = DJEN_RESULTADOS.filter(function(i){ return !jaImportadoDJEN(i); });
+  if (!silencioso) {
+    toast('✓ ' + DJEN_RESULTADOS.length + ' publicação(ões) encontrada(s)' + (falhas ? ' (' + falhas + ' OAB(s) falharam)' : ''));
+  } else if (pend.length > 0) {
+    toast('🔔 ' + pend.length + ' nova(s) publicação(ões) no DJEN');
+  }
+  if (btn) { btn.disabled = false; btn.textContent = '🔍 Buscar no DJEN'; }
+}
+
+function jaImportadoDJEN(item) {
+  return (PRAZOS||[]).some(function(p){ return p.djenId && p.djenId === item.id; });
+}
+
+function renderDJENlista() {
+  var lista = DJEN_RESULTADOS || [];
+  var cont = document.getElementById('dj-lista');
+  var cntEl = document.getElementById('dj-cnt');
+  if (!cont || !cntEl) return;
+  var pend = lista.filter(function(i){ return !jaImportadoDJEN(i); });
+
+  setTxt('dj-tot', lista.length);
+  setTxt('dj-pend', pend.length);
+  var badge = document.getElementById('badge-djen');
+  if (badge) {
+    if (pend.length > 0) { badge.style.display = ''; badge.textContent = pend.length; }
+    else { badge.style.display = 'none'; }
+  }
+
+  if (!lista.length) {
+    cntEl.textContent = 'Nenhuma publicação encontrada no período';
+    cont.innerHTML = '<div class="vazio"><div class="vazio-ic">📨</div><div class="vazio-t">Nenhuma publicação encontrada</div><div class="vazio-s">Ajuste o período e clique em Buscar no DJEN</div></div>';
+    return;
+  }
+  cntEl.textContent = lista.length + ' publicação(ões)';
+
+  cont.innerHTML = lista.map(function(it, idx) {
+    var jaImp = jaImportadoDJEN(it);
+    var oabTag = it.oabNumero ? '<span class="bgt" style="font-size:9px;margin-left:6px;">OAB ' + esc(it.oabNumero) + '/' + esc(it.oabUf) + (it.oabNome ? ' · ' + esc(it.oabNome) : '') + '</span>' : '';
+
+    var iaHtml = '';
+    if (it.iaAnalise) {
+      var a = it.iaAnalise;
+      iaHtml = '<div style="margin-top:8px;padding:10px 12px;background:rgba(63,103,73,.1);border:1px solid rgba(86,120,90,.25);border-radius:7px;">' +
+        '<div style="font-size:9px;color:var(--ch);text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px;">🤖 Análise da IA</div>' +
+        (a.tipoPeca ? '<div style="font-size:11.5px;color:var(--tp);margin-bottom:4px;"><strong>Peça sugerida:</strong> ' + esc(a.tipoPeca) + '</div>' : '<div style="font-size:11px;color:var(--tw);margin-bottom:4px;">Nenhum ato processual identificado nesta publicação.</div>') +
+        (a.temPrazo && a.prazoDias ? '<div style="font-size:11px;color:#D4B84A;margin-bottom:4px;"><strong>Prazo identificado:</strong> ' + esc(String(a.prazoDias)) + ' dia(s)</div>' : '') +
+        (a.explicacao ? '<div style="font-size:11px;color:var(--ts);line-height:1.5;">' + esc(a.explicacao) + '</div>' : '') +
+      '</div>';
+    }
+
+    return '<div class="prazo-card" style="margin-bottom:10px;">' +
+      '<div class="prazo-hdr">' +
+        '<div><div class="prazo-cliente">' + esc(it.numproc || 'Processo não identificado') + oabTag + '</div>' +
+          (it.orgao ? '<div class="prazo-tipo">' + esc(it.orgao) + '</div>' : '') +
+        '</div>' +
+        '<div class="prazo-contador ' + (jaImp ? 'cumprido' : 'urgente') + '" style="font-size:10px;">' + (jaImp ? '✓ Já importado' : (fmtData(it.data) || 'Nova')) + '</div>' +
+      '</div>' +
+      '<div class="prazo-descr" style="max-height:70px;overflow-y:auto;">' + esc((it.texto || '').substring(0,600)) + '</div>' +
+      iaHtml +
+      '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">' +
+        (it.iaAnalise ? '' : '<button class="btn-o" id="ia-btn-' + idx + '" style="padding:6px 14px;font-size:11px;" onclick="analisarComIA(' + idx + ')">🤖 Analisar com IA</button>') +
+        (jaImp ? '' : '<button class="btn-v" style="padding:6px 14px;font-size:11px;" onclick="importarDJEN(' + idx + ')">+ Criar Prazo</button>') +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function importarDJEN(idx) {
+  var it = DJEN_RESULTADOS[idx];
+  if (!it) return;
+  abrirModalPrazo(null);
+  var clienteMatch = (DB||[]).find(function(c){ return c.numproc && it.numproc && c.numproc.replace(/\D/g,'') === it.numproc.replace(/\D/g,''); });
+  setVal('pz-cliente', clienteMatch ? clienteMatch.nome : '');
+  setVal('pz-proc', it.numproc || '');
+  var descr = 'Publicação DJEN' + (it.orgao ? (' — ' + it.orgao) : '') + ': ' + (it.texto || '').substring(0,180);
+  if (it.iaAnalise && it.iaAnalise.tipoPeca) descr = 'Peça sugerida pela IA: ' + it.iaAnalise.tipoPeca + '. ' + descr;
+  setVal('pz-descr', descr);
+  setVal('pz-pubdata', it.data || '');
+  setVal('pz-tipoprazo', 'Publicação DJEN');
+  if (it.iaAnalise && it.iaAnalise.temPrazo && it.iaAnalise.prazoDias) {
+    setVal('pz-dias', it.iaAnalise.prazoDias);
+    calcDataFinal();
+  }
+  window._djenImportId = it.id;
+  if (!clienteMatch) toast('Cliente não identificado automaticamente — confirme o nome antes de salvar', true);
+}
+
+function tentarAutoCheckDJEN() {
+  if (window._djenAutoCheckDone) return;
+  if (!window._prazosLoaded || !window._oabsLoaded) return;
+  window._djenAutoCheckDone = true;
+  if (typeof autoCheckDJEN === 'function') autoCheckDJEN();
+}
+
+function autoCheckDJEN() {
+  try {
+    var hoje = new Date().toISOString().split('T')[0];
+    var ultimo = localStorage.getItem('dj-auto-check-date');
+    if (ultimo === hoje) return;
+    localStorage.setItem('dj-auto-check-date', hoje);
+    var d = new Date(); d.setDate(d.getDate() - 3);
+    setVal('dj-data-ini', d.toISOString().split('T')[0]);
+    setVal('dj-data-fim', hoje);
+    buscarDJEN(true);
+  } catch (e) { console.error('Auto-check DJEN falhou:', e); }
+}
+
 // ========== PRAZOS & INTIMAÇÕES ==========
 function abrirModalPrazo(id) {
   editPrazoId = id;
@@ -2365,6 +3080,7 @@ function salvarPrazo() {
     tipoprazo: getVal('pz-tipoprazo'), obs: getVal('pz-obs'),
     cumprido: false
   };
+  if (window._djenImportId) { obj.djenId = window._djenImportId; window._djenImportId = null; }
 
   if (editPrazoId) {
     obj.id = editPrazoId;
@@ -2481,6 +3197,7 @@ function atualizarBadgePrazos() {
   });
   var badge = document.getElementById('badge-prazos');
   if (badge) badge.textContent = ativos.length;
+  if (typeof renderDJENlista === 'function') renderDJENlista();
   // Renderizar se aba estiver ativa
   if (document.getElementById('pg-prazos').classList.contains('on')) renderPrazos();
 }
