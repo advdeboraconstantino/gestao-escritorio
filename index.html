@@ -899,6 +899,7 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
     </div>
     <div class="mo-foot">
       <button class="btn-o" onclick="document.getElementById('ov-atend').style.display='none'">Cancelar</button>
+      <button class="btn-o" onclick="abrirGoogleAgendaAtendModal()">📅 Google Agenda</button>
       <button class="btn-v" onclick="salvarAtend()">✓ Salvar Atendimento</button>
     </div>
   </div>
@@ -3608,6 +3609,7 @@ function renderAtendimentos() {
       '<td style="font-size:11px;color:var(--ts);max-width:160px;overflow:hidden;text-overflow:ellipsis">'+esc(a.assunto||'')+'</td>'+
       '<td style="font-size:11px;color:var(--tw)">'+esc(a.obs||'')+'</td>'+
       '<td><div class="acoes">'+
+        '<button class="btn-ic" title="Adicionar ao Google Agenda" onclick="abrirGoogleAgendaAtend(\''+a.id+'\')">📅</button>'+
         '<button class="btn-ic" title="Editar" onclick="abrirModalAtend(\''+a.id+'\')">✏️</button>'+
         '<button class="btn-ic x" title="Excluir" onclick="excluirAtend(\''+a.id+'\')">🗑️</button>'+
       '</div></td>'+
@@ -3628,6 +3630,53 @@ function exportAtendCSV() {
   var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download='atendimentos.csv'; a.click(); URL.revokeObjectURL(url);
   toast('✓ CSV exportado');
 }
+
+// ========== INTEGRAÇÃO GOOGLE AGENDA (ATENDIMENTOS) ==========
+function _gaDataISO(str) {
+  if (!str) return null;
+  str = (''+str).trim();
+  var m = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[1]+m[2]+m[3];
+  m = str.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if (m) return m[3]+m[2]+m[1];
+  return null;
+}
+function _gaLink(opts) {
+  var url = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
+  if (opts.dataISO) url += '&dates=' + opts.dataISO + '/' + opts.dataISO;
+  url += '&text=' + encodeURIComponent(opts.titulo || 'Atendimento');
+  var det = [];
+  if (opts.tipo) det.push('Tipo: ' + opts.tipo);
+  if (opts.situacao) det.push('Situação: ' + opts.situacao);
+  if (opts.assunto) det.push('Assunto: ' + opts.assunto);
+  if (opts.whats) det.push('WhatsApp: ' + opts.whats);
+  if (opts.email) det.push('E-mail: ' + opts.email);
+  if (det.length) url += '&details=' + encodeURIComponent(det.join('\n'));
+  return url;
+}
+function abrirGoogleAgendaAtend(id) {
+  var a = (ATENDIMENTOS||[]).find(function(x){ return x.id===id; });
+  if (!a) { toast('Atendimento não encontrado'); return; }
+  if (!a.data) { alert('Este atendimento não tem uma data cadastrada.'); return; }
+  var link = _gaLink({
+    titulo: (a.tipo?a.tipo+' — ':'')+(a.nome||'Atendimento'),
+    dataISO: _gaDataISO(a.data), tipo: a.tipo, situacao: a.situacao,
+    assunto: a.assunto, whats: a.whats, email: a.email
+  });
+  window.open(link, '_blank');
+}
+window.abrirGoogleAgendaAtendModal = function() {
+  var nome = getVal('at-nome'), dataInput = getVal('at-data'), tipo = getVal('at-tipo'),
+      situacao = getVal('at-situacao'), assunto = getVal('at-assunto'),
+      whats = getVal('at-whats'), email = getVal('at-email');
+  if (!dataInput) { alert('Preencha a Data do Atendimento antes de vincular ao Google Agenda.'); return; }
+  var link = _gaLink({
+    titulo: (tipo?tipo+' — ':'')+(nome||'Atendimento'),
+    dataISO: _gaDataISO(dataInput), tipo: tipo, situacao: situacao,
+    assunto: assunto, whats: whats, email: email
+  });
+  window.open(link, '_blank');
+};
 
 // ========== INIT ==========
 document.addEventListener('keydown', function(e){ 
