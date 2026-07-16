@@ -1346,6 +1346,7 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
 
     <div class="mo-foot">
       <button class="btn-o" onclick="fecharModal()">Cancelar</button>
+      <button class="btn-o" id="btn-novo-proc-mesmo" style="display:none;color:var(--ch);border-color:var(--ch);" onclick="novoProcessoMesmoCliente()">+ Novo Processo (mesmo cliente)</button>
       <button class="btn-v" onclick="salvar()">✓ Salvar Cliente</button>
     </div>
   </div>
@@ -1508,6 +1509,7 @@ function abrirModal(id) {
     if (!c) return;
     document.getElementById('mo-tit').textContent = 'Editar Cliente';
     document.getElementById('mo-sub').textContent = c.nome || '';
+    document.getElementById('btn-novo-proc-mesmo').style.display = 'inline-block';
     setVal('f-nome', c.nome);
     setVal('f-data', c.data);
     setVal('f-tipo', c.tipo);
@@ -1573,6 +1575,7 @@ function abrirModal(id) {
   } else {
     document.getElementById('mo-tit').textContent = 'Novo Cliente';
     document.getElementById('mo-sub').textContent = 'Preencha os dados do contrato';
+    document.getElementById('btn-novo-proc-mesmo').style.display = 'none';
     var hoje = new Date();
     var iso = hoje.toISOString().split('T')[0];
     setVal('f-data', iso);
@@ -1584,6 +1587,55 @@ function abrirModal(id) {
 function fecharModal() {
   document.getElementById('overlay').classList.remove('on');
   editId = null;
+}
+
+// ========== NOVO PROCESSO PARA CLIENTE JA CADASTRADO ==========
+function novoProcessoMesmoCliente() {
+  var nome = getVal('f-nome');
+  var email = getVal('f-email');
+  var whats = getVal('f-whats');
+  var cpf = getVal('f-cpf');
+  var orgao = getVal('f-orgao');
+
+  if (!nome) { toast('Informe ao menos o nome do cliente antes de criar um novo processo', true); return; }
+
+  editId = null;
+  limparForm();
+  setVal('f-nome', nome);
+  setVal('f-email', email);
+  setVal('f-whats', whats);
+  setVal('f-cpf', cpf);
+  setVal('f-orgao', orgao);
+
+  var hoje = new Date();
+  setVal('f-data', hoje.toISOString().split('T')[0]);
+
+  document.getElementById('mo-tit').textContent = 'Novo Processo';
+  document.getElementById('mo-sub').textContent = 'Mesmo cliente: ' + nome;
+  document.getElementById('btn-novo-proc-mesmo').style.display = 'none';
+  moAba(0);
+  toast('✓ Dados do cliente mantidos — preencha os dados do novo processo');
+}
+
+function abrirNovoProcessoParaCliente(baseId) {
+  var base = DB.find(function(x){ return x.id === baseId; });
+  editId = null;
+  moAba(0);
+  limparForm();
+  if (base) {
+    setVal('f-nome', base.nome || '');
+    setVal('f-email', base.email || '');
+    setVal('f-whats', base.whats || '');
+    setVal('f-cpf', base.cpf || '');
+    setVal('f-orgao', base.orgao || '');
+  }
+  var hoje = new Date();
+  setVal('f-data', hoje.toISOString().split('T')[0]);
+  document.getElementById('mo-tit').textContent = 'Novo Processo';
+  document.getElementById('mo-sub').textContent = base ? ('Mesmo cliente: ' + base.nome) : 'Preencha os dados do contrato';
+  document.getElementById('btn-novo-proc-mesmo').style.display = 'none';
+  document.getElementById('ov-det').style.display = 'none';
+  document.getElementById('overlay').classList.add('on');
 }
 
 function overlayClick(e) {
@@ -2065,7 +2117,10 @@ function abrirDetalhe(id) {
   document.getElementById('det-cont').innerHTML = cont || '<span style="color:var(--tw);font-size:12px;">Sem dados de contato cadastrados</span>';
 
   var procs = DB.filter(function(x){ return x.nome === c.nome; });
-  var html = '<div style="font-size:10px;color:var(--tw);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">'+procs.length+' processo(s) vinculado(s)</div>';
+  var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+      '<div style="font-size:10px;color:var(--tw);text-transform:uppercase;letter-spacing:1px;">'+procs.length+' processo(s) vinculado(s)</div>' +
+      '<button class="btn-v" style="font-size:11px;padding:6px 14px;" onclick="abrirNovoProcessoParaCliente(\''+c.id+'\')">+ Novo Processo</button>' +
+    '</div>';
   procs.forEach(function(p) {
     html += '<div class="proc-card">' +
       '<div class="pc-hdr"><span class="pc-tipo">'+esc(p.tipo||'')+'</span><span class="bgs '+(p.status==='Protocolado'?'sp':'sn')+'">'+esc(p.status)+'</span></div>' +
