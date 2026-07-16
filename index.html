@@ -1360,11 +1360,45 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
         <div class="mo-tit" id="det-nm">—</div>
         <div class="mo-sub" id="det-sub">—</div>
       </div>
-      <button class="mo-cls" onclick="document.getElementById('ov-det').style.display='none'">✕</button>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn-ic" title="Editar dados do cliente" onclick="abrirEditarCliente(window._detId)">🪪</button>
+        <button class="mo-cls" onclick="document.getElementById('ov-det').style.display='none'">✕</button>
+      </div>
     </div>
     <div style="padding:20px 26px;">
       <div class="det-cont" id="det-cont"></div>
       <div id="det-procs"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDITAR CLIENTE (dados cadastrais - aplica a todos os processos vinculados) -->
+<div id="ov-cliente" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:600;display:none;overflow-y:auto;padding:20px;" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal" style="max-width:560px;">
+    <div class="mo-head">
+      <div>
+        <div class="mo-tit">Editar Cliente</div>
+        <div class="mo-sub">Atualiza os dados cadastrais em todos os processos vinculados a este cliente</div>
+      </div>
+      <button class="mo-cls" onclick="document.getElementById('ov-cliente').style.display='none'">✕</button>
+    </div>
+    <div style="padding:20px 26px;">
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Nome Completo *</label><input class="fi" id="ec-nome" placeholder="Nome completo do cliente"></div>
+        <div class="fg"><label class="fl">CPF / Matrícula</label><input class="fi" id="ec-cpf" placeholder="000.000.000-00"></div>
+      </div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">E-mail</label><input type="email" class="fi" id="ec-email" placeholder="cliente@email.com"></div>
+        <div class="fg"><label class="fl">WhatsApp</label><input class="fi" id="ec-whats" placeholder="(12) 99999-9999" oninput="fmtTel(this)"></div>
+      </div>
+      <div class="gr" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Órgão / Repartição</label><input class="fi" id="ec-orgao" placeholder="Ex.: SEDUC SP, PMESP..."></div>
+      </div>
+      <div style="font-size:11px;color:var(--tw);">Esta alteração será aplicada a <strong id="ec-qtd">0</strong> processo(s) vinculado(s) a este cliente.</div>
+    </div>
+    <div class="mo-foot">
+      <button class="btn-o" onclick="document.getElementById('ov-cliente').style.display='none'">Cancelar</button>
+      <button class="btn-v" onclick="salvarEdicaoCliente()">✓ Salvar Dados do Cliente</button>
     </div>
   </div>
 </div>
@@ -2090,7 +2124,8 @@ function renderTabela() {
         '<td style="min-width:120px;">'+exitoHtml+comissaoHtml+'</td>' +
         '<td><div class="acoes">' +
           '<button class="btn-ic" title="Ver detalhes" onclick="abrirDetalhe(\''+c.id+'\')">👁</button>' +
-          '<button class="btn-ic" title="Editar" onclick="abrirModal(\''+c.id+'\')">✏️</button>' +
+          '<button class="btn-ic" title="Editar dados do cliente (nome, CPF, contato)" onclick="abrirEditarCliente(\''+c.id+'\')">🪪</button>' +
+          '<button class="btn-ic" title="Editar este processo" onclick="abrirModal(\''+c.id+'\')">✏️</button>' +
           '<button class="btn-ic" title="Alternar status" onclick="toggleStatus(\''+c.id+'\')">🔄</button>' +
           '<button class="btn-ic x" title="Excluir" onclick="pedirDel(\''+c.id+'\')">🗑️</button>' +
         '</div></td>' +
@@ -2108,6 +2143,7 @@ function renderTabela() {
 function abrirDetalhe(id) {
   var c = DB.find(function(x){ return x.id === id; });
   if (!c) return;
+  window._detId = c.id;
   document.getElementById('det-nm').textContent = c.nome;
   document.getElementById('det-sub').textContent = (c.orgao||'') + (c.cpf ? ' | CPF: '+c.cpf : '');
 
@@ -2136,6 +2172,54 @@ function abrirDetalhe(id) {
   });
   document.getElementById('det-procs').innerHTML = html;
   document.getElementById('ov-det').style.display = 'block';
+}
+
+// ========== EDITAR DADOS CADASTRAIS DO CLIENTE (todos os processos vinculados) ==========
+function abrirEditarCliente(baseId) {
+  var base = DB.find(function(x){ return x.id === baseId; });
+  if (!base) { toast('Cliente não encontrado', true); return; }
+
+  setVal('ec-nome', base.nome || '');
+  setVal('ec-cpf', base.cpf || '');
+  setVal('ec-email', base.email || '');
+  setVal('ec-whats', base.whats || '');
+  setVal('ec-orgao', base.orgao || '');
+
+  window._ecNomeOriginal = base.nome;
+
+  var qtd = DB.filter(function(x){ return x.nome === base.nome; }).length;
+  document.getElementById('ec-qtd').textContent = qtd;
+
+  document.getElementById('ov-cliente').style.display = 'block';
+}
+
+function salvarEdicaoCliente() {
+  var novoNome = getVal('ec-nome');
+  var cpf = getVal('ec-cpf');
+  var email = getVal('ec-email');
+  var whats = getVal('ec-whats');
+  var orgao = getVal('ec-orgao');
+
+  if (!novoNome) { toast('Informe o nome do cliente', true); return; }
+
+  var nomeOriginal = window._ecNomeOriginal;
+  var vinculados = DB.filter(function(x){ return x.nome === nomeOriginal; });
+
+  if (!vinculados.length) { toast('Nenhum processo vinculado encontrado', true); return; }
+
+  vinculados.forEach(function(p) {
+    var atualizado = Object.assign({}, p, {
+      nome: novoNome, cpf: cpf, email: email, whats: whats, orgao: orgao
+    });
+    window._fbSave(atualizado);
+  });
+
+  toast('✓ Dados do cliente atualizados em ' + vinculados.length + ' processo(s)');
+  document.getElementById('ov-cliente').style.display = 'none';
+
+  if (document.getElementById('ov-det').style.display === 'block' && window._detId) {
+    setTimeout(function(){ abrirDetalhe(window._detId); }, 300);
+  }
 }
 
 // ========== RECEBIMENTOS ==========
