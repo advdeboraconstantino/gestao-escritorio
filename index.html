@@ -28,6 +28,8 @@
   const padRef = collection(db, "pad");
   const atendRef = collection(db, "atendimentos");
   const oabsRef = collection(db, "oabs_monitoradas");
+  const colabRef = collection(db, "colaboradoras");
+  const tarefasRef = collection(db, "tarefas");
 
   // Expor funções globais para o código legado
   window._fbSave = async function(obj) {
@@ -105,6 +107,24 @@
   window._fbDeleteOab = async function(id) {
     try { await deleteDoc(doc(db, "oabs_monitoradas", id)); } catch(e) { console.error(e); }
   };
+  window._fbSaveColab = async function(obj) {
+    try {
+      if (obj.id && typeof obj.id === 'string') { await setDoc(doc(db, "colaboradoras", obj.id), obj); }
+      else { const ref = await addDoc(colabRef, obj); return ref.id; }
+    } catch(e) { console.error(e); }
+  };
+  window._fbDeleteColab = async function(id) {
+    try { await deleteDoc(doc(db, "colaboradoras", id)); } catch(e) { console.error(e); }
+  };
+  window._fbSaveTarefa = async function(obj) {
+    try {
+      if (obj.id && typeof obj.id === 'string') { await setDoc(doc(db, "tarefas", obj.id), obj); }
+      else { const ref = await addDoc(tarefasRef, obj); return ref.id; }
+    } catch(e) { console.error(e); }
+  };
+  window._fbDeleteTarefa = async function(id) {
+    try { await deleteDoc(doc(db, "tarefas", id)); } catch(e) { console.error(e); }
+  };
 
   window._fbListen = function(callback) {
     return onSnapshot(colRef, function(snapshot) {
@@ -168,6 +188,21 @@
       window.ATENDIMENTOS = [];
       snap.forEach(function(d){ window.ATENDIMENTOS.push(Object.assign({id:d.id}, d.data())); });
       if (document.getElementById('pg-atendimentos').classList.contains('on')) renderAtendimentos();
+    });
+    onSnapshot(colabRef, function(snap) {
+      window.COLABORADORAS = [];
+      snap.forEach(function(d){ window.COLABORADORAS.push(Object.assign({id:d.id}, d.data())); });
+      if (typeof popularSelectColaboradoras === 'function') popularSelectColaboradoras();
+      if (document.getElementById('pg-colaboradoras') && document.getElementById('pg-colaboradoras').classList.contains('on')) renderColaboradoras();
+      if (document.getElementById('pg-tarefas') && document.getElementById('pg-tarefas').classList.contains('on')) renderTarefas();
+    });
+    onSnapshot(tarefasRef, function(snap) {
+      window.TAREFAS = [];
+      snap.forEach(function(d){ window.TAREFAS.push(Object.assign({id:d.id}, d.data())); });
+      if (document.getElementById('pg-tarefas') && document.getElementById('pg-tarefas').classList.contains('on')) renderTarefas();
+      if (document.getElementById('pg-calendario') && document.getElementById('pg-calendario').classList.contains('on')) renderCalendario();
+      if (document.getElementById('pg-colaboradoras') && document.getElementById('pg-colaboradoras').classList.contains('on')) renderColaboradoras();
+      if (typeof atualizarBadgeTarefas === 'function') atualizarBadgeTarefas();
     });
   });
 </script>
@@ -481,6 +516,9 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
     <button class="side-item" onclick="mudarAba('djen',this)"><span class="ic">📨</span><span class="lbl">DJEN — Publicações</span><span class="abadge" id="badge-djen" style="display:none;">0</span></button>
     <button class="side-item" onclick="mudarAba('pad',this)"><span class="ic">📁</span><span class="lbl">PAD</span></button>
     <button class="side-item" onclick="mudarAba('atendimentos',this)"><span class="ic">📝</span><span class="lbl">Atendimentos</span></button>
+    <button class="side-item" onclick="mudarAba('tarefas',this)"><span class="ic">✅</span><span class="lbl">Tarefas da Equipe</span><span class="abadge" id="badge-tarefas" style="display:none;">0</span></button>
+    <button class="side-item" onclick="mudarAba('calendario',this)"><span class="ic">📅</span><span class="lbl">Calendário</span></button>
+    <button class="side-item" onclick="mudarAba('colaboradoras',this)"><span class="ic">👥</span><span class="lbl">Colaboradoras</span></button>
     <button class="side-item" onclick="mudarAba('parceiros',this)"><span class="ic">🤝</span><span class="lbl">Advogados Parceiros</span></button>
     <button class="side-item" onclick="mudarAba('relatorios',this)"><span class="ic">📊</span><span class="lbl">Relatórios Financeiros</span></button>
     <button class="side-item" onclick="mudarAba('alertas',this)"><span class="ic">🔔</span><span class="lbl">Alertas</span><span class="abadge" id="badge-n">0</span></button>
@@ -795,6 +833,7 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
     </div>
     <div class="mo-foot">
       <button class="btn-o" onclick="document.getElementById('ov-pad').style.display='none'">Cancelar</button>
+      <button class="btn-o" onclick="vincularTarefaDe('PAD', editPADId, getVal('pad-nome'))">🗒️ Vincular Tarefa</button>
       <button class="btn-v" onclick="salvarPAD()">✓ Salvar PAD</button>
     </div>
   </div>
@@ -900,7 +939,198 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
     <div class="mo-foot">
       <button class="btn-o" onclick="document.getElementById('ov-atend').style.display='none'">Cancelar</button>
       <button class="btn-o" onclick="abrirGoogleAgendaAtendModal()">📅 Google Agenda</button>
+      <button class="btn-o" onclick="vincularTarefaDe('Atendimento', editAtendId, getVal('at-nome'))">🗒️ Vincular Tarefa</button>
       <button class="btn-v" onclick="salvarAtend()">✓ Salvar Atendimento</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PÁGINA: TAREFAS DA EQUIPE ===== -->
+<div class="pg" id="pg-tarefas">
+  <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+    <div class="card"><div class="card-l">Total</div><div class="card-v" id="tf-tot">0</div><div class="card-s">tarefas atribuídas</div></div>
+    <div class="card"><div class="card-l">Pendentes</div><div class="card-v" id="tf-pend" style="color:#D4B84A">0</div><div class="card-s">aguardando início</div></div>
+    <div class="card"><div class="card-l">Em Andamento</div><div class="card-v" id="tf-and" style="color:var(--ch)">0</div><div class="card-s">em execução</div></div>
+    <div class="card"><div class="card-l">Concluídas</div><div class="card-v" id="tf-conc" style="color:#7ec492">0</div><div class="card-s">finalizadas</div></div>
+    <div class="card"><div class="card-l">Atrasadas</div><div class="card-v" id="tf-atr" style="color:var(--rc)">0</div><div class="card-s">prazo vencido</div></div>
+  </div>
+  <div class="toolbar">
+    <div class="tb-l">
+      <div class="sw"><span class="sw-ic">🔍</span><input type="text" id="tf-busca" placeholder="Buscar tarefa ou cliente..." oninput="renderTarefas()"></div>
+      <select class="sel" id="tf-filtro-colab" onchange="renderTarefas()"><option value="">Todas as colaboradoras</option></select>
+      <select class="sel" id="tf-filtro-status" onchange="renderTarefas()">
+        <option value="">Todos os status</option>
+        <option value="Pendente">Pendente</option>
+        <option value="Em andamento">Em andamento</option>
+        <option value="Concluída">Concluída</option>
+      </select>
+      <select class="sel" id="tf-filtro-prior" onchange="renderTarefas()">
+        <option value="">Todas as prioridades</option>
+        <option value="Baixa">Baixa</option>
+        <option value="Média">Média</option>
+        <option value="Alta">Alta</option>
+        <option value="Urgente">Urgente</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-o" onclick="exportTarefasCSV()">⬇ CSV</button>
+      <button class="btn-v" onclick="abrirModalTarefa(null)">+ Nova Tarefa</button>
+    </div>
+  </div>
+  <div class="tbl-box">
+    <div class="tbl-bar"><div class="tbl-tit">📋 Tarefas atribuídas à equipe</div><div class="tbl-cnt" id="tf-cnt">0 registros</div></div>
+    <div class="tbl-sc"><table>
+      <thead><tr>
+        <th>Colaboradora</th><th>Vinculada a</th><th>Tarefa</th><th>Prazo</th><th>Prioridade</th><th>Status</th><th>Ações</th>
+      </tr></thead>
+      <tbody id="tf-tbody"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- MODAL TAREFA -->
+<div id="ov-tarefa" style="position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:520;display:none;overflow-y:auto;padding:20px;" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal" style="max-width:640px;">
+    <div class="mo-head">
+      <div><div class="mo-tit" id="tf-mo-tit">Nova Tarefa</div><div class="mo-sub">Atribua uma tarefa a uma colaboradora</div></div>
+      <button class="mo-cls" onclick="document.getElementById('ov-tarefa').style.display='none'">✕</button>
+    </div>
+    <div style="padding:20px 26px;">
+      <input type="hidden" id="tf-vinculo-tipo"><input type="hidden" id="tf-vinculo-id"><input type="hidden" id="tf-vinculo-nome">
+      <div id="tf-vinculo-info" style="display:none;background:rgba(63,103,73,.1);border:1px solid rgba(63,103,73,.25);border-radius:7px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--ch);"></div>
+      <div class="sec" style="margin-top:0;">Responsável e Prazo</div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Colaboradora Responsável *</label>
+          <select class="fi" id="tf-colab"><option value="">Selecione...</option></select>
+        </div>
+        <div class="fg"><label class="fl">Prioridade</label>
+          <select class="fi" id="tf-prioridade">
+            <option value="Baixa">Baixa</option>
+            <option value="Média" selected>Média</option>
+            <option value="Alta">Alta</option>
+            <option value="Urgente">Urgente</option>
+          </select>
+        </div>
+      </div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Prazo *</label><input type="date" class="fi" id="tf-prazo"></div>
+        <div class="fg"><label class="fl">Horário (opcional)</label><input type="time" class="fi" id="tf-hora"></div>
+      </div>
+      <div class="sec">A Tarefa</div>
+      <div class="gr" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Título da Tarefa *</label><input class="fi" id="tf-titulo" placeholder="Ex.: Protocolar contestação, juntar documento..."></div>
+      </div>
+      <div class="gr" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Descrição / Instruções</label><input class="fi" id="tf-descricao" placeholder="Detalhe o que precisa ser feito"></div>
+      </div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Status</label>
+          <select class="fi" id="tf-status">
+            <option value="Pendente">Pendente</option>
+            <option value="Em andamento">Em andamento</option>
+            <option value="Concluída">Concluída</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Observações</label><input class="fi" id="tf-obs" placeholder="Notas adicionais"></div>
+      </div>
+      <div style="background:rgba(63,103,73,.08);border:1px solid rgba(63,103,73,.25);border-radius:8px;padding:14px 16px;margin-top:6px;">
+        <div style="font-size:11px;color:var(--ch);font-weight:600;text-transform:uppercase;letter-spacing:.9px;margin-bottom:10px;">📅 Agenda + E-mail da Colaboradora</div>
+        <div style="font-size:12px;color:var(--ts);margin-bottom:10px;line-height:1.6;">
+          Salve a tarefa e use os botões abaixo: o e-mail abre pronto para a colaboradora, e o Google Agenda cria o evento já convidando o e-mail dela — ao aceitar o convite, a tarefa entra automaticamente na agenda pessoal dela.
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button type="button" class="btn-v" id="btn-tf-agenda" onclick="abrirAgendaTarefa()" style="background:linear-gradient(135deg,#1a73e8,#1557b0);opacity:.5;cursor:not-allowed;" disabled>
+            📅 Abrir no Google Agenda
+          </button>
+          <button type="button" class="btn-o" id="btn-tf-email" onclick="enviarEmailTarefa()" style="opacity:.5;cursor:not-allowed;" disabled>
+            ✉️ Enviar e-mail para a colaboradora
+          </button>
+        </div>
+        <div style="font-size:10px;color:var(--tw);margin-top:8px;" id="tf-agenda-hint">Preencha os dados e salve para ativar os botões.</div>
+      </div>
+    </div>
+    <div class="mo-foot">
+      <button class="btn-o" onclick="document.getElementById('ov-tarefa').style.display='none'">Cancelar</button>
+      <button class="btn-v" onclick="salvarTarefa()">✓ Salvar Tarefa</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PÁGINA: CALENDÁRIO ===== -->
+<div class="pg" id="pg-calendario">
+  <div class="toolbar">
+    <div class="tb-l">
+      <button class="btn-o" onclick="navCalendario(-1)">◀</button>
+      <div style="font-family:'Playfair Display',serif;font-size:16px;min-width:170px;text-align:center;" id="cal-titulo">—</div>
+      <button class="btn-o" onclick="navCalendario(1)">▶</button>
+      <button class="btn-o" onclick="calendarioHoje()">Hoje</button>
+      <select class="sel" id="cal-filtro-colab" onchange="renderCalendario()"><option value="">Todas as colaboradoras</option></select>
+    </div>
+    <div style="display:flex;gap:14px;align-items:center;font-size:11px;color:var(--tw);flex-wrap:wrap;">
+      <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#3F6749;margin-right:4px;"></span>Tarefas</span>
+      <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#C0504A;margin-right:4px;"></span>Prazos &amp; Intimações</span>
+    </div>
+  </div>
+  <div class="tbl-box" style="padding:14px;">
+    <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;"></div>
+  </div>
+</div>
+
+<!-- MODAL DIA DO CALENDÁRIO -->
+<div id="ov-cal-dia" style="position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:520;display:none;overflow-y:auto;padding:20px;" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal" style="max-width:520px;">
+    <div class="mo-head">
+      <div><div class="mo-tit" id="cal-dia-tit">—</div><div class="mo-sub">Compromissos do dia</div></div>
+      <button class="mo-cls" onclick="document.getElementById('ov-cal-dia').style.display='none'">✕</button>
+    </div>
+    <div style="padding:16px 26px;" id="cal-dia-lista"></div>
+    <div class="mo-foot">
+      <button class="btn-o" onclick="document.getElementById('ov-cal-dia').style.display='none'">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PÁGINA: COLABORADORAS ===== -->
+<div class="pg" id="pg-colaboradoras">
+  <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+    <div class="card"><div class="card-l">Colaboradoras</div><div class="card-v" id="cl-tot">0</div><div class="card-s">cadastradas</div></div>
+    <div class="card"><div class="card-l">Tarefas Atribuídas</div><div class="card-v" id="cl-tarefas" style="color:var(--ch)">0</div><div class="card-s">no total</div></div>
+    <div class="card"><div class="card-l">Tarefas Pendentes</div><div class="card-v" id="cl-pend" style="color:#D4B84A">0</div><div class="card-s">aguardando</div></div>
+    <div class="card"><div class="card-l">Tarefas Atrasadas</div><div class="card-v" id="cl-atr" style="color:var(--rc)">0</div><div class="card-s">prazo vencido</div></div>
+  </div>
+  <div class="toolbar">
+    <div class="tb-l">
+      <div class="sw"><span class="sw-ic">🔍</span><input type="text" id="cl-busca" placeholder="Buscar colaboradora..." oninput="renderColaboradoras()"></div>
+    </div>
+    <button class="btn-v" onclick="abrirModalColab(null)">+ Nova Colaboradora</button>
+  </div>
+  <div class="parc-grid" id="colab-grid"></div>
+</div>
+
+<!-- MODAL COLABORADORA -->
+<div id="ov-colab" style="position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;display:none;overflow-y:auto;padding:20px;" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal" style="max-width:560px;">
+    <div class="mo-head">
+      <div><div class="mo-tit" id="cl-mo-tit">Nova Colaboradora</div><div class="mo-sub">Dados da colaboradora e contato</div></div>
+      <button class="mo-cls" onclick="document.getElementById('ov-colab').style.display='none'">✕</button>
+    </div>
+    <div style="padding:20px 26px;">
+      <div class="sec" style="margin-top:0;">Identificação</div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Nome da Colaboradora *</label><input class="fi" id="cl-nome" placeholder="Nome completo"></div>
+        <div class="fg"><label class="fl">Cargo / Área</label><input class="fi" id="cl-cargo" placeholder="Ex.: Advogada, Estagiária, Assistente..."></div>
+      </div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">E-mail *</label><input type="email" class="fi" id="cl-email" placeholder="colaboradora@email.com"></div>
+        <div class="fg"><label class="fl">WhatsApp</label><input class="fi" id="cl-whats" placeholder="(12) 99999-9999" oninput="fmtTel(this)"></div>
+      </div>
+      <div class="gr" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Observações</label><input class="fi" id="cl-obs" placeholder="Notas adicionais"></div>
+      </div>
+    </div>
+    <div class="mo-foot">
+      <button class="btn-o" onclick="document.getElementById('ov-colab').style.display='none'">Cancelar</button>
+      <button class="btn-v" onclick="salvarColab()">✓ Salvar Colaboradora</button>
     </div>
   </div>
 </div>
@@ -1361,6 +1591,7 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
         <div class="mo-sub" id="det-sub">—</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn-o" style="font-size:11px;padding:7px 12px;" onclick="vincularTarefaDe('Cliente &amp; Processo', window._detId, document.getElementById('det-nm').textContent)">🗒️ Vincular Tarefa</button>
         <button class="btn-ic" title="Editar Cliente (dados gerais, financeiro e contato)" onclick="abrirModal(window._detId)">✏️</button>
         <button class="mo-cls" onclick="document.getElementById('ov-det').style.display='none'">✕</button>
       </div>
@@ -1470,6 +1701,13 @@ var editParceiroId = null;
 var editIndicacaoId = null;
 var editPADId = null;
 var editAtendId = null;
+var COLABORADORAS = [];
+var TAREFAS = [];
+var editColabId = null;
+var editTarefaId = null;
+var tarefaSalva = null;
+var calAno = new Date().getFullYear();
+var calMes = new Date().getMonth();
 var sCol = 'data', sDir = 'desc';
 
 function loadDB() { }
@@ -1488,6 +1726,9 @@ function mudarAba(id, btn) {
   if (id === 'parceiros') renderParceiros();
   if (id === 'pad') renderPAD();
   if (id === 'atendimentos') renderAtendimentos();
+  if (id === 'tarefas') renderTarefas();
+  if (id === 'calendario') renderCalendario();
+  if (id === 'colaboradoras') renderColaboradoras();
   if (id === 'djen') {
     renderDJENlista();
     renderOabsLista();
@@ -3738,8 +3979,434 @@ window.abrirGoogleAgendaAtendModal = function() {
   window.open(link, '_blank');
 };
 
+// ========== COLABORADORAS ==========
+function abrirModalColab(id) {
+  editColabId = id;
+  ['cl-nome','cl-cargo','cl-email','cl-whats','cl-obs'].forEach(function(f){ setVal(f,''); });
+  if (id) {
+    var c = (COLABORADORAS||[]).find(function(x){ return x.id===id; });
+    if (!c) return;
+    document.getElementById('cl-mo-tit').textContent = 'Editar Colaboradora';
+    setVal('cl-nome', c.nome||''); setVal('cl-cargo', c.cargo||'');
+    setVal('cl-email', c.email||''); setVal('cl-whats', c.whats||'');
+    setVal('cl-obs', c.obs||'');
+  } else {
+    document.getElementById('cl-mo-tit').textContent = 'Nova Colaboradora';
+  }
+  document.getElementById('ov-colab').style.display = 'block';
+}
+
+function salvarColab() {
+  var nome = getVal('cl-nome'), email = getVal('cl-email');
+  if (!nome) { toast('Informe o nome da colaboradora', true); return; }
+  if (!email) { toast('Informe o e-mail da colaboradora', true); return; }
+  var obj = { nome:nome, cargo:getVal('cl-cargo'), email:email, whats:getVal('cl-whats'), obs:getVal('cl-obs') };
+  if (editColabId) { obj.id = editColabId; window._fbSaveColab(obj); toast('✓ Colaboradora atualizada'); }
+  else { window._fbSaveColab(obj); toast('✓ Colaboradora cadastrada'); }
+  document.getElementById('ov-colab').style.display = 'none';
+  editColabId = null;
+}
+
+function excluirColab(id) {
+  if (!confirm('Excluir esta colaboradora? As tarefas já atribuídas a ela não serão apagadas.')) return;
+  window._fbDeleteColab(id);
+  toast('Colaboradora removida');
+}
+
+function popularSelectColaboradoras() {
+  var lista = (COLABORADORAS||[]).slice().sort(function(a,b){ return (a.nome||'').localeCompare(b.nome||''); });
+  [
+    {id:'tf-colab', placeholder:'Selecione...'},
+    {id:'tf-filtro-colab', placeholder:'Todas as colaboradoras'},
+    {id:'cal-filtro-colab', placeholder:'Todas as colaboradoras'}
+  ].forEach(function(cfg) {
+    var sel = document.getElementById(cfg.id);
+    if (!sel) return;
+    var cur = sel.value;
+    sel.innerHTML = '<option value="">'+cfg.placeholder+'</option>' +
+      lista.map(function(c){ return '<option value="'+c.id+'">'+esc(c.nome||'')+(c.cargo?' — '+esc(c.cargo):'')+'</option>'; }).join('');
+    sel.value = cur;
+  });
+}
+
+function renderColaboradoras() {
+  popularSelectColaboradoras();
+  var busca = (getVal('cl-busca')||'').toLowerCase();
+  var lista = (COLABORADORAS||[]).filter(function(c){
+    return !busca || (c.nome||'').toLowerCase().includes(busca) || (c.cargo||'').toLowerCase().includes(busca);
+  });
+  lista.sort(function(a,b){ return (a.nome||'').localeCompare(b.nome||''); });
+
+  var totTarefas = (TAREFAS||[]).length;
+  var hoje = new Date(); hoje.setHours(0,0,0,0);
+  var pend = (TAREFAS||[]).filter(function(t){ return t.status !== 'Concluída'; }).length;
+  var atr = (TAREFAS||[]).filter(function(t){
+    if (t.status === 'Concluída' || !t.prazo) return false;
+    var d = new Date(t.prazo+'T00:00:00');
+    return d < hoje;
+  }).length;
+  setTxt('cl-tot', (COLABORADORAS||[]).length);
+  setTxt('cl-tarefas', totTarefas);
+  setTxt('cl-pend', pend);
+  setTxt('cl-atr', atr);
+
+  var grid = document.getElementById('colab-grid');
+  if (!grid) return;
+  if (!lista.length) {
+    grid.innerHTML = '<div class="vazio" style="grid-column:1/-1"><div class="vazio-ic">👥</div><div class="vazio-t">Nenhuma colaboradora cadastrada</div><div class="vazio-s">Cadastre sua equipe para começar a atribuir tarefas</div></div>';
+    return;
+  }
+  grid.innerHTML = lista.map(function(c) {
+    var tarefasDela = (TAREFAS||[]).filter(function(t){ return t.colaboradoraId === c.id; });
+    var pendDela = tarefasDela.filter(function(t){ return t.status !== 'Concluída'; }).length;
+    var atrDela = tarefasDela.filter(function(t){
+      if (t.status === 'Concluída' || !t.prazo) return false;
+      var d = new Date(t.prazo+'T00:00:00');
+      return d < hoje;
+    }).length;
+    return '<div class="parc-card-box">' +
+      '<div class="parc-card-head">' +
+        '<div><div class="parc-card-nome">'+esc(c.nome)+'</div>' +
+        (c.cargo?'<div class="parc-card-area">'+esc(c.cargo)+'</div>':'') +
+        '</div>' +
+        '<div style="display:flex;gap:5px;">' +
+          '<button class="btn-ic" title="Editar" onclick="abrirModalColab(\''+c.id+'\')">✏️</button>' +
+          '<button class="btn-ic x" title="Excluir" onclick="excluirColab(\''+c.id+'\')">🗑️</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="parc-card-body">' +
+        '<div class="parc-info-row"><span class="lbl">✉️ E-mail</span><span class="val"><a href="mailto:'+esc(c.email)+'" style="color:var(--ch)">'+esc(c.email||'—')+'</a></span></div>' +
+        (c.whats?'<div class="parc-info-row"><span class="lbl">📱 WhatsApp</span><span class="val"><a href="https://wa.me/55'+c.whats.replace(/\D/g,'')+'" target="_blank" style="color:var(--ch)">'+esc(c.whats)+'</a></span></div>':'') +
+        '<div class="parc-info-row"><span class="lbl">📋 Tarefas</span><span class="val">'+tarefasDela.length+' ('+pendDela+' pendente'+(pendDela!==1?'s':'')+')</span></div>' +
+        (atrDela>0?'<div class="parc-info-row"><span class="lbl">⏱️ Atrasadas</span><span class="val" style="color:var(--rc)">'+atrDela+'</span></div>':'') +
+      '</div>' +
+      '<div class="parc-card-foot">' +
+        '<button class="btn-v" style="font-size:11px;padding:6px 14px;" onclick="abrirModalTarefa(null,\'\',\'\',\'\',\''+c.id+'\')">+ Nova Tarefa</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+// ========== TAREFAS DA EQUIPE ==========
+function vincularTarefaDe(tipo, id, nome) {
+  if (!id) { toast('Salve este registro primeiro para poder vincular uma tarefa', true); return; }
+  abrirModalTarefa(null, tipo, id, nome);
+}
+
+function desativarBotoesTarefa() {
+  var b1 = document.getElementById('btn-tf-agenda');
+  var b2 = document.getElementById('btn-tf-email');
+  var h = document.getElementById('tf-agenda-hint');
+  if (b1) { b1.disabled=true; b1.style.opacity='.5'; b1.style.cursor='not-allowed'; }
+  if (b2) { b2.disabled=true; b2.style.opacity='.5'; b2.style.cursor='not-allowed'; }
+  if (h) h.textContent='Preencha os dados e salve para ativar os botões.';
+}
+
+function ativarBotoesTarefa() {
+  var b1 = document.getElementById('btn-tf-agenda');
+  var b2 = document.getElementById('btn-tf-email');
+  var h = document.getElementById('tf-agenda-hint');
+  if (b1) { b1.disabled=false; b1.style.opacity='1'; b1.style.cursor='pointer'; }
+  if (b2) { b2.disabled=false; b2.style.opacity='1'; b2.style.cursor='pointer'; }
+  if (h) h.textContent='Tarefa salva! Clique nos botões acima para avisar a colaboradora.';
+}
+
+function abrirModalTarefa(id, vinculoTipo, vinculoId, vinculoNome, colabIdPreSel) {
+  editTarefaId = id;
+  tarefaSalva = null;
+  popularSelectColaboradoras();
+  ['tf-titulo','tf-descricao','tf-obs','tf-hora'].forEach(function(f){ setVal(f,''); });
+  setVal('tf-prioridade','Média'); setVal('tf-status','Pendente'); setVal('tf-colab','');
+  setVal('tf-vinculo-tipo',''); setVal('tf-vinculo-id',''); setVal('tf-vinculo-nome','');
+  document.getElementById('tf-vinculo-info').style.display = 'none';
+  desativarBotoesTarefa();
+
+  if (id) {
+    var t = (TAREFAS||[]).find(function(x){ return x.id===id; });
+    if (!t) return;
+    document.getElementById('tf-mo-tit').textContent = 'Editar Tarefa';
+    setVal('tf-colab', t.colaboradoraId||'');
+    setVal('tf-titulo', t.titulo||''); setVal('tf-descricao', t.descricao||'');
+    setVal('tf-prazo', t.prazo||''); setVal('tf-hora', t.hora||'');
+    setVal('tf-prioridade', t.prioridade||'Média'); setVal('tf-status', t.status||'Pendente');
+    setVal('tf-obs', t.obs||'');
+    setVal('tf-vinculo-tipo', t.vinculoTipo||''); setVal('tf-vinculo-id', t.vinculoId||''); setVal('tf-vinculo-nome', t.vinculoNome||'');
+    if (t.vinculoTipo && t.vinculoNome) {
+      document.getElementById('tf-vinculo-info').style.display = 'block';
+      document.getElementById('tf-vinculo-info').innerHTML = '🔗 Vinculada a <strong>'+esc(t.vinculoTipo)+'</strong> — '+esc(t.vinculoNome);
+    }
+    tarefaSalva = t;
+    ativarBotoesTarefa();
+  } else {
+    document.getElementById('tf-mo-tit').textContent = 'Nova Tarefa';
+    setVal('tf-prazo', new Date().toISOString().split('T')[0]);
+    if (vinculoTipo && vinculoId) {
+      setVal('tf-vinculo-tipo', vinculoTipo); setVal('tf-vinculo-id', vinculoId); setVal('tf-vinculo-nome', vinculoNome||'');
+      document.getElementById('tf-vinculo-info').style.display = 'block';
+      document.getElementById('tf-vinculo-info').innerHTML = '🔗 Vinculada a <strong>'+esc(vinculoTipo)+'</strong> — '+esc(vinculoNome||'');
+    }
+    if (colabIdPreSel) setVal('tf-colab', colabIdPreSel);
+  }
+  document.getElementById('ov-tarefa').style.display = 'block';
+}
+
+function salvarTarefa() {
+  var colabId = getVal('tf-colab');
+  var titulo = getVal('tf-titulo');
+  var prazo = getVal('tf-prazo');
+  if (!colabId) { toast('Selecione a colaboradora responsável', true); return; }
+  if (!titulo) { toast('Informe o título da tarefa', true); return; }
+  if (!prazo) { toast('Informe o prazo da tarefa', true); return; }
+  var colab = (COLABORADORAS||[]).find(function(c){ return c.id===colabId; }) || {};
+  var obj = {
+    colaboradoraId: colabId, colaboradoraNome: colab.nome||'', colaboradoraEmail: colab.email||'',
+    titulo: titulo, descricao: getVal('tf-descricao'), prazo: prazo, hora: getVal('tf-hora'),
+    prioridade: getVal('tf-prioridade'), status: getVal('tf-status'), obs: getVal('tf-obs'),
+    vinculoTipo: getVal('tf-vinculo-tipo'), vinculoId: getVal('tf-vinculo-id'), vinculoNome: getVal('tf-vinculo-nome')
+  };
+  if (editTarefaId) {
+    obj.id = editTarefaId;
+    window._fbSaveTarefa(obj);
+    toast('✓ Tarefa atualizada');
+    tarefaSalva = obj;
+    ativarBotoesTarefa();
+  } else {
+    window._fbSaveTarefa(obj).then(function(newId) {
+      if (newId) obj.id = newId;
+      tarefaSalva = obj;
+      ativarBotoesTarefa();
+    });
+    toast('✓ Tarefa cadastrada e enviada para a colaboradora');
+    tarefaSalva = obj;
+    ativarBotoesTarefa();
+  }
+}
+
+function abrirAgendaTarefa() {
+  var t = tarefaSalva;
+  if (!t || !t.prazo) { toast('Salve a tarefa primeiro', true); return; }
+  var dtStr = t.prazo.replace(/-/g,'') + 'T' + (t.hora ? t.hora.replace(':','')+'00' : '090000');
+  var dtFim = new Date(t.prazo+'T'+(t.hora||'09:00')+':00');
+  dtFim.setHours(dtFim.getHours()+1);
+  var dtFimStr = dtFim.getFullYear().toString() +
+    String(dtFim.getMonth()+1).padStart(2,'0') +
+    String(dtFim.getDate()).padStart(2,'0') + 'T' +
+    String(dtFim.getHours()).padStart(2,'0') +
+    String(dtFim.getMinutes()).padStart(2,'0') + '00';
+
+  var titulo = encodeURIComponent('[TAREFA] ' + t.titulo + ' — ' + (t.colaboradoraNome||''));
+  var detalhes = encodeURIComponent(
+    'RESPONSÁVEL: ' + (t.colaboradoraNome||'') + '\n' +
+    (t.vinculoTipo ? 'VINCULADA A: ' + t.vinculoTipo + ' — ' + (t.vinculoNome||'') + '\n' : '') +
+    'PRIORIDADE: ' + (t.prioridade||'') + '\n' +
+    (t.descricao ? 'DESCRIÇÃO: ' + t.descricao + '\n' : '') +
+    (t.obs ? 'OBS: ' + t.obs + '\n' : '') + '\n' +
+    'Escritório Débora Constantino — OAB/SP 378.037'
+  );
+  var url = 'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+    '&text=' + titulo + '&dates=' + dtStr + '/' + dtFimStr + '&details=' + detalhes +
+    (t.colaboradoraEmail ? '&add=' + encodeURIComponent(t.colaboradoraEmail) : '');
+  window.open(url, '_blank');
+  toast('Google Agenda aberto — confirme e salve o evento para convidar a colaboradora!');
+}
+
+function enviarEmailTarefa() {
+  var t = tarefaSalva;
+  if (!t) { toast('Salve a tarefa primeiro', true); return; }
+  if (!t.colaboradoraEmail) { toast('Esta colaboradora não tem e-mail cadastrado', true); return; }
+  var assunto = encodeURIComponent('[TAREFA] ' + t.titulo + ' — Prazo ' + fmtData(t.prazo||''));
+  var corpo = encodeURIComponent(
+    'Olá, ' + (t.colaboradoraNome||'') + '!\n\n' +
+    'Uma nova tarefa foi atribuída a você no sistema:\n\n' +
+    '▸ Tarefa: ' + (t.titulo||'') + '\n' +
+    (t.vinculoTipo ? '▸ Vinculada a: ' + t.vinculoTipo + ' — ' + (t.vinculoNome||'') + '\n' : '') +
+    '▸ Prazo: ' + fmtData(t.prazo||'') + (t.hora ? ' às ' + t.hora : '') + '\n' +
+    '▸ Prioridade: ' + (t.prioridade||'') + '\n' +
+    (t.descricao ? '▸ Descrição: ' + t.descricao + '\n' : '') +
+    (t.obs ? '▸ Obs: ' + t.obs + '\n' : '') +
+    '\nPor favor, confirme o recebimento.\n\n' +
+    'Escritório Débora Constantino — OAB/SP 378.037'
+  );
+  window.location.href = 'mailto:' + encodeURIComponent(t.colaboradoraEmail) + '?subject=' + assunto + '&body=' + corpo;
+  toast('Cliente de e-mail aberto para a colaboradora!');
+}
+
+function toggleTarefaConcluida(id) {
+  var t = (TAREFAS||[]).find(function(x){ return x.id===id; });
+  if (!t) return;
+  var obj = Object.assign({}, t, { status: t.status==='Concluída' ? 'Pendente' : 'Concluída' });
+  window._fbSaveTarefa(obj);
+  toast(obj.status==='Concluída' ? '✓ Tarefa marcada como concluída' : 'Tarefa reaberta');
+}
+
+function excluirTarefa(id) {
+  if (!confirm('Excluir esta tarefa?')) return;
+  window._fbDeleteTarefa(id);
+  toast('Tarefa removida');
+}
+
+function renderTarefas() {
+  popularSelectColaboradoras();
+  var hoje = new Date(); hoje.setHours(0,0,0,0);
+  var busca = (getVal('tf-busca')||'').toLowerCase();
+  var fColab = getVal('tf-filtro-colab');
+  var fStatus = getVal('tf-filtro-status');
+  var fPrior = getVal('tf-filtro-prior');
+
+  var lista = (TAREFAS||[]).filter(function(t) {
+    var okB = !busca || (t.titulo||'').toLowerCase().includes(busca) || (t.vinculoNome||'').toLowerCase().includes(busca) || (t.colaboradoraNome||'').toLowerCase().includes(busca);
+    return okB && (!fColab || t.colaboradoraId===fColab) && (!fStatus || t.status===fStatus) && (!fPrior || t.prioridade===fPrior);
+  });
+  lista.sort(function(a,b){ return (a.prazo||'9999')+((a.hora)||'') < (b.prazo||'9999')+((b.hora)||'') ? -1 : 1; });
+
+  var pend=0, and=0, conc=0, atr=0;
+  (TAREFAS||[]).forEach(function(t) {
+    if (t.status==='Concluída') conc++;
+    else if (t.status==='Em andamento') and++;
+    else pend++;
+    if (t.status!=='Concluída' && t.prazo) {
+      var d = new Date(t.prazo+'T00:00:00');
+      if (d < hoje) atr++;
+    }
+  });
+  setTxt('tf-tot', (TAREFAS||[]).length);
+  setTxt('tf-pend', pend); setTxt('tf-and', and); setTxt('tf-conc', conc); setTxt('tf-atr', atr);
+  var badge = document.getElementById('badge-tarefas');
+  if (badge) { if (atr>0) { badge.style.display=''; badge.textContent=atr; } else badge.style.display='none'; }
+  document.getElementById('tf-cnt').textContent = lista.length + ' registro' + (lista.length!==1?'s':'');
+
+  var priorCores = {'Baixa':'var(--tw)','Média':'var(--ch)','Alta':'#D4B84A','Urgente':'var(--rc)'};
+  var statusCores = {'Pendente':'#D4B84A','Em andamento':'var(--ch)','Concluída':'#7ec492'};
+  var tbody = document.getElementById('tf-tbody');
+  if (!lista.length) {
+    tbody.innerHTML = '<tr><td colspan="7"><div class="vazio"><div class="vazio-ic">✅</div><div class="vazio-t">Nenhuma tarefa cadastrada</div><div class="vazio-s">Clique em "+ Nova Tarefa" ou vincule uma a partir de um processo</div></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = lista.map(function(t) {
+    var atrasada = t.status!=='Concluída' && t.prazo && (new Date(t.prazo+'T00:00:00') < hoje);
+    return '<tr>' +
+      '<td style="font-weight:600;color:var(--tp)">'+esc(t.colaboradoraNome||'—')+'</td>' +
+      '<td style="font-size:11px;color:var(--tw)">'+(t.vinculoTipo?esc(t.vinculoTipo)+'<br><span style="color:var(--ch)">'+esc(t.vinculoNome||'')+'</span>':'—')+'</td>' +
+      '<td><div style="font-weight:600;color:var(--tp)">'+esc(t.titulo||'')+'</div>'+(t.descricao?'<div style="font-size:10px;color:var(--tw);max-width:200px;overflow:hidden;text-overflow:ellipsis">'+esc(t.descricao)+'</div>':'')+'</td>' +
+      '<td style="font-size:11px;white-space:nowrap;color:'+(atrasada?'var(--rc)':'var(--tw)')+';font-weight:'+(atrasada?'700':'400')+'">'+fmtData(t.prazo||'')+(t.hora?' '+t.hora:'')+(atrasada?' 🚨':'')+'</td>' +
+      '<td><span style="font-size:11px;font-weight:600;color:'+(priorCores[t.prioridade]||'var(--tw)')+'">'+esc(t.prioridade||'')+'</span></td>' +
+      '<td><span style="font-size:11px;font-weight:600;color:'+(statusCores[t.status]||'var(--tw)')+'">'+esc(t.status||'')+'</span></td>' +
+      '<td><div class="acoes">' +
+        '<button class="btn-check" onclick="toggleTarefaConcluida(\''+t.id+'\')" title="Marcar concluída/reabrir">'+(t.status==='Concluída'?'↺':'✓')+'</button>' +
+        '<button class="btn-ic" title="Editar" onclick="abrirModalTarefa(\''+t.id+'\')">✏️</button>' +
+        '<button class="btn-ic x" title="Excluir" onclick="excluirTarefa(\''+t.id+'\')">🗑️</button>' +
+      '</div></td>' +
+    '</tr>';
+  }).join('');
+}
+
+function atualizarBadgeTarefas() {
+  var hoje = new Date(); hoje.setHours(0,0,0,0);
+  var atr = (TAREFAS||[]).filter(function(t){ return t.status!=='Concluída' && t.prazo && (new Date(t.prazo+'T00:00:00') < hoje); }).length;
+  var badge = document.getElementById('badge-tarefas');
+  if (badge) { if (atr>0) { badge.style.display=''; badge.textContent=atr; } else badge.style.display='none'; }
+  if (document.getElementById('pg-tarefas') && document.getElementById('pg-tarefas').classList.contains('on')) renderTarefas();
+}
+
+function exportTarefasCSV() {
+  var h = ['Colaboradora','E-mail','Vinculado a','Tarefa','Descrição','Prazo','Prioridade','Status','Obs'];
+  var rows = (TAREFAS||[]).map(function(t){ return [t.colaboradoraNome,t.colaboradoraEmail,(t.vinculoTipo?t.vinculoTipo+' — '+t.vinculoNome:''),t.titulo,t.descricao,fmtData(t.prazo),t.prioridade,t.status,t.obs]; });
+  var csv=[h].concat(rows).map(function(r){ return r.map(function(v){ return '"'+(v||'').toString().replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
+  var blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download='tarefas.csv'; a.click(); URL.revokeObjectURL(url);
+  toast('✓ CSV exportado');
+}
+
+// ========== CALENDÁRIO UNIFICADO ==========
+function navCalendario(delta) {
+  calMes += delta;
+  if (calMes < 0) { calMes = 11; calAno--; }
+  if (calMes > 11) { calMes = 0; calAno++; }
+  renderCalendario();
+}
+
+function calendarioHoje() {
+  var hj = new Date();
+  calAno = hj.getFullYear(); calMes = hj.getMonth();
+  renderCalendario();
+}
+
+function renderCalendario() {
+  popularSelectColaboradoras();
+  var grid = document.getElementById('cal-grid');
+  if (!grid) return;
+  var fColab = getVal('cal-filtro-colab');
+  var meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  setTxt('cal-titulo', meses[calMes] + ' de ' + calAno);
+
+  var primeiroDia = new Date(calAno, calMes, 1);
+  var ultimoDia = new Date(calAno, calMes+1, 0);
+  var offset = primeiroDia.getDay();
+  var hojeStr = new Date().toISOString().split('T')[0];
+
+  var itensPorDia = {};
+  (TAREFAS||[]).forEach(function(t) {
+    if (!t.prazo) return;
+    if (fColab && t.colaboradoraId !== fColab) return;
+    (itensPorDia[t.prazo] = itensPorDia[t.prazo] || []).push({ tipo:'tarefa', cor:'#3F6749', label: (t.colaboradoraNome?t.colaboradoraNome+': ':'')+t.titulo, ref:t });
+  });
+  (PRAZOS||[]).forEach(function(p) {
+    if (p.cumprido || !p.datafinal) return;
+    (itensPorDia[p.datafinal] = itensPorDia[p.datafinal] || []).push({ tipo:'prazo', cor:'#C0504A', label: (p.cliente?p.cliente+': ':'')+(p.descr||p.tipoprazo||'Prazo'), ref:p });
+  });
+
+  var html = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(function(d){
+    return '<div style="text-align:center;font-size:9px;color:var(--ch);text-transform:uppercase;letter-spacing:.8px;padding:4px 0;">'+d+'</div>';
+  }).join('');
+
+  for (var i=0; i<offset; i++) html += '<div></div>';
+  for (var dia=1; dia<=ultimoDia.getDate(); dia++) {
+    var dataStr = calAno+'-'+String(calMes+1).padStart(2,'0')+'-'+String(dia).padStart(2,'0');
+    var itens = itensPorDia[dataStr] || [];
+    var isHoje = dataStr === hojeStr;
+    var dots = itens.slice(0,4).map(function(it){ return '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:'+it.cor+';margin:1px;"></span>'; }).join('');
+    html += '<div onclick="abrirDiaCalendario(\''+dataStr+'\')" style="min-height:64px;padding:6px;border-radius:6px;cursor:pointer;background:'+(isHoje?'rgba(180,138,74,.12)':'var(--fp)')+';border:1px solid '+(isHoje?'var(--do)':'var(--bd)')+';">' +
+      '<div style="font-size:11px;color:'+(isHoje?'var(--do)':'var(--ts)')+';font-weight:'+(isHoje?'700':'400')+';">'+dia+'</div>' +
+      '<div style="margin-top:4px;line-height:1;">'+dots+'</div>' +
+    '</div>';
+  }
+  grid.innerHTML = html;
+}
+
+function abrirDiaCalendario(dataStr) {
+  var fColab = getVal('cal-filtro-colab');
+  var tarefasDoDia = (TAREFAS||[]).filter(function(t){ return t.prazo===dataStr && (!fColab || t.colaboradoraId===fColab); });
+  var prazosDoDia = (PRAZOS||[]).filter(function(p){ return p.datafinal===dataStr && !p.cumprido; });
+
+  var d = new Date(dataStr+'T00:00:00');
+  document.getElementById('cal-dia-tit').textContent = d.toLocaleDateString('pt-BR', {weekday:'long', day:'2-digit', month:'long', year:'numeric'});
+
+  var html = '';
+  if (!tarefasDoDia.length && !prazosDoDia.length) {
+    html = '<div class="vazio"><div class="vazio-ic">📅</div><div class="vazio-t">Nada agendado neste dia</div></div>';
+  }
+  if (tarefasDoDia.length) {
+    html += '<div class="sec" style="margin-top:0;">✅ Tarefas</div>';
+    tarefasDoDia.forEach(function(t) {
+      html += '<div class="prazo-card" style="cursor:pointer;margin-bottom:8px;" onclick="document.getElementById(\'ov-cal-dia\').style.display=\'none\';abrirModalTarefa(\''+t.id+'\')">' +
+        '<div class="prazo-hdr"><div><div class="prazo-cliente">'+esc(t.titulo||'')+'</div><div class="prazo-tipo">'+esc(t.colaboradoraNome||'')+(t.vinculoNome?' — '+esc(t.vinculoNome):'')+'</div></div></div>' +
+      '</div>';
+    });
+  }
+  if (prazosDoDia.length) {
+    html += '<div class="sec">⏱️ Prazos &amp; Intimações</div>';
+    prazosDoDia.forEach(function(p) {
+      html += '<div class="prazo-card" style="cursor:pointer;margin-bottom:8px;" onclick="document.getElementById(\'ov-cal-dia\').style.display=\'none\';abrirModalPrazo(\''+p.id+'\')">' +
+        '<div class="prazo-hdr"><div><div class="prazo-cliente">'+esc(p.cliente||'')+'</div><div class="prazo-tipo">'+esc(p.descr||p.tipoprazo||'')+'</div></div></div>' +
+      '</div>';
+    });
+  }
+  document.getElementById('cal-dia-lista').innerHTML = html;
+  document.getElementById('ov-cal-dia').style.display = 'block';
+}
+
 // ========== INIT ==========
-document.addEventListener('keydown', function(e){ 
+document.addEventListener('keydown', function(e){
   if(e.key==='Escape'){ 
     fecharModal(); 
     document.getElementById('conf-ov').classList.remove('on');
