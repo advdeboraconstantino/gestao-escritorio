@@ -30,6 +30,8 @@
   const oabsRef = collection(db, "oabs_monitoradas");
   const colabRef = collection(db, "colaboradoras");
   const tarefasRef = collection(db, "tarefas");
+  const sociosRef = collection(db, "socios");
+  const indSocioRef = collection(db, "indicacoes_socio");
 
   // Expor funções globais para o código legado
   window._fbSave = async function(obj) {
@@ -125,6 +127,24 @@
   window._fbDeleteTarefa = async function(id) {
     try { await deleteDoc(doc(db, "tarefas", id)); } catch(e) { console.error(e); }
   };
+  window._fbSaveSocio = async function(obj) {
+    try {
+      if (obj.id && typeof obj.id === 'string') { await setDoc(doc(db, "socios", obj.id), obj); }
+      else { const ref = await addDoc(sociosRef, obj); return ref.id; }
+    } catch(e) { console.error(e); }
+  };
+  window._fbDeleteSocio = async function(id) {
+    try { await deleteDoc(doc(db, "socios", id)); } catch(e) { console.error(e); }
+  };
+  window._fbSaveIndSocio = async function(obj) {
+    try {
+      if (obj.id && typeof obj.id === 'string') { await setDoc(doc(db, "indicacoes_socio", obj.id), obj); }
+      else { const ref = await addDoc(indSocioRef, obj); return ref.id; }
+    } catch(e) { console.error(e); }
+  };
+  window._fbDeleteIndSocio = async function(id) {
+    try { await deleteDoc(doc(db, "indicacoes_socio", id)); } catch(e) { console.error(e); }
+  };
 
   window._fbListen = function(callback) {
     return onSnapshot(colRef, function(snapshot) {
@@ -203,6 +223,16 @@
       if (document.getElementById('pg-calendario') && document.getElementById('pg-calendario').classList.contains('on')) renderCalendario();
       if (document.getElementById('pg-colaboradoras') && document.getElementById('pg-colaboradoras').classList.contains('on')) renderColaboradoras();
       if (typeof atualizarBadgeTarefas === 'function') atualizarBadgeTarefas();
+    });
+    onSnapshot(sociosRef, function(snap) {
+      window.SOCIOS = [];
+      snap.forEach(function(d){ window.SOCIOS.push(Object.assign({id:d.id}, d.data())); });
+      if (document.getElementById('pg-socios') && document.getElementById('pg-socios').classList.contains('on')) renderSocios();
+    });
+    onSnapshot(indSocioRef, function(snap) {
+      window.INDICACOES_SOCIO = [];
+      snap.forEach(function(d){ window.INDICACOES_SOCIO.push(Object.assign({id:d.id}, d.data())); });
+      if (document.getElementById('pg-socios') && document.getElementById('pg-socios').classList.contains('on')) renderSocios();
     });
   });
 </script>
@@ -520,6 +550,7 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
     <button class="side-item" onclick="mudarAba('calendario',this)"><span class="ic">📅</span><span class="lbl">Calendário</span></button>
     <button class="side-item" onclick="mudarAba('colaboradoras',this)"><span class="ic">👥</span><span class="lbl">Colaboradoras</span></button>
     <button class="side-item" onclick="mudarAba('parceiros',this)"><span class="ic">🤝</span><span class="lbl">Advogados Parceiros</span></button>
+    <button class="side-item" onclick="mudarAba('socios',this)"><span class="ic">🏛️</span><span class="lbl">Sócio/Parceiro</span></button>
     <button class="side-item" onclick="mudarAba('relatorios',this)"><span class="ic">📊</span><span class="lbl">Relatórios Financeiros</span></button>
     <button class="side-item" onclick="mudarAba('alertas',this)"><span class="ic">🔔</span><span class="lbl">Alertas</span><span class="abadge" id="badge-n">0</span></button>
   </nav>
@@ -1259,6 +1290,146 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
   </div>
 </div>
 
+<!-- ===== PÁGINA: SÓCIO/PARCEIRO ===== -->
+<div class="pg" id="pg-socios">
+
+  <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+    <div class="card"><div class="card-l">Sócios Cadastrados</div><div class="card-v" id="sc-tot">0</div><div class="card-s">sócios do escritório</div></div>
+    <div class="card"><div class="card-l">Processos Indicados</div><div class="card-v" id="sc-ind">0</div><div class="card-s">clientes vinculados</div></div>
+    <div class="card"><div class="card-l">Contratos Fechados</div><div class="card-v" id="sc-fech" style="color:#7ec492">0</div><div class="card-s">via sócios/parceiros</div></div>
+    <div class="card"><div class="card-l">Taxa Repassada</div><div class="card-v" id="sc-taxa" style="color:var(--rc)">R$ 0</div><div class="card-s">total repassado aos sócios</div></div>
+  </div>
+
+  <div class="toolbar">
+    <div class="tb-l">
+      <div class="sw"><span class="sw-ic">🔍</span><input type="text" id="sc-busca" placeholder="Buscar sócio..." oninput="renderSocios()"></div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-o" onclick="exportSociosCSV()">⬇ CSV</button>
+      <button class="btn-v" onclick="abrirModalSocio(null)">+ Novo Sócio/Parceiro</button>
+    </div>
+  </div>
+
+  <!-- LISTA SÓCIOS -->
+  <div class="parc-grid" id="socios-grid"></div>
+
+  <!-- TODOS OS PROCESSOS/CLIENTES VINCULADOS -->
+  <div id="indicacoes-socio-sec">
+    <div style="font-family:'Playfair Display',serif;font-size:15px;margin-bottom:14px;padding-bottom:7px;border-bottom:1px solid var(--bd);">
+      📋 Todos os Clientes/Processos Indicados por Sócios
+    </div>
+    <div class="tbl-box"><div class="tbl-sc"><table>
+      <thead><tr>
+        <th>Sócio</th><th>Cliente</th><th>Nº Processo</th><th>Data</th><th>Fechamento</th>
+        <th>Taxa Repassada</th><th>% Êxito</th><th>% Divisão Sócios</th><th>Sucumbência</th><th>Ações</th>
+      </tr></thead>
+      <tbody id="ind-soc-tbody"></tbody>
+    </table></div></div>
+  </div>
+</div>
+
+<!-- MODAL SÓCIO -->
+<div id="ov-socio" style="position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;display:none;overflow-y:auto;padding:20px;" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal" style="max-width:620px;">
+    <div class="mo-head">
+      <div>
+        <div class="mo-tit" id="sc-mo-tit">Novo Sócio/Parceiro</div>
+        <div class="mo-sub">Sócio do escritório e condições de repasse combinadas</div>
+      </div>
+      <button class="mo-cls" onclick="document.getElementById('ov-socio').style.display='none'">✕</button>
+    </div>
+    <div style="padding:20px 26px;">
+      <div class="sec">Identificação</div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Nome do Sócio/Parceiro *</label><input class="fi" id="sc-nome" placeholder="Nome completo"></div>
+        <div class="fg"><label class="fl">WhatsApp</label><input class="fi" id="sc-whats" placeholder="(12) 99999-9999" oninput="fmtTel(this)"></div>
+      </div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Área de Atuação</label><input class="fi" id="sc-area" placeholder="Ex.: Direito Previdenciário, Trabalhista..."></div>
+        <div class="fg"><label class="fl">OAB</label><input class="fi" id="sc-oab" placeholder="Ex.: SP 123.456"></div>
+      </div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Data Início da Parceria</label><input type="date" class="fi" id="sc-inicio"></div>
+        <div class="fg"><label class="fl">E-mail</label><input type="email" class="fi" id="sc-email" placeholder="socio@email.com"></div>
+      </div>
+      <div class="sec">Condição Financeira Padrão</div>
+      <div class="gr" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Percentual Padrão que o Sócio Repassa ao Escritório (%)</label><input class="fi" id="sc-pct-padrao" placeholder="Ex.: 30" inputmode="decimal">
+          <div style="font-size:10px;color:var(--tw);margin-top:4px;">Este percentual é sugerido automaticamente em cada cliente vinculado a este sócio, podendo ser ajustado individualmente por caso.</div>
+        </div>
+      </div>
+      <div class="gr" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Observações</label><input class="fi" id="sc-obs" placeholder="Condições especiais, notas..."></div>
+      </div>
+    </div>
+    <div class="mo-foot">
+      <button class="btn-o" onclick="document.getElementById('ov-socio').style.display='none'">Cancelar</button>
+      <button class="btn-v" onclick="salvarSocio()">✓ Salvar Sócio/Parceiro</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CLIENTE/PROCESSO INDICADO PELO SÓCIO -->
+<div id="ov-indicacao-socio" style="position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;display:none;overflow-y:auto;padding:20px;" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal" style="max-width:640px;">
+    <div class="mo-head">
+      <div>
+        <div class="mo-tit" id="ind-soc-mo-tit">Novo Cliente/Processo Indicado</div>
+        <div class="mo-sub" id="ind-soc-mo-sub">Cliente indicado por sócio/parceiro</div>
+      </div>
+      <button class="mo-cls" onclick="document.getElementById('ov-indicacao-socio').style.display='none'">✕</button>
+    </div>
+    <div style="padding:20px 26px;">
+      <input type="hidden" id="ind-soc-socio-id">
+      <div class="sec">Dados do Cliente / Processo</div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Nome do Cliente *</label><input class="fi" id="ind-soc-nome" placeholder="Nome completo"></div>
+        <div class="fg"><label class="fl">Telefone / WhatsApp</label><input class="fi" id="ind-soc-tel" placeholder="(12) 99999-9999" oninput="fmtTel(this)"></div>
+      </div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Caso / Situação Indicada *</label><input class="fi" id="ind-soc-caso" placeholder="Ex.: PAD, progressão, reintegração..."></div>
+        <div class="fg"><label class="fl">Nº do Processo</label><input class="fi" id="ind-soc-numproc" placeholder="Ex.: 1234567-89.2026.8.26.0001"></div>
+      </div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Data da Indicação *</label><input type="date" class="fi" id="ind-soc-data"></div>
+        <div class="fg"><label class="fl">Houve Fechamento?</label>
+          <select class="fi" id="ind-soc-fechamento">
+            <option value="nao">Não fechou</option>
+            <option value="sim">Sim, fechou contrato</option>
+            <option value="andamento">Em andamento</option>
+          </select>
+        </div>
+      </div>
+      <div class="sec">Parte Financeira Específica deste Sócio</div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Taxa Inicial Repassada</label><input class="fi" id="ind-soc-taxa-repassada" placeholder="R$ 0,00" oninput="fmtMoeda(this)"></div>
+        <div class="fg"><label class="fl">% de Êxito Fechado com o Cliente</label><input class="fi" id="ind-soc-exito-pct" placeholder="Ex.: 30" inputmode="decimal"></div>
+      </div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">% a Dividir entre os Sócios/Parceiros</label><input class="fi" id="ind-soc-pct-divisao" placeholder="Ex.: 30" inputmode="decimal"></div>
+        <div class="fg"><label class="fl">Honorários de Sucumbência Serão Divididos?</label>
+          <select class="fi" id="ind-soc-sucumbencia" onchange="toggleSucumbenciaSocio()">
+            <option value="nao">Não serão divididos</option>
+            <option value="sim">Sim, serão divididos</option>
+          </select>
+        </div>
+      </div>
+      <div class="gr" style="margin-bottom:13px;" id="ind-soc-grp-sucumbencia-pct">
+        <div class="fg"><label class="fl">% da Sucumbência a Dividir com o Sócio</label><input class="fi" id="ind-soc-sucumbencia-pct" placeholder="Ex.: 20" inputmode="decimal"></div>
+      </div>
+      <div class="gr" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Observações</label><input class="fi" id="ind-soc-obs" placeholder="Notas adicionais sobre o acordo"></div>
+      </div>
+      <div class="sec">Cadastro Completo do Cliente</div>
+      <div id="ind-soc-cliente-sec"></div>
+    </div>
+    <div class="mo-foot">
+      <button class="btn-o" onclick="document.getElementById('ov-indicacao-socio').style.display='none'">Cancelar</button>
+      <button class="btn-v" onclick="salvarIndicacaoSocio()">✓ Salvar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== PÁGINA: RELATÓRIOS ===== -->
 <div class="pg" id="pg-relatorios">
 
@@ -1372,6 +1543,7 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
       <button class="mo-cls" onclick="fecharModal()">✕</button>
     </div>
     <div id="f-parceiro-info" style="display:none;margin:0 26px;padding:8px 14px;background:rgba(63,103,73,.1);border:1px solid rgba(63,103,73,.25);border-radius:7px;font-size:12px;color:var(--ch);"></div>
+    <div id="f-socio-info" style="display:none;margin:0 26px;padding:8px 14px;background:rgba(180,138,74,.1);border:1px solid rgba(180,138,74,.3);border-radius:7px;font-size:12px;color:var(--ch);"></div>
     <div class="mo-abas">
       <button class="mo-aba on" id="tab-btn-0" onclick="moAba(0)">📋 Dados Gerais</button>
       <button class="mo-aba" id="tab-btn-1" onclick="moAba(1)">💳 Financeiro</button>
@@ -1709,6 +1881,10 @@ var TAREFAS = [];
 var editColabId = null;
 var editTarefaId = null;
 var tarefaSalva = null;
+var SOCIOS = [];
+var INDICACOES_SOCIO = [];
+var editSocioId = null;
+var editIndicacaoSocioId = null;
 var calAno = new Date().getFullYear();
 var calMes = new Date().getMonth();
 var sCol = 'data', sDir = 'desc';
@@ -1727,6 +1903,7 @@ function mudarAba(id, btn) {
   if (id === 'relatorios') iniciarRelatorios();
   if (id === 'prazos') renderPrazos();
   if (id === 'parceiros') renderParceiros();
+  if (id === 'socios') renderSocios();
   if (id === 'pad') renderPAD();
   if (id === 'atendimentos') renderAtendimentos();
   if (id === 'tarefas') renderTarefas();
@@ -1824,6 +2001,10 @@ function abrirModal(id) {
     // Vínculo com advogado parceiro (preserva o vínculo já existente do cliente)
     window._clienteVinculoParceiro = { parceiroId: c.parceiroId||'', parceiroNome: c.parceiroNome||'' };
     atualizarBadgeParceiroCliente();
+
+    // Vínculo com sócio/parceiro do escritório (preserva o vínculo já existente do cliente)
+    window._clienteVinculoSocio = { socioId: c.socioId||'', socioNome: c.socioNome||'' };
+    atualizarBadgeSocioCliente();
   } else {
     document.getElementById('mo-tit').textContent = 'Novo Cliente';
     document.getElementById('mo-sub').textContent = 'Preencha os dados do contrato';
@@ -1837,6 +2018,12 @@ function abrirModal(id) {
       ? { parceiroId: window._pendingIndicacaoVinculo.parceiroId||'', parceiroNome: window._pendingIndicacaoVinculo.parceiroNome||'' }
       : null;
     atualizarBadgeParceiroCliente();
+
+    // Vínculo com sócio/parceiro do escritório (herdado de uma indicação de sócio, quando aplicável)
+    window._clienteVinculoSocio = window._pendingIndicacaoSocioVinculo
+      ? { socioId: window._pendingIndicacaoSocioVinculo.socioId||'', socioNome: window._pendingIndicacaoSocioVinculo.socioNome||'' }
+      : null;
+    atualizarBadgeSocioCliente();
   }
 
   document.getElementById('overlay').classList.add('on');
@@ -1855,10 +2042,24 @@ function atualizarBadgeParceiroCliente() {
   }
 }
 
+function atualizarBadgeSocioCliente() {
+  var el = document.getElementById('f-socio-info');
+  if (!el) return;
+  var v = window._clienteVinculoSocio;
+  if (v && v.socioNome) {
+    el.style.display = 'block';
+    el.innerHTML = '🏛️ Este cliente/processo foi trazido pelo sócio/parceiro <strong>'+esc(v.socioNome)+'</strong>.';
+  } else {
+    el.style.display = 'none';
+    el.innerHTML = '';
+  }
+}
+
 function fecharModal() {
   document.getElementById('overlay').classList.remove('on');
   editId = null;
   window._pendingIndicacaoVinculo = null;
+  window._pendingIndicacaoSocioVinculo = null;
 }
 
 // ========== NOVO PROCESSO PARA CLIENTE JA CADASTRADO ==========
@@ -2234,10 +2435,13 @@ function salvar() {
     cpf: getVal('f-cpf'), orgao: getVal('f-orgao'),
     taxa: taxa, hon: hon,
     parceiroId: (window._clienteVinculoParceiro && window._clienteVinculoParceiro.parceiroId) || '',
-    parceiroNome: (window._clienteVinculoParceiro && window._clienteVinculoParceiro.parceiroNome) || ''
+    parceiroNome: (window._clienteVinculoParceiro && window._clienteVinculoParceiro.parceiroNome) || '',
+    socioId: (window._clienteVinculoSocio && window._clienteVinculoSocio.socioId) || '',
+    socioNome: (window._clienteVinculoSocio && window._clienteVinculoSocio.socioNome) || ''
   };
 
   var vinculoIndicacao = window._pendingIndicacaoVinculo;
+  var vinculoIndicacaoSocio = window._pendingIndicacaoSocioVinculo;
 
   if (editId !== null) {
     obj.id = editId;
@@ -2251,11 +2455,18 @@ function salvar() {
         window._fbSaveIndicacao(indObj);
         toast('✓ Cliente cadastrado e vinculado à indicação');
       }
+      if (newId && vinculoIndicacaoSocio && vinculoIndicacaoSocio.indicacaoId) {
+        var indSocOrig = (INDICACOES_SOCIO||[]).find(function(x){ return x.id===vinculoIndicacaoSocio.indicacaoId; });
+        var indSocObj = Object.assign({}, indSocOrig||{}, { id: vinculoIndicacaoSocio.indicacaoId, clienteId: newId });
+        window._fbSaveIndSocio(indSocObj);
+        toast('✓ Cliente cadastrado e vinculado ao sócio/parceiro');
+      }
     });
-    toast(vinculoIndicacao ? '✓ Cliente cadastrado, vinculando à indicação...' : '✓ Cliente cadastrado');
+    toast((vinculoIndicacao || vinculoIndicacaoSocio) ? '✓ Cliente cadastrado, vinculando...' : '✓ Cliente cadastrado');
   }
 
   window._pendingIndicacaoVinculo = null;
+  window._pendingIndicacaoSocioVinculo = null;
   fecharModal();
 }
 
@@ -2356,6 +2567,7 @@ function renderTabela() {
           '<span style="cursor:pointer;text-decoration:underline dotted;color:var(--ch)" onclick="abrirDetalhe(\''+c.id+'\')">'+esc(c.nome)+'</span>' +
           (c.orgao ? '<span class="sub">'+esc(c.orgao)+'</span>' : '') +
           (c.parceiroNome ? '<span class="sub" style="color:var(--ch)">🤝 Indicado por '+esc(c.parceiroNome)+'</span>' : '') +
+          (c.socioNome ? '<span class="sub" style="color:var(--do)">🏛️ Trazido pelo sócio '+esc(c.socioNome)+'</span>' : '') +
           (qtdProc > 1 ? '<span class="sub" style="color:var(--do)">'+qtdProc+' processos</span>' : '') +
           alertaHtml +
         '</td>' +
@@ -2399,6 +2611,7 @@ function abrirDetalhe(id) {
   if (c.email) cont += '<div class="det-lk">📧 <a href="mailto:'+esc(c.email)+'">'+esc(c.email)+'</a></div>';
   if (c.whats) cont += '<div class="det-lk">📱 <a href="https://wa.me/55'+c.whats.replace(/\D/g,'')+'" target="_blank">'+esc(c.whats)+'</a></div>';
   if (c.parceiroNome) cont += '<div class="det-lk" style="color:var(--ch)">🤝 Indicado por: <strong>'+esc(c.parceiroNome)+'</strong></div>';
+  if (c.socioNome) cont += '<div class="det-lk" style="color:var(--do)">🏛️ Trazido pelo sócio/parceiro: <strong>'+esc(c.socioNome)+'</strong></div>';
   document.getElementById('det-cont').innerHTML = cont || '<span style="color:var(--tw);font-size:12px;">Sem dados de contato cadastrados</span>';
 
   var procs = DB.filter(function(x){ return x.nome === c.nome; });
@@ -3824,6 +4037,309 @@ function exportParceirosCSV() {
   var blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a'); a.href=url; a.download='parceiros.csv'; a.click(); URL.revokeObjectURL(url);
+  toast('✓ CSV exportado');
+}
+
+// ========== SÓCIO/PARCEIRO (SÓCIOS DO ESCRITÓRIO) ==========
+function abrirModalSocio(id) {
+  editSocioId = id;
+  ['sc-nome','sc-whats','sc-area','sc-oab','sc-inicio','sc-email','sc-obs','sc-pct-padrao'].forEach(function(f){ setVal(f,''); });
+  if (id) {
+    var s = (SOCIOS||[]).find(function(x){ return x.id===id; });
+    if (!s) return;
+    document.getElementById('sc-mo-tit').textContent = 'Editar Sócio/Parceiro';
+    setVal('sc-nome', s.nome||''); setVal('sc-whats', s.whats||'');
+    setVal('sc-area', s.area||''); setVal('sc-oab', s.oab||'');
+    setVal('sc-inicio', s.inicio||''); setVal('sc-email', s.email||'');
+    setVal('sc-obs', s.obs||''); setVal('sc-pct-padrao', s.pctPadrao||'');
+  } else {
+    document.getElementById('sc-mo-tit').textContent = 'Novo Sócio/Parceiro';
+    setVal('sc-inicio', new Date().toISOString().split('T')[0]);
+  }
+  document.getElementById('ov-socio').style.display = 'block';
+}
+
+function salvarSocio() {
+  var nome = getVal('sc-nome');
+  if (!nome) { toast('Informe o nome do sócio/parceiro', true); return; }
+  var obj = { nome:nome, whats:getVal('sc-whats'), area:getVal('sc-area'), oab:getVal('sc-oab'),
+    inicio:getVal('sc-inicio'), email:getVal('sc-email'), obs:getVal('sc-obs'), pctPadrao:getVal('sc-pct-padrao') };
+  if (editSocioId) { obj.id = editSocioId; window._fbSaveSocio(obj); toast('✓ Sócio/Parceiro atualizado'); }
+  else { window._fbSaveSocio(obj); toast('✓ Sócio/Parceiro cadastrado'); }
+  document.getElementById('ov-socio').style.display = 'none';
+  editSocioId = null;
+}
+
+function excluirSocio(id) {
+  if (!confirm('Excluir este sócio/parceiro? Os clientes/processos já vinculados a ele (na aba Clientes & Processos) não serão apagados.')) return;
+  window._fbDeleteSocio(id);
+  (INDICACOES_SOCIO||[]).filter(function(i){ return i.socioId===id; }).forEach(function(i){ window._fbDeleteIndSocio(i.id); });
+  toast('Sócio/Parceiro removido');
+}
+
+function abrirModalIndicacaoSocio(socioId, indId) {
+  editIndicacaoSocioId = indId || null;
+  ['ind-soc-nome','ind-soc-tel','ind-soc-caso','ind-soc-numproc','ind-soc-data','ind-soc-taxa-repassada',
+   'ind-soc-exito-pct','ind-soc-pct-divisao','ind-soc-sucumbencia-pct','ind-soc-obs'].forEach(function(f){ setVal(f,''); });
+  setVal('ind-soc-fechamento','nao');
+  setVal('ind-soc-sucumbencia','nao');
+  toggleSucumbenciaSocio();
+
+  if (indId) {
+    var ind = (INDICACOES_SOCIO||[]).find(function(x){ return x.id===indId; });
+    if (!ind) return;
+    document.getElementById('ind-soc-mo-tit').textContent = 'Editar Cliente/Processo Indicado';
+    setVal('ind-soc-nome', ind.nomeCliente||''); setVal('ind-soc-tel', ind.tel||'');
+    setVal('ind-soc-caso', ind.caso||''); setVal('ind-soc-numproc', ind.numproc||'');
+    setVal('ind-soc-data', ind.data||''); setVal('ind-soc-fechamento', ind.fechamento||'nao');
+    setVal('ind-soc-taxa-repassada', ind.taxaRepassada||'');
+    setVal('ind-soc-exito-pct', ind.exitoPctFechado||'');
+    setVal('ind-soc-pct-divisao', ind.pctDivisaoSocios||'');
+    setVal('ind-soc-sucumbencia', ind.sucumbencia||'nao');
+    setVal('ind-soc-sucumbencia-pct', ind.sucumbenciaPct||'');
+    setVal('ind-soc-obs', ind.obs||'');
+    document.getElementById('ind-soc-socio-id').value = ind.socioId||'';
+    toggleSucumbenciaSocio();
+  } else {
+    document.getElementById('ind-soc-mo-tit').textContent = 'Novo Cliente/Processo Indicado';
+    var soc = (SOCIOS||[]).find(function(x){ return x.id===socioId; });
+    document.getElementById('ind-soc-mo-sub').textContent = soc ? 'Indicado por: '+soc.nome : 'Cliente indicado por sócio/parceiro';
+    document.getElementById('ind-soc-socio-id').value = socioId||'';
+    setVal('ind-soc-data', new Date().toISOString().split('T')[0]);
+    if (soc && soc.pctPadrao) setVal('ind-soc-pct-divisao', soc.pctPadrao);
+  }
+  renderIndicacaoSocioClienteSec();
+  document.getElementById('ov-indicacao-socio').style.display = 'block';
+}
+
+function toggleSucumbenciaSocio() {
+  var v = getVal('ind-soc-sucumbencia');
+  document.getElementById('ind-soc-grp-sucumbencia-pct').style.display = (v==='sim') ? 'block' : 'none';
+}
+
+function salvarIndicacaoSocio() {
+  var nome = getVal('ind-soc-nome'), caso = getVal('ind-soc-caso'), data = getVal('ind-soc-data');
+  var socioId = document.getElementById('ind-soc-socio-id').value;
+  if (!nome) { toast('Informe o nome do cliente', true); return; }
+  if (!caso) { toast('Informe o caso indicado', true); return; }
+  if (!data) { toast('Informe a data da indicação', true); return; }
+  var obj = {
+    socioId: socioId, nomeCliente:nome, tel:getVal('ind-soc-tel'),
+    caso:caso, numproc:getVal('ind-soc-numproc'), data:data, fechamento:getVal('ind-soc-fechamento'),
+    taxaRepassada:getVal('ind-soc-taxa-repassada'),
+    exitoPctFechado:getVal('ind-soc-exito-pct'),
+    pctDivisaoSocios:getVal('ind-soc-pct-divisao'),
+    sucumbencia:getVal('ind-soc-sucumbencia'),
+    sucumbenciaPct: getVal('ind-soc-sucumbencia')==='sim' ? getVal('ind-soc-sucumbencia-pct') : '',
+    obs:getVal('ind-soc-obs')
+  };
+  if (editIndicacaoSocioId) {
+    obj.id = editIndicacaoSocioId;
+    var existente = (INDICACOES_SOCIO||[]).find(function(x){ return x.id===editIndicacaoSocioId; });
+    if (existente && existente.clienteId) obj.clienteId = existente.clienteId;
+    window._fbSaveIndSocio(obj);
+    toast('✓ Registro atualizado');
+    renderIndicacaoSocioClienteSec(obj);
+  } else {
+    window._fbSaveIndSocio(obj).then(function(newId) {
+      editIndicacaoSocioId = newId;
+      obj.id = newId;
+      document.getElementById('ind-soc-mo-tit').textContent = 'Editar Cliente/Processo Indicado';
+      renderIndicacaoSocioClienteSec(obj);
+    });
+    toast('✓ Cliente/processo cadastrado — agora você já pode cadastrar o cliente completo abaixo');
+  }
+}
+
+function excluirIndicacaoSocio(id) {
+  if (!confirm('Excluir este registro?')) return;
+  window._fbDeleteIndSocio(id);
+  toast('Registro removido');
+}
+
+// ========== CLIENTE COMPLETO VINCULADO AO SÓCIO/PARCEIRO ==========
+function renderIndicacaoSocioClienteSec(overrideInd) {
+  var cont = document.getElementById('ind-soc-cliente-sec');
+  if (!cont) return;
+
+  if (!editIndicacaoSocioId) {
+    cont.innerHTML = '<div style="font-size:11px;color:var(--tw);background:var(--fp);border:1px solid var(--bd);border-radius:7px;padding:10px 14px;">Salve o registro primeiro para poder cadastrar ou vincular o cadastro completo do cliente.</div>';
+    return;
+  }
+
+  var ind = overrideInd || (INDICACOES_SOCIO||[]).find(function(x){ return x.id===editIndicacaoSocioId; });
+  var cli = ind && ind.clienteId ? (DB||[]).find(function(x){ return x.id===ind.clienteId; }) : null;
+
+  if (cli) {
+    cont.innerHTML =
+      '<div style="background:rgba(180,138,74,.1);border:1px solid rgba(180,138,74,.3);border-radius:8px;padding:12px 14px;">' +
+        '<div style="font-size:11px;color:var(--tw);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;">✓ Cliente já cadastrado</div>' +
+        '<div style="font-weight:600;color:var(--tp);font-size:13px;">'+esc(cli.nome||'')+'</div>' +
+        '<div style="font-size:11px;color:var(--ts);margin-top:2px;">'+esc(cli.tipo||'')+' — <span class="bgs '+(cli.status==='Protocolado'?'sp':'sn')+'" style="font-size:9px;">'+esc(cli.status||'')+'</span></div>' +
+        (cli.valor?'<div style="font-size:11px;color:var(--ch);margin-top:2px;">Valor: R$ '+esc(cli.valor)+'</div>':'') +
+        '<div style="display:flex;gap:8px;margin-top:10px;">' +
+          '<button type="button" class="btn-v" style="font-size:11px;padding:6px 14px;" onclick="document.getElementById(\'ov-indicacao-socio\').style.display=\'none\';abrirDetalhe(\''+cli.id+'\')">👁 Abrir Cadastro Completo</button>' +
+          '<button type="button" class="btn-o" style="font-size:11px;padding:6px 14px;" onclick="desvincularClienteIndicacaoSocio()">✕ Desvincular</button>' +
+        '</div>' +
+      '</div>';
+    return;
+  }
+
+  var opcoesClientes = (DB||[]).slice().sort(function(a,b){ return (a.nome||'').localeCompare(b.nome||''); })
+    .map(function(c){ return '<option value="'+c.id+'">'+esc(c.nome||'')+(c.tipo?' — '+esc(c.tipo):'')+'</option>'; }).join('');
+
+  cont.innerHTML =
+    '<div style="font-size:12px;color:var(--ts);margin-bottom:10px;line-height:1.6;">Cadastre o cliente indicado com todos os dados (gerais, financeiro e contato) e ele já entra automaticamente em Clientes &amp; Processos, vinculado a este sócio/parceiro.</div>' +
+    '<button type="button" class="btn-v" style="margin-bottom:12px;" onclick="abrirClienteDeIndicacaoSocioNovo()">📇 Cadastrar Cliente Completo</button>' +
+    '<div style="font-size:10px;color:var(--tw);text-transform:uppercase;letter-spacing:.8px;margin:10px 0 6px;">ou vincular um cliente já cadastrado</div>' +
+    '<div style="display:flex;gap:8px;">' +
+      '<select class="fi" id="ind-soc-cliente-select" style="flex:1;"><option value="">Selecione um cliente...</option>'+opcoesClientes+'</select>' +
+      '<button type="button" class="btn-o" onclick="vincularClienteExistenteIndicacaoSocio()">Vincular</button>' +
+    '</div>';
+}
+
+function abrirClienteDeIndicacaoSocioNovo() {
+  if (!editIndicacaoSocioId) { toast('Salve o registro primeiro', true); return; }
+  var nome = getVal('ind-soc-nome');
+  var tel = getVal('ind-soc-tel');
+  var socioId = document.getElementById('ind-soc-socio-id').value;
+  var soc = (SOCIOS||[]).find(function(s){ return s.id===socioId; });
+  window._pendingIndicacaoSocioVinculo = { indicacaoId: editIndicacaoSocioId, socioId: socioId, socioNome: soc ? soc.nome : '' };
+  document.getElementById('ov-indicacao-socio').style.display = 'none';
+  abrirModal(null);
+  setVal('f-nome', nome);
+  setVal('f-whats', tel);
+  toast('Preencha os dados completos do cliente indicado' + (soc ? ' por '+soc.nome : ''));
+}
+
+function vincularClienteExistenteIndicacaoSocio() {
+  if (!editIndicacaoSocioId) { toast('Salve o registro primeiro', true); return; }
+  var selId = getVal('ind-soc-cliente-select');
+  if (!selId) { toast('Selecione um cliente', true); return; }
+  var ind = (INDICACOES_SOCIO||[]).find(function(x){ return x.id===editIndicacaoSocioId; });
+  var cli = (DB||[]).find(function(x){ return x.id===selId; });
+  if (!ind || !cli) { toast('Não foi possível localizar o registro', true); return; }
+  var soc = (SOCIOS||[]).find(function(s){ return s.id===ind.socioId; });
+
+  var cliObj = Object.assign({}, cli, { socioId: ind.socioId||'', socioNome: soc ? soc.nome : '' });
+  window._fbSave(cliObj);
+
+  var indObj = Object.assign({}, ind, { clienteId: selId });
+  window._fbSaveIndSocio(indObj);
+
+  toast('✓ Cliente vinculado ao sócio/parceiro');
+  renderIndicacaoSocioClienteSec(indObj);
+}
+
+function desvincularClienteIndicacaoSocio() {
+  if (!editIndicacaoSocioId) return;
+  if (!confirm('Desvincular o cadastro completo deste cliente? O cadastro do cliente não será apagado, apenas o vínculo com este registro.')) return;
+  var ind = (INDICACOES_SOCIO||[]).find(function(x){ return x.id===editIndicacaoSocioId; });
+  if (!ind) return;
+  var indObj = Object.assign({}, ind);
+  delete indObj.clienteId;
+  indObj.id = editIndicacaoSocioId;
+  window._fbSaveIndSocio(indObj);
+  toast('Vínculo removido');
+  renderIndicacaoSocioClienteSec(indObj);
+}
+
+function renderSocios() {
+  var busca = (document.getElementById('sc-busca').value||'').toLowerCase();
+  var socios = (SOCIOS||[]).filter(function(s){
+    return !busca || (s.nome||'').toLowerCase().includes(busca) || (s.area||'').toLowerCase().includes(busca);
+  });
+
+  // Cards resumo
+  var totalInd = (INDICACOES_SOCIO||[]).length;
+  var totalFech = (INDICACOES_SOCIO||[]).filter(function(i){ return i.fechamento==='sim'; }).length;
+  var totalTaxa = (INDICACOES_SOCIO||[]).filter(function(i){ return i.fechamento==='sim' && i.taxaRepassada; })
+    .reduce(function(s,i){ return s + parseMoeda(i.taxaRepassada); }, 0);
+  setTxt('sc-tot', (SOCIOS||[]).length);
+  setTxt('sc-ind', totalInd);
+  setTxt('sc-fech', totalFech);
+  setTxt('sc-taxa', 'R$ '+fmtVal(totalTaxa));
+
+  // Grid sócios
+  var grid = document.getElementById('socios-grid');
+  if (!socios.length) {
+    grid.innerHTML = '<div class="vazio" style="grid-column:1/-1"><div class="vazio-ic">🏛️</div><div class="vazio-t">Nenhum sócio/parceiro cadastrado</div><div class="vazio-s">Cadastre os sócios do escritório para gerenciar processos indicados e a divisão financeira</div></div>';
+  } else {
+    grid.innerHTML = socios.map(function(s) {
+      var inds = (INDICACOES_SOCIO||[]).filter(function(i){ return i.socioId===s.id; });
+      var fechados = inds.filter(function(i){ return i.fechamento==='sim'; }).length;
+      var taxaTot = inds.filter(function(i){ return i.fechamento==='sim' && i.taxaRepassada; })
+        .reduce(function(s2,i){ return s2+parseMoeda(i.taxaRepassada); },0);
+      var sucumb = inds.filter(function(i){ return i.sucumbencia==='sim'; }).length;
+      return '<div class="parc-card-box">' +
+        '<div class="parc-card-head">' +
+          '<div><div class="parc-card-nome">'+esc(s.nome)+'</div>' +
+          (s.area?'<div class="parc-card-area">'+esc(s.area)+'</div>':'') +
+          (s.oab?'<div style="font-size:10px;color:var(--tw);margin-top:1px;">OAB: '+esc(s.oab)+'</div>':'') +
+          '</div>' +
+          '<div style="display:flex;gap:5px;">' +
+            '<button class="btn-ic" title="Editar" onclick="abrirModalSocio(\''+s.id+'\')">✏️</button>' +
+            '<button class="btn-ic x" title="Excluir" onclick="excluirSocio(\''+s.id+'\')">🗑️</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="parc-card-body">' +
+          (s.whats?'<div class="parc-info-row"><span class="lbl">📱 WhatsApp</span><span class="val"><a href="https://wa.me/55'+s.whats.replace(/\D/g,'')+'" target="_blank" style="color:var(--ch)">'+esc(s.whats)+'</a></span></div>':'') +
+          (s.inicio?'<div class="parc-info-row"><span class="lbl">📅 Parceria desde</span><span class="val">'+fmtData(s.inicio)+'</span></div>':'') +
+          (s.pctPadrao?'<div class="parc-info-row"><span class="lbl">🔁 % Padrão Repassado</span><span class="val" style="color:var(--ch)">'+esc(s.pctPadrao)+'%</span></div>':'') +
+          '<div class="parc-info-row"><span class="lbl">📋 Processos Indicados</span><span class="val">'+inds.length+' ('+fechados+' fechados)</span></div>' +
+          (taxaTot>0?'<div class="parc-info-row"><span class="lbl">💰 Taxa Repassada</span><span class="val" style="color:var(--rc)">R$ '+fmtVal(taxaTot)+'</span></div>':'') +
+          (sucumb>0?'<div class="parc-info-row"><span class="lbl">⚖️ Sucumbência a Dividir</span><span class="val" style="color:var(--do)">'+sucumb+' processo(s)</span></div>':'') +
+        '</div>' +
+        '<div class="parc-card-foot">' +
+          '<button class="btn-v" style="font-size:11px;padding:6px 14px;" onclick="abrirModalIndicacaoSocio(\''+s.id+'\',null)">+ Novo Cliente/Processo</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  // Tabela de clientes/processos indicados
+  var inds = (INDICACOES_SOCIO||[]).slice().sort(function(a,b){ return (b.data||'')>(a.data||'')?1:-1; });
+  var tbody = document.getElementById('ind-soc-tbody');
+  if (!inds.length) {
+    tbody.innerHTML = '<tr><td colspan="10" class="rel-vazio">Nenhum cliente/processo indicado por sócios</td></tr>';
+  } else {
+    tbody.innerHTML = inds.map(function(i) {
+      var soc = (SOCIOS||[]).find(function(s){ return s.id===i.socioId; });
+      var clsFech = i.fechamento==='sim'?'sim':'nao';
+      var txtFech = i.fechamento==='sim'?'✓ Fechou':(i.fechamento==='andamento'?'Em andamento':'Não fechou');
+      return '<tr>' +
+        '<td style="font-weight:600;color:var(--ch)">'+(soc?esc(soc.nome):'—')+'</td>' +
+        '<td style="font-weight:600;color:var(--tp)">'+esc(i.nomeCliente||'')+(i.clienteId?' <span title="Cadastro completo vinculado" style="cursor:pointer;" onclick="abrirDetalhe(\''+i.clienteId+'\')">📇</span>':'')+'</td>' +
+        '<td style="font-size:11px;color:var(--tw)">'+esc(i.numproc||'—')+'</td>' +
+        '<td style="font-size:11px;color:var(--tw)">'+fmtData(i.data)+'</td>' +
+        '<td><span class="fechado-badge '+clsFech+'">'+txtFech+'</span></td>' +
+        '<td style="font-weight:600;color:'+(i.taxaRepassada?'var(--rc)':'var(--tw)')+'">'+(i.taxaRepassada?'R$ '+esc(i.taxaRepassada):'—')+'</td>' +
+        '<td style="font-size:11px;color:var(--tw)">'+(i.exitoPctFechado?esc(i.exitoPctFechado)+'%':'—')+'</td>' +
+        '<td style="font-size:11px;color:var(--tw)">'+(i.pctDivisaoSocios?esc(i.pctDivisaoSocios)+'%':'—')+'</td>' +
+        '<td style="font-size:11px;">'+(i.sucumbencia==='sim'?'<span style="color:var(--do)">Divide'+(i.sucumbenciaPct?' ('+esc(i.sucumbenciaPct)+'%)':'')+'</span>':'<span style="color:var(--tw)">Não divide</span>')+'</td>' +
+        '<td><div class="acoes">' +
+          '<button class="btn-ic" title="Editar" onclick="abrirModalIndicacaoSocio(\''+i.socioId+'\',\''+i.id+'\')">✏️</button>' +
+          '<button class="btn-ic x" title="Excluir" onclick="excluirIndicacaoSocio(\''+i.id+'\')">🗑️</button>' +
+        '</div></td>' +
+      '</tr>';
+    }).join('');
+  }
+}
+
+function exportSociosCSV() {
+  var linhas = [['Sócio/Parceiro','OAB','Área','Início Parceria','% Padrão','Cliente','Nº Processo','Caso','Data','Fechamento','Taxa Repassada','% Êxito Fechado','% Divisão Sócios','Sucumbência Dividida','% Sucumbência']];
+  (INDICACOES_SOCIO||[]).forEach(function(i) {
+    var s = (SOCIOS||[]).find(function(x){ return x.id===i.socioId; })||{};
+    linhas.push([s.nome||'',s.oab||'',s.area||'',s.inicio||'',s.pctPadrao||'',
+      i.nomeCliente||'',i.numproc||'',i.caso||'',fmtData(i.data),
+      i.fechamento==='sim'?'Fechou':i.fechamento==='andamento'?'Em andamento':'Não fechou',
+      i.taxaRepassada||'', i.exitoPctFechado||'', i.pctDivisaoSocios||'',
+      i.sucumbencia==='sim'?'Sim':'Não', i.sucumbenciaPct||'']);
+  });
+  var csv = linhas.map(function(r){ return r.map(function(v){ return '"'+(v||'').replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
+  var blob = new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a'); a.href=url; a.download='socios_parceiros.csv'; a.click(); URL.revokeObjectURL(url);
   toast('✓ CSV exportado');
 }
 
