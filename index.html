@@ -1249,6 +1249,8 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
       <div class="gr" style="margin-bottom:13px;">
         <div class="fg"><label class="fl">Observações</label><input class="fi" id="ind-obs" placeholder="Notas adicionais"></div>
       </div>
+      <div class="sec">Cadastro Completo do Cliente</div>
+      <div id="ind-cliente-sec"></div>
     </div>
     <div class="mo-foot">
       <button class="btn-o" onclick="document.getElementById('ov-indicacao').style.display='none'">Cancelar</button>
@@ -1369,6 +1371,7 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
       </div>
       <button class="mo-cls" onclick="fecharModal()">✕</button>
     </div>
+    <div id="f-parceiro-info" style="display:none;margin:0 26px;padding:8px 14px;background:rgba(63,103,73,.1);border:1px solid rgba(63,103,73,.25);border-radius:7px;font-size:12px;color:var(--ch);"></div>
     <div class="mo-abas">
       <button class="mo-aba on" id="tab-btn-0" onclick="moAba(0)">📋 Dados Gerais</button>
       <button class="mo-aba" id="tab-btn-1" onclick="moAba(1)">💳 Financeiro</button>
@@ -1817,6 +1820,10 @@ function abrirModal(id) {
     window._comissaoHonRows = infoHonEdit.colaboradores;
     renderComissaoRows('taxa');
     renderComissaoRows('hon');
+
+    // Vínculo com advogado parceiro (preserva o vínculo já existente do cliente)
+    window._clienteVinculoParceiro = { parceiroId: c.parceiroId||'', parceiroNome: c.parceiroNome||'' };
+    atualizarBadgeParceiroCliente();
   } else {
     document.getElementById('mo-tit').textContent = 'Novo Cliente';
     document.getElementById('mo-sub').textContent = 'Preencha os dados do contrato';
@@ -1824,14 +1831,34 @@ function abrirModal(id) {
     var hoje = new Date();
     var iso = hoje.toISOString().split('T')[0];
     setVal('f-data', iso);
+
+    // Vínculo com advogado parceiro (herdado de uma indicação, quando aplicável)
+    window._clienteVinculoParceiro = window._pendingIndicacaoVinculo
+      ? { parceiroId: window._pendingIndicacaoVinculo.parceiroId||'', parceiroNome: window._pendingIndicacaoVinculo.parceiroNome||'' }
+      : null;
+    atualizarBadgeParceiroCliente();
   }
 
   document.getElementById('overlay').classList.add('on');
 }
 
+function atualizarBadgeParceiroCliente() {
+  var el = document.getElementById('f-parceiro-info');
+  if (!el) return;
+  var v = window._clienteVinculoParceiro;
+  if (v && v.parceiroNome) {
+    el.style.display = 'block';
+    el.innerHTML = '🤝 Este cliente está vinculado ao advogado parceiro <strong>'+esc(v.parceiroNome)+'</strong> (indicação).';
+  } else {
+    el.style.display = 'none';
+    el.innerHTML = '';
+  }
+}
+
 function fecharModal() {
   document.getElementById('overlay').classList.remove('on');
   editId = null;
+  window._pendingIndicacaoVinculo = null;
 }
 
 // ========== NOVO PROCESSO PARA CLIENTE JA CADASTRADO ==========
@@ -2205,8 +2232,12 @@ function salvar() {
     },
     email: getVal('f-email'), whats: getVal('f-whats'),
     cpf: getVal('f-cpf'), orgao: getVal('f-orgao'),
-    taxa: taxa, hon: hon
+    taxa: taxa, hon: hon,
+    parceiroId: (window._clienteVinculoParceiro && window._clienteVinculoParceiro.parceiroId) || '',
+    parceiroNome: (window._clienteVinculoParceiro && window._clienteVinculoParceiro.parceiroNome) || ''
   };
+
+  var vinculoIndicacao = window._pendingIndicacaoVinculo;
 
   if (editId !== null) {
     obj.id = editId;
@@ -2214,11 +2245,17 @@ function salvar() {
     toast('✓ Cliente atualizado');
   } else {
     window._fbSave(obj).then(function(newId) {
-      // Firebase listener atualiza DB automaticamente
+      if (newId && vinculoIndicacao && vinculoIndicacao.indicacaoId) {
+        var indOrig = (INDICACOES||[]).find(function(x){ return x.id===vinculoIndicacao.indicacaoId; });
+        var indObj = Object.assign({}, indOrig||{}, { id: vinculoIndicacao.indicacaoId, clienteId: newId });
+        window._fbSaveIndicacao(indObj);
+        toast('✓ Cliente cadastrado e vinculado à indicação');
+      }
     });
-    toast('✓ Cliente cadastrado');
+    toast(vinculoIndicacao ? '✓ Cliente cadastrado, vinculando à indicação...' : '✓ Cliente cadastrado');
   }
 
+  window._pendingIndicacaoVinculo = null;
   fecharModal();
 }
 
@@ -2318,6 +2355,7 @@ function renderTabela() {
         '<td class="td-nm">' +
           '<span style="cursor:pointer;text-decoration:underline dotted;color:var(--ch)" onclick="abrirDetalhe(\''+c.id+'\')">'+esc(c.nome)+'</span>' +
           (c.orgao ? '<span class="sub">'+esc(c.orgao)+'</span>' : '') +
+          (c.parceiroNome ? '<span class="sub" style="color:var(--ch)">🤝 Indicado por '+esc(c.parceiroNome)+'</span>' : '') +
           (qtdProc > 1 ? '<span class="sub" style="color:var(--do)">'+qtdProc+' processos</span>' : '') +
           alertaHtml +
         '</td>' +
@@ -2360,6 +2398,7 @@ function abrirDetalhe(id) {
   var cont = '';
   if (c.email) cont += '<div class="det-lk">📧 <a href="mailto:'+esc(c.email)+'">'+esc(c.email)+'</a></div>';
   if (c.whats) cont += '<div class="det-lk">📱 <a href="https://wa.me/55'+c.whats.replace(/\D/g,'')+'" target="_blank">'+esc(c.whats)+'</a></div>';
+  if (c.parceiroNome) cont += '<div class="det-lk" style="color:var(--ch)">🤝 Indicado por: <strong>'+esc(c.parceiroNome)+'</strong></div>';
   document.getElementById('det-cont').innerHTML = cont || '<span style="color:var(--tw);font-size:12px;">Sem dados de contato cadastrados</span>';
 
   var procs = DB.filter(function(x){ return x.nome === c.nome; });
@@ -3564,6 +3603,7 @@ function abrirModalIndicacao(parceiroId, indId) {
     document.getElementById('ind-parceiro-id').value = parceiroId||'';
     setVal('ind-data', new Date().toISOString().split('T')[0]);
   }
+  renderIndicacaoClienteSec();
   document.getElementById('ov-indicacao').style.display = 'block';
 }
 
@@ -3581,16 +3621,115 @@ function salvarIndicacao() {
   var obj = { parceiroId:parceiroId, nomeCliente:nome, tel:getVal('ind-tel'),
     caso:caso, data:data, fechamento:getVal('ind-fechamento'),
     repasse:getVal('ind-repasse'), obs:getVal('ind-obs') };
-  if (editIndicacaoId) { obj.id = editIndicacaoId; window._fbSaveIndicacao(obj); toast('✓ Indicação atualizada'); }
-  else { window._fbSaveIndicacao(obj); toast('✓ Indicação cadastrada'); }
-  document.getElementById('ov-indicacao').style.display = 'none';
-  editIndicacaoId = null;
+  if (editIndicacaoId) {
+    obj.id = editIndicacaoId;
+    var existente = (INDICACOES||[]).find(function(x){ return x.id===editIndicacaoId; });
+    if (existente && existente.clienteId) obj.clienteId = existente.clienteId;
+    window._fbSaveIndicacao(obj);
+    toast('✓ Indicação atualizada');
+    renderIndicacaoClienteSec(obj);
+  } else {
+    window._fbSaveIndicacao(obj).then(function(newId) {
+      editIndicacaoId = newId;
+      obj.id = newId;
+      document.getElementById('ind-mo-tit').textContent = 'Editar Indicação';
+      renderIndicacaoClienteSec(obj);
+    });
+    toast('✓ Indicação cadastrada — agora você já pode cadastrar o cliente completo abaixo');
+  }
 }
 
 function excluirIndicacao(id) {
   if (!confirm('Excluir esta indicação?')) return;
   window._fbDeleteIndicacao(id);
   toast('Indicação removida');
+}
+
+// ========== CLIENTE COMPLETO VINCULADO À INDICAÇÃO ==========
+function renderIndicacaoClienteSec(overrideInd) {
+  var cont = document.getElementById('ind-cliente-sec');
+  if (!cont) return;
+
+  if (!editIndicacaoId) {
+    cont.innerHTML = '<div style="font-size:11px;color:var(--tw);background:var(--fp);border:1px solid var(--bd);border-radius:7px;padding:10px 14px;">Salve a indicação primeiro para poder cadastrar ou vincular o cadastro completo do cliente.</div>';
+    return;
+  }
+
+  var ind = overrideInd || (INDICACOES||[]).find(function(x){ return x.id===editIndicacaoId; });
+  var cli = ind && ind.clienteId ? (DB||[]).find(function(x){ return x.id===ind.clienteId; }) : null;
+
+  if (cli) {
+    cont.innerHTML =
+      '<div style="background:rgba(63,103,73,.1);border:1px solid rgba(63,103,73,.25);border-radius:8px;padding:12px 14px;">' +
+        '<div style="font-size:11px;color:var(--tw);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;">✓ Cliente já cadastrado</div>' +
+        '<div style="font-weight:600;color:var(--tp);font-size:13px;">'+esc(cli.nome||'')+'</div>' +
+        '<div style="font-size:11px;color:var(--ts);margin-top:2px;">'+esc(cli.tipo||'')+' — <span class="bgs '+(cli.status==='Protocolado'?'sp':'sn')+'" style="font-size:9px;">'+esc(cli.status||'')+'</span></div>' +
+        (cli.valor?'<div style="font-size:11px;color:var(--ch);margin-top:2px;">Valor: R$ '+esc(cli.valor)+'</div>':'') +
+        '<div style="display:flex;gap:8px;margin-top:10px;">' +
+          '<button type="button" class="btn-v" style="font-size:11px;padding:6px 14px;" onclick="document.getElementById(\'ov-indicacao\').style.display=\'none\';abrirDetalhe(\''+cli.id+'\')">👁 Abrir Cadastro Completo</button>' +
+          '<button type="button" class="btn-o" style="font-size:11px;padding:6px 14px;" onclick="desvincularClienteIndicacao()">✕ Desvincular</button>' +
+        '</div>' +
+      '</div>';
+    return;
+  }
+
+  var opcoesClientes = (DB||[]).slice().sort(function(a,b){ return (a.nome||'').localeCompare(b.nome||''); })
+    .map(function(c){ return '<option value="'+c.id+'">'+esc(c.nome||'')+(c.tipo?' — '+esc(c.tipo):'')+'</option>'; }).join('');
+
+  cont.innerHTML =
+    '<div style="font-size:12px;color:var(--ts);margin-bottom:10px;line-height:1.6;">Cadastre o cliente indicado com todos os dados (gerais, financeiro e contato) e ele já entra automaticamente em Clientes &amp; Processos, vinculado a este parceiro.</div>' +
+    '<button type="button" class="btn-v" style="margin-bottom:12px;" onclick="abrirClienteDeIndicacaoNovo()">📇 Cadastrar Cliente Completo</button>' +
+    '<div style="font-size:10px;color:var(--tw);text-transform:uppercase;letter-spacing:.8px;margin:10px 0 6px;">ou vincular um cliente já cadastrado</div>' +
+    '<div style="display:flex;gap:8px;">' +
+      '<select class="fi" id="ind-cliente-select" style="flex:1;"><option value="">Selecione um cliente...</option>'+opcoesClientes+'</select>' +
+      '<button type="button" class="btn-o" onclick="vincularClienteExistenteIndicacao()">Vincular</button>' +
+    '</div>';
+}
+
+function abrirClienteDeIndicacaoNovo() {
+  if (!editIndicacaoId) { toast('Salve a indicação primeiro', true); return; }
+  var nome = getVal('ind-nome');
+  var tel = getVal('ind-tel');
+  var parceiroId = document.getElementById('ind-parceiro-id').value;
+  var parc = (PARCEIROS||[]).find(function(p){ return p.id===parceiroId; });
+  window._pendingIndicacaoVinculo = { indicacaoId: editIndicacaoId, parceiroId: parceiroId, parceiroNome: parc ? parc.nome : '' };
+  document.getElementById('ov-indicacao').style.display = 'none';
+  abrirModal(null);
+  setVal('f-nome', nome);
+  setVal('f-whats', tel);
+  toast('Preencha os dados completos do cliente indicado' + (parc ? ' por '+parc.nome : ''));
+}
+
+function vincularClienteExistenteIndicacao() {
+  if (!editIndicacaoId) { toast('Salve a indicação primeiro', true); return; }
+  var selId = getVal('ind-cliente-select');
+  if (!selId) { toast('Selecione um cliente', true); return; }
+  var ind = (INDICACOES||[]).find(function(x){ return x.id===editIndicacaoId; });
+  var cli = (DB||[]).find(function(x){ return x.id===selId; });
+  if (!ind || !cli) { toast('Não foi possível localizar o registro', true); return; }
+  var parc = (PARCEIROS||[]).find(function(p){ return p.id===ind.parceiroId; });
+
+  var cliObj = Object.assign({}, cli, { parceiroId: ind.parceiroId||'', parceiroNome: parc ? parc.nome : '' });
+  window._fbSave(cliObj);
+
+  var indObj = Object.assign({}, ind, { clienteId: selId });
+  window._fbSaveIndicacao(indObj);
+
+  toast('✓ Cliente vinculado ao parceiro');
+  renderIndicacaoClienteSec(indObj);
+}
+
+function desvincularClienteIndicacao() {
+  if (!editIndicacaoId) return;
+  if (!confirm('Desvincular o cadastro completo deste cliente? O cadastro do cliente não será apagado, apenas o vínculo com esta indicação.')) return;
+  var ind = (INDICACOES||[]).find(function(x){ return x.id===editIndicacaoId; });
+  if (!ind) return;
+  var indObj = Object.assign({}, ind);
+  delete indObj.clienteId;
+  indObj.id = editIndicacaoId;
+  window._fbSaveIndicacao(indObj);
+  toast('Vínculo removido');
+  renderIndicacaoClienteSec(indObj);
 }
 
 function renderParceiros() {
@@ -3656,7 +3795,7 @@ function renderParceiros() {
       var txtFech = i.fechamento==='sim'?'✓ Fechou':(i.fechamento==='andamento'?'Em andamento':'Não fechou');
       return '<tr>' +
         '<td style="font-weight:600;color:var(--ch)">'+(parc?esc(parc.nome):'—')+'</td>' +
-        '<td style="font-weight:600;color:var(--tp)">'+esc(i.nomeCliente||'')+'</td>' +
+        '<td style="font-weight:600;color:var(--tp)">'+esc(i.nomeCliente||'')+(i.clienteId?' <span title="Cadastro completo vinculado" style="cursor:pointer;" onclick="abrirDetalhe(\''+i.clienteId+'\')">📇</span>':'')+'</td>' +
         '<td style="font-size:11px;color:var(--tw)">'+(i.tel?'<a href="https://wa.me/55'+i.tel.replace(/\D/g,'')+'" target="_blank" style="color:var(--ch)">'+esc(i.tel)+'</a>':'—')+'</td>' +
         '<td><span class="bgt">'+esc(i.caso||'')+'</span></td>' +
         '<td style="font-size:11px;color:var(--tw)">'+fmtData(i.data)+'</td>' +
