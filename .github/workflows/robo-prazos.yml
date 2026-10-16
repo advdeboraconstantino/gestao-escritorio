@@ -1,0 +1,41 @@
+name: Robô de Prazos
+
+on:
+  schedule:
+    - cron: "30 9 * * *"   # todos os dias às 06h30 (Brasília)
+    - cron: "30 15 * * 1-5" # dias úteis às 12h30: publicações tardias e sincronização da agenda
+  workflow_dispatch:
+    inputs:
+      desde:
+        description: "Ler publicações desde (AAAA-MM-DD). Carga inicial: 2026-09-22"
+        required: false
+        default: ""
+      simulacao:
+        description: "Somente simular (não grava nada)"
+        type: boolean
+        default: false
+
+concurrency: robo-prazos
+
+jobs:
+  executar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r robo/requirements.txt
+      - name: Executar robô
+        env:
+          FIREBASE_SA_JSON: ${{ secrets.FIREBASE_SA_JSON }}
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          AGENDA_ATIVA: "1"
+        run: |
+          ARGS=""
+          if [ -n "${{ github.event.inputs.desde }}" ]; then ARGS="$ARGS --desde ${{ github.event.inputs.desde }}"; fi
+          if [ "${{ github.event.inputs.simulacao }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+          python robo/robo_prazos.py $ARGS
