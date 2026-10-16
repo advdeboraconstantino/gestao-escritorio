@@ -76,7 +76,7 @@ def _cabecalho(texto: str, numero: str):
 
 def parse_oab(texto: str, msg_id: str = ""):
     t = _flat(texto)
-    blocos = re.split(r"\|?\s*Publica[çc][ãa]o:\s*\d+\.\s*\|?", t)
+    blocos = re.split(r"\|?\s*Publica[çc][ãa]o:\s*\d+\s*\.\s*\|?", t)
     out = []
     for b in blocos[1:]:
         md = re.search(r"Disponibiliza[çc][ãa]o:\s*" + RX_DATA, b)

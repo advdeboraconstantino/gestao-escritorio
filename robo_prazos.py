@@ -80,8 +80,7 @@ def _corpo(payload):
         for c in p.get("parts", []) or []:
             walk(c)
     walk(payload)
-    # o HTML preserva melhor a estrutura de tabela do Recorte Digital
-    return "\n".join(htmls) if htmls else "\n".join(textos)
+    return "\n".join(textos), "\n".join(htmls)
 
 
 def ler_emails(cred, desde: date):
@@ -98,7 +97,11 @@ def ler_emails(cred, desde: date):
     for mid in ids:
         m = svc.users().messages().get(userId="me", id=mid, format="full").execute()
         hdr = {h["name"].lower(): h["value"] for h in m["payload"].get("headers", [])}
-        yield mid, hdr.get("from", "").lower(), _corpo(m["payload"])
+        rem = hdr.get("from", "").lower()
+        texto, html = _corpo(m["payload"])
+        # OAB: o HTML preserva a tabela; AASP: o texto simples é mais limpo
+        corpo = (html or texto) if "recortedigital" in rem else (texto or html)
+        yield mid, rem, corpo
 
 
 # ---------------------------------------------------------------- Firestore
