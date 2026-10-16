@@ -8,7 +8,7 @@
 <!-- Firebase SDK -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, onSnapshot, addDoc, setDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getFirestore, collection, onSnapshot, addDoc, setDoc, deleteDoc, doc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyDLF7RQE4hg8AiJYf-7ZO0LoOqak1304zw",
@@ -35,6 +35,36 @@
   const sociosIndicacaoRef = collection(db, "socios_indicacao");
   const indSIRef = collection(db, "indicacoes_socio_indicacao");
 
+  // ===== Robô de prazos: funções genéricas e coleções novas =====
+  window._fbSaveDoc = async function(col, obj, merge) {
+    try {
+      if (obj.id && typeof obj.id === 'string') { await setDoc(doc(db, col, obj.id), obj, merge ? {merge:true} : undefined); return obj.id; }
+      const ref = await addDoc(collection(db, col), obj); return ref.id;
+    } catch(e) { console.error('Firebase save error ('+col+'):', e); }
+  };
+  window._fbMergeDoc = async function(col, id, campos) {
+    try { await setDoc(doc(db, col, id), campos, {merge:true}); } catch(e) { console.error(e); }
+  };
+  window._fbDeleteDoc = async function(col, id) {
+    try { await deleteDoc(doc(db, col, id)); } catch(e) { console.error(e); }
+  };
+  document.addEventListener('DOMContentLoaded', function() {
+    onSnapshot(collection(db, "regras_atribuicao"), function(snap) {
+      window.REGRAS_ATRIB = [];
+      snap.forEach(function(d){ window.REGRAS_ATRIB.push(Object.assign({id:d.id}, d.data())); });
+      window._regrasLoaded = true;
+      if (typeof renderRoboPainel === 'function') renderRoboPainel();
+    });
+    onSnapshot(query(collection(db, "robo_execucoes"), orderBy("quando", "desc"), limit(5)), function(snap) {
+      window.ROBO_EXEC = [];
+      snap.forEach(function(d){ window.ROBO_EXEC.push(Object.assign({id:d.id}, d.data())); });
+      if (typeof renderRoboPainel === 'function') renderRoboPainel();
+    });
+    onSnapshot(doc(db, "config", "feriados"), function(d) {
+      window.FERIADOS_EXTRA = (d.exists() && d.data().datas) || [];
+      if (typeof renderRoboPainel === 'function') renderRoboPainel();
+    });
+  });
   // Expor funções globais para o código legado
   window._fbSave = async function(obj) {
     try {
@@ -697,11 +727,18 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
         <option value="vencidos">Vencidos</option>
         <option value="urgentes">Urgentes (até 3 dias)</option>
         <option value="cumpridos">Cumpridos</option>
+        <option value="ciencia">Somente ciência (sem prazo)</option>
       </select>
+      <select class="sel" id="pz-filtro-resp" onchange="renderPrazos()"><option value="">Todas as responsáveis</option></select>
+      <input class="sel" id="pz-busca" placeholder="Buscar processo ou cliente" oninput="renderPrazos()" style="min-width:200px;">
     </div>
-    <button class="btn-v" onclick="abrirModalPrazo(null)">+ Nova Intimação / Prazo</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn-o" onclick="toggleRoboPainel()">🤖 Robô de prazos</button>
+      <button class="btn-v" onclick="abrirModalPrazo(null)">+ Nova Intimação / Prazo</button>
+    </div>
   </div>
 
+  <div id="robo-painel" style="display:none;margin-bottom:16px;"></div>
   <div id="prazos-lista"></div>
 </div>
 
@@ -1998,6 +2035,10 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
         </div>
         <div class="fg"><label class="fl">Prazo (dias)</label>
           <input type="number" class="fi" id="pz-dias" min="1" max="365" placeholder="Ex.: 15" oninput="calcDataFinal()">
+          <select class="fi" id="pz-contagem" onchange="calcDataFinal()" style="margin-top:6px;">
+            <option value="úteis">Dias úteis (CPC, art. 219)</option>
+            <option value="corridos">Dias corridos</option>
+          </select>
         </div>
         <div class="fg"><label class="fl">Data Final</label>
           <input type="date" class="fi" id="pz-datafinal">
@@ -2020,9 +2061,22 @@ td{padding:11px 13px;vertical-align:middle;font-size:12px;color:var(--ts);}
           </select>
         </div>
       </div>
+      <div class="gr gr2" style="margin-bottom:13px;">
+        <div class="fg"><label class="fl">Responsável</label>
+          <select class="fi" id="pz-resp"><option value="">Definir pelas regras automáticas</option></select>
+        </div>
+        <div class="fg" style="justify-content:flex-end;"><label class="fl">&nbsp;</label>
+          <label style="font-size:12px;color:var(--ts);display:flex;gap:6px;align-items:center;"><input type="checkbox" id="pz-criartarefa" checked> Criar/atualizar tarefa da responsável</label>
+        </div>
+      </div>
       <div class="gr" style="margin-bottom:13px;">
         <div class="fg"><label class="fl">Observações</label>
           <input class="fi" id="pz-obs" placeholder="Notas adicionais (opcional)">
+        </div>
+      </div>
+      <div class="gr" id="pz-texto-box" style="margin-bottom:13px;display:none;">
+        <div class="fg"><label class="fl">Texto da publicação (capturado pelo robô)</label>
+          <div id="pz-texto" style="max-height:180px;overflow-y:auto;font-size:11px;line-height:1.5;color:var(--ts);background:var(--fi);border:1px solid var(--bd);border-radius:6px;padding:10px;"></div>
         </div>
       </div>
     </div>
@@ -5709,5 +5763,264 @@ document.addEventListener('keydown', function(e){
 // Dados carregados pelo Firebase listener em tempo real (ver módulo acima)
 
 </script>
+<script id="robo-prazos-ui">
+/* ==========================================================================
+   ROBÔ DE PRAZOS — integração com a aba Prazos & Intimações
+   Regras de atribuição, responsável por prazo, contagem em dias úteis,
+   tarefas automáticas e painel de execução do robô (GitHub Actions).
+   ========================================================================== */
+(function(){
+  // ---------- Calendário forense (mesma regra do robô: robo/calendario.py)
+  function pascoa(a){var b=a%19,c=Math.floor(a/100),d=a%100,e=Math.floor(c/4),f=c%4,g=Math.floor((c+8)/25),h=Math.floor((c-g+1)/3),i=(19*b+c-e-h+15)%30,k=Math.floor(d/4),l=d%4,m=(32+2*f+2*k-i-l)%7,n=Math.floor((b+11*i+22*m)/451),mes=Math.floor((i+m-7*n+114)/31),dia=((i+m-7*n+114)%31)+1;return new Date(a,mes-1,dia);}
+  var cacheFer={};
+  function iso(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  function feriados(a){
+    if(cacheFer[a])return cacheFer[a];
+    var s={};[[1,1],[4,21],[5,1],[7,9],[9,7],[10,12],[11,2],[11,15],[11,20],[12,8],[12,25]].forEach(function(x){s[iso(new Date(a,x[0]-1,x[1]))]=1;});
+    var p=pascoa(a);[-48,-47,-2,60].forEach(function(o){var d=new Date(p);d.setDate(d.getDate()+o);s[iso(d)]=1;});
+    return cacheFer[a]=s;
+  }
+  function util(d){if(d.getDay()===0||d.getDay()===6)return false;if(feriados(d.getFullYear())[iso(d)])return false;return (window.FERIADOS_EXTRA||[]).indexOf(iso(d))<0;}
+  function suspenso(d){return (d.getMonth()===11&&d.getDate()>=20)||(d.getMonth()===0&&d.getDate()<=20);}
+  function proxUtil(d){d=new Date(d);do{d.setDate(d.getDate()+1);}while(!util(d));return d;}
+  window.vencimentoPrazo=function(pubIso,dias,uteis){
+    var d=new Date(pubIso+'T00:00:00');
+    if(uteis){var n=0;while(n<dias){d=proxUtil(d);if(suspenso(d))continue;n++;}return iso(d);}
+    d.setDate(d.getDate()+dias);while(!util(d))d.setDate(d.getDate()+1);return iso(d);
+  };
+  window.menosUteis=function(i,n){var d=new Date(i+'T00:00:00');while(n>0){d.setDate(d.getDate()-1);if(util(d))n--;}return iso(d);};
+  window.uteisAte=function(i){var h=new Date();h.setHours(0,0,0,0);var f=new Date(i+'T00:00:00');var neg=f<h;var a=neg?f:h,b=neg?h:f,n=0;while(a<b){a.setDate(a.getDate()+1);if(util(a))n++;}return neg?-n:n;};
+
+  function norm(s){return (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase();}
+  function colabPorId(id){return (COLABORADORAS||[]).find(function(c){return c.id===id;})||null;}
+  function colabPorNome(n){n=norm(n);return (COLABORADORAS||[]).find(function(c){return n&&norm(c.nome).indexOf(n)>=0;})||null;}
+
+  // ---------- Regras de atribuição
+  var REGRAS_PADRAO=[
+    {ordem:1,tipo:'final',valor:'0292',colaboradoraNome:'Rafaela',descricao:'Processos do Foro de Jacareí (final 0292)',ativo:true},
+    {ordem:2,tipo:'assunto',valor:'PISO SALARIAL',colaboradoraNome:'Amanda',descricao:'Assunto Piso Salarial',ativo:true},
+    {ordem:99,tipo:'padrao',valor:'',colaboradoraNome:'Débora',descricao:'Todos os demais processos',ativo:true}
+  ];
+  function regras(){var r=(window.REGRAS_ATRIB&&window.REGRAS_ATRIB.length)?window.REGRAS_ATRIB:REGRAS_PADRAO;return r.filter(function(x){return x.ativo!==false;}).sort(function(a,b){return (a.ordem||50)-(b.ordem||50);});}
+  window.responsavelPorRegras=function(proc,texto){
+    proc=proc||'';var alvo=norm(texto||'');
+    var fixo=(PRAZOS||[]).find(function(p){return p.responsavelManual&&p.proc===proc&&p.responsavelId;});
+    if(fixo)return colabPorId(fixo.responsavelId)||{id:fixo.responsavelId,nome:fixo.responsavelNome,email:fixo.responsavelEmail};
+    var rs=regras();
+    for(var i=0;i<rs.length;i++){var r=rs[i],v=norm(r.valor);
+      var ok=(r.tipo==='processo'&&v.replace(/\D/g,'')===proc.replace(/\D/g,''))||(r.tipo==='final'&&v&&proc.slice(-v.length)===v.trim())||
+             ((r.tipo==='assunto'||r.tipo==='texto')&&v&&alvo.indexOf(v)>=0)||r.tipo==='padrao';
+      if(ok)return (r.colaboradoraId&&colabPorId(r.colaboradoraId))||colabPorNome(r.colaboradoraNome)||{id:'',nome:r.colaboradoraNome||'',email:''};
+    }
+    return colabPorNome('Débora')||{id:'',nome:'Dra. Débora',email:''};
+  };
+
+  // ---------- Selects de colaboradoras
+  window.popularSelectColaboradoras=(function(orig){return function(){
+    if(orig)orig.apply(this,arguments);
+    var lista=(COLABORADORAS||[]).slice().sort(function(a,b){return (a.nome||'').localeCompare(b.nome||'');});
+    [['pz-resp','Definir pelas regras automáticas'],['pz-filtro-resp','Todas as responsáveis'],['rg-colab','Selecione...']].forEach(function(c){
+      var sel=document.getElementById(c[0]);if(!sel)return;var cur=sel.value;
+      sel.innerHTML='<option value="">'+c[1]+'</option>'+lista.map(function(x){return '<option value="'+x.id+'">'+esc(x.nome||'')+'</option>';}).join('');
+      sel.value=cur;
+    });
+  };})(window.popularSelectColaboradoras);
+
+  // ---------- Modal de prazo
+  window.abrirModalPrazo=(function(orig){return function(id){
+    orig(id);
+    popularSelectColaboradoras();
+    var p=id?(PRAZOS||[]).find(function(x){return x.id===id;}):null;
+    setVal('pz-resp',p?(p.responsavelId||''):'');
+    setVal('pz-contagem',p&&p.contagem==='corridos'?'corridos':'úteis');
+    document.getElementById('pz-criartarefa').checked=true;
+    var box=document.getElementById('pz-texto-box');
+    if(p&&p.textoIntegral){box.style.display='';document.getElementById('pz-texto').textContent=p.textoIntegral;}
+    else box.style.display='none';
+  };})(window.abrirModalPrazo);
+
+  window.calcDataFinal=function(){
+    var pub=getVal('pz-pubdata'),dias=parseInt(getVal('pz-dias'));
+    if(!pub||!dias)return;
+    setVal('pz-datafinal',vencimentoPrazo(pub,dias,getVal('pz-contagem')!=='corridos'));
+  };
+
+  function sincronizarTarefa(prazo){
+    if(!prazo.datafinal||!prazo.responsavelId)return;
+    var c=colabPorId(prazo.responsavelId)||{};
+    var tid=prazo.tarefaId||('tar_'+prazo.id);
+    var antiga=(TAREFAS||[]).find(function(t){return t.id===tid;})||{};
+    var hoje=iso(new Date());var interno=menosUteis(prazo.datafinal,2);
+    if(interno<hoje)interno=prazo.datafinal<hoje?prazo.datafinal:hoje;
+    var u=uteisAte(prazo.datafinal);
+    var t=Object.assign({},antiga,{
+      id:tid,colaboradoraId:c.id||prazo.responsavelId,colaboradoraNome:c.nome||prazo.responsavelNome||'',colaboradoraEmail:c.email||'',
+      titulo:(prazo.tipoprazo||'Prazo')+' · '+(prazo.proc||prazo.cliente),
+      descricao:(prazo.acao||prazo.descr||'')+'\nCliente: '+(prazo.cliente||'')+'\nVencimento fatal: '+fmtData(prazo.datafinal)+(prazo.dias?' ('+prazo.dias+' dia(s) '+(prazo.contagem||'')+')':''),
+      prazo:interno,dataFatal:prazo.datafinal,
+      prioridade:antiga.prioridade||(u<=2?'Urgente':u<=5?'Alta':'Média'),
+      status:prazo.cumprido?'Concluída':(antiga.status||'Pendente'),
+      vinculoTipo:'Prazo',vinculoId:prazo.id,vinculoNome:(prazo.proc||'')+' — '+(prazo.cliente||'')
+    });
+    if(!t.obs)t.obs='Prazo interno (2 dias úteis antes do fatal).';
+    window._fbSaveTarefa(t);
+    return tid;
+  }
+
+  window.salvarPrazo=async function(){
+    var cliente=getVal('pz-cliente'),descr=getVal('pz-descr'),pubdata=getVal('pz-pubdata');
+    if(!cliente){toast('Informe o cliente',true);return;}
+    if(!descr){toast('Informe a descrição da intimação',true);return;}
+    if(!pubdata){toast('Informe a data da publicação',true);return;}
+    var antigo=editPrazoId?((PRAZOS||[]).find(function(p){return p.id===editPrazoId;})||{}):{};
+    var respId=getVal('pz-resp'),resp,manual=!!antigo.responsavelManual;
+    if(respId){resp=colabPorId(respId)||{id:respId};if(respId!==antigo.responsavelId)manual=true;}
+    else resp=antigo.responsavelId?{id:antigo.responsavelId,nome:antigo.responsavelNome,email:antigo.responsavelEmail}:responsavelPorRegras(getVal('pz-proc'),descr);
+    var obj=Object.assign({},antigo,{
+      cliente:cliente,proc:getVal('pz-proc'),descr:descr,pubdata:pubdata,dias:getVal('pz-dias'),datafinal:getVal('pz-datafinal'),
+      tipoprazo:getVal('pz-tipoprazo'),obs:getVal('pz-obs'),contagem:getVal('pz-dias')?getVal('pz-contagem'):'',
+      responsavelId:resp.id||'',responsavelNome:resp.nome||'',responsavelEmail:resp.email||'',responsavelManual:manual,
+      cumprido:editPrazoId?!!antigo.cumprido:false
+    });
+    if(obj.datafinal)obj.ciencia=false;
+    if(window._djenImportId){obj.djenId=window._djenImportId;window._djenImportId=null;}
+    if(!editPrazoId){obj.origem=obj.origem||'manual';obj.criadoEm=new Date().toISOString();}
+    if(editPrazoId)obj.id=editPrazoId;
+    var novoId=await window._fbSaveDoc('prazos',obj);
+    if(!obj.id&&novoId)obj.id=novoId;
+    if(obj.id&&document.getElementById('pz-criartarefa').checked&&obj.datafinal&&obj.responsavelId){
+      var tid=sincronizarTarefa(obj);
+      if(tid&&tid!==obj.tarefaId)window._fbMergeDoc('prazos',obj.id,{tarefaId:tid});
+    }
+    toast(editPrazoId?'✓ Prazo atualizado':'✓ Prazo cadastrado'+(obj.responsavelNome?' e atribuído a '+obj.responsavelNome:''));
+    document.getElementById('ov-prazo').style.display='none';editPrazoId=null;
+  };
+
+  window.toggleCumprido=function(id){
+    var p=(PRAZOS||[]).find(function(x){return x.id===id;});if(!p)return;
+    window._fbMergeDoc('prazos',id,{cumprido:!p.cumprido});
+    var tid=p.tarefaId||('tar_'+id);
+    if((TAREFAS||[]).some(function(t){return t.id===tid;}))window._fbMergeDoc('tarefas',tid,{status:!p.cumprido?'Concluída':'Pendente'});
+    toast(!p.cumprido?'✓ Prazo marcado como cumprido':'Prazo reaberto');
+  };
+
+  window.excluirPrazo=function(id){
+    if(!confirm('Excluir este prazo e a tarefa vinculada?'))return;
+    var p=(PRAZOS||[]).find(function(x){return x.id===id;})||{};
+    window._fbDeletePrazo(id);
+    var tid=p.tarefaId||('tar_'+id);
+    if((TAREFAS||[]).some(function(t){return t.id===tid;}))window._fbDeleteTarefa(tid);
+    toast('Prazo removido');
+  };
+
+  window.reatribuirPrazo=function(id,colabId){
+    var p=(PRAZOS||[]).find(function(x){return x.id===id;});var c=colabPorId(colabId);if(!p||!c)return;
+    var obj=Object.assign({},p,{responsavelId:c.id,responsavelNome:c.nome||'',responsavelEmail:c.email||'',responsavelManual:true});
+    window._fbMergeDoc('prazos',id,{responsavelId:obj.responsavelId,responsavelNome:obj.responsavelNome,responsavelEmail:obj.responsavelEmail,responsavelManual:true});
+    if(obj.datafinal)sincronizarTarefa(obj);
+    toast('✓ Prazo atribuído a '+c.nome+'. Próximas publicações deste processo também irão para ela.');
+  };
+
+  // ---------- Lista de prazos
+  window.renderPrazos=function(){
+    var hoje=new Date();hoje.setHours(0,0,0,0);
+    var filtro=getVal('pz-filtro'),fResp=getVal('pz-filtro-resp'),busca=norm(getVal('pz-busca'));
+    function df(p){return p.datafinal?new Date(p.datafinal+'T00:00:00'):null;}
+    var todos=PRAZOS||[];
+    var lista=todos.filter(function(p){
+      if(fResp&&p.responsavelId!==fResp)return false;
+      if(busca&&norm((p.proc||'')+' '+(p.cliente||'')).indexOf(busca)<0)return false;
+      var d=df(p),diff=d?Math.round((d-hoje)/86400000):999;
+      if(filtro==='ciencia')return !!p.ciencia&&!p.cumprido;
+      if(filtro==='cumpridos')return p.cumprido;
+      if(filtro==='todos')return true;
+      if(p.ciencia)return false;
+      if(filtro==='vencidos')return !p.cumprido&&d&&d<hoje;
+      if(filtro==='urgentes')return !p.cumprido&&diff>=0&&diff<=3;
+      return !p.cumprido;
+    });
+    lista.sort(function(a,b){if(a.cumprido!==b.cumprido)return a.cumprido?1:-1;return (df(a)||new Date(9999,0,1))-(df(b)||new Date(9999,0,1));});
+    var v=0,u=0,an=0,cu=0;
+    todos.forEach(function(p){if(fResp&&p.responsavelId!==fResp)return;if(p.cumprido){cu++;return;}if(p.ciencia)return;var d=df(p);if(!d){an++;return;}var x=Math.round((d-hoje)/86400000);if(x<0)v++;else if(x<=3)u++;else an++;});
+    setTxt('pz-tot',todos.filter(function(p){return !p.ciencia;}).length);setTxt('pz-venc',v);setTxt('pz-urg',u);setTxt('pz-and',an);setTxt('pz-cum',cu);
+    var cont=document.getElementById('prazos-lista');
+    if(!lista.length){cont.innerHTML='<div class="vazio"><div class="vazio-ic">⏱️</div><div class="vazio-t">Nenhum prazo encontrado</div><div class="vazio-s">Ajuste os filtros ou cadastre uma intimação</div></div>';return;}
+    var colabs=(COLABORADORAS||[]).slice().sort(function(a,b){return (a.nome||'').localeCompare(b.nome||'');});
+    cont.innerHTML=lista.map(function(p){
+      var d=df(p),diff=d?Math.round((d-hoje)/86400000):null,uteis=p.datafinal?uteisAte(p.datafinal):null;
+      var cls=p.cumprido?'cumprido':(d&&diff<0?'vencido':(d&&diff<=3?'urgente':''));
+      var cc=p.cumprido?'cumprido':(d&&diff<0?'vencido':(d&&diff<=3?'urgente':'ok'));
+      var ct=p.cumprido?'✓ Cumprido':(p.ciencia?'Ciência':(!d?'Sem data final':(diff<0?'VENCIDO há '+Math.abs(uteis)+' dia(s) útil(eis)':diff===0?'Vence HOJE':'Restam '+uteis+' dia(s) útil(eis)')));
+      var sel='<select class="sel" style="font-size:11px;padding:4px 6px;" onchange="reatribuirPrazo(\''+p.id+'\',this.value)"><option value="">'+(p.responsavelNome?'👤 '+esc(p.responsavelNome):'👤 Sem responsável')+'</option>'+
+        colabs.filter(function(c){return c.id!==p.responsavelId;}).map(function(c){return '<option value="'+c.id+'">Atribuir a '+esc(c.nome)+'</option>';}).join('')+'</select>';
+      var badges=(p.origem==='robo'?'<span class="bgt" style="font-size:9px;margin-left:6px;">🤖 '+esc(p.fonte||'Robô')+'</span>':'')+(p.responsavelManual?'<span class="bgt" style="font-size:9px;margin-left:4px;">atribuição manual</span>':'');
+      return '<div class="prazo-card '+cls+'">'+
+        '<div class="prazo-hdr"><div><div class="prazo-cliente">'+esc(p.cliente)+badges+'</div>'+
+          (p.proc?'<div class="prazo-tipo">'+esc(p.proc)+(p.orgao?' · '+esc(p.orgao):'')+'</div>':'')+
+          (p.tipoprazo?'<div class="prazo-tipo" style="color:var(--ch)">'+esc(p.tipoprazo)+(p.assunto?' · '+esc(p.assunto):'')+'</div>':'')+
+        '</div><div class="prazo-contador '+cc+'">'+ct+'</div></div>'+
+        '<div class="prazo-body">'+
+          '<div class="prazo-info"><div class="lbl">Publicação</div><div class="val">'+fmtData(p.pubdata)+(p.disponibilizacao?'<br><span style="color:var(--tw)">disp. '+fmtData(p.disponibilizacao)+'</span>':'')+'</div></div>'+
+          '<div class="prazo-info"><div class="lbl">Prazo</div><div class="val">'+(p.dias?p.dias+' dias '+(p.contagem||''):(p.dataSessao?'Sessão '+fmtData(p.dataSessao):'—'))+(p.inicioPrazo?'<br><span style="color:var(--tw)">início '+fmtData(p.inicioPrazo)+'</span>':'')+'</div></div>'+
+          '<div class="prazo-info"><div class="lbl">Vencimento</div><div class="val">'+(p.datafinal?fmtData(p.datafinal):'—')+'</div></div>'+
+          '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">'+sel+
+            '<button class="btn-check '+(p.cumprido?'feito':'')+'" onclick="toggleCumprido(\''+p.id+'\')">'+(p.cumprido?'✓ Cumprido':'✓ Marcar cumprido')+'</button>'+
+            '<button class="btn-ic" title="Editar" onclick="abrirModalPrazo(\''+p.id+'\')">✏️</button>'+
+            '<button class="btn-ic x" title="Excluir" onclick="excluirPrazo(\''+p.id+'\')">🗑️</button>'+
+          '</div></div>'+
+        '<div class="prazo-descr"><strong>O que fazer:</strong> '+esc(p.acao||p.descr||'')+(p.obs?'<br><span style="color:var(--tw)">'+esc(p.obs)+'</span>':'')+'</div>'+
+      '</div>';
+    }).join('');
+  };
+
+  // ---------- Painel do robô e regras
+  window.toggleRoboPainel=function(){var el=document.getElementById('robo-painel');el.style.display=el.style.display==='none'?'':'none';renderRoboPainel();};
+  var TIPOS={final:'Final do nº do processo (ex.: 0292)',assunto:'Assunto contém',texto:'Texto da publicação contém',processo:'Processo específico',padrao:'Todos os demais (padrão)'};
+  window.renderRoboPainel=function(){
+    var el=document.getElementById('robo-painel');if(!el||el.style.display==='none')return;
+    popularSelectColaboradoras();
+    var ex=(window.ROBO_EXEC||[])[0];
+    var exHtml=ex?('Última execução: <strong>'+new Date(ex.quando).toLocaleString('pt-BR')+'</strong> · '+ex.emailsLidos+' e-mail(s) · '+ex.publicacoes+' publicação(ões) · <strong>'+ex.novosPrazos+' novo(s) registro(s)</strong>'+(ex.dryRun?' (simulação)':'')):'O robô ainda não foi executado. Siga o manual MANUAL-ROBO-PRAZOS.md para ativá-lo.';
+    var usando=(window.REGRAS_ATRIB&&window.REGRAS_ATRIB.length)?'':'<div style="font-size:11px;color:#D4B84A;margin:6px 0;">Usando as regras padrão. <button class="btn-o" style="padding:3px 10px;font-size:11px;" onclick="gravarRegrasPadrao()">Gravar regras padrão no sistema</button></div>';
+    var rs=((window.REGRAS_ATRIB&&window.REGRAS_ATRIB.length)?window.REGRAS_ATRIB:REGRAS_PADRAO).slice().sort(function(a,b){return (a.ordem||50)-(b.ordem||50);});
+    el.innerHTML='<div class="prazo-card" style="background:var(--fs);">'+
+      '<div style="font-size:12px;color:var(--ts);margin-bottom:10px;">🤖 '+exHtml+'</div>'+
+      '<div class="sec" style="margin-top:0;">Regras de atribuição automática (aplicadas em ordem; a primeira que se encaixar define a responsável)</div>'+usando+
+      '<table class="tbl" style="width:100%;font-size:12px;"><thead><tr><th>Ordem</th><th>Regra</th><th>Valor</th><th>Responsável</th><th></th></tr></thead><tbody>'+
+      rs.map(function(r){return '<tr><td>'+(r.ordem||'')+'</td><td>'+esc(TIPOS[r.tipo]||r.tipo)+'</td><td>'+esc(r.valor||'—')+'</td><td>'+esc((r.colaboradoraId&&(colabPorId(r.colaboradoraId)||{}).nome)||r.colaboradoraNome||'')+'</td><td>'+(r.id?'<button class="btn-ic x" onclick="excluirRegra(\''+r.id+'\')">🗑️</button>':'')+'</td></tr>';}).join('')+
+      '</tbody></table>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center;">'+
+        '<input class="fi" id="rg-ordem" type="number" placeholder="Ordem" style="width:80px;">'+
+        '<select class="fi" id="rg-tipo" style="width:230px;">'+Object.keys(TIPOS).map(function(k){return '<option value="'+k+'">'+TIPOS[k]+'</option>';}).join('')+'</select>'+
+        '<input class="fi" id="rg-valor" placeholder="Valor (ex.: 0292, PISO SALARIAL, nº do processo)" style="width:260px;">'+
+        '<select class="fi" id="rg-colab" style="width:190px;"></select>'+
+        '<button class="btn-v" style="padding:6px 14px;font-size:11px;" onclick="salvarRegra()">+ Adicionar regra</button>'+
+      '</div>'+
+      '<div class="sec">Feriados e suspensões de expediente adicionais (municipais, TJSP)</div>'+
+      '<div style="font-size:11px;color:var(--tw);margin-bottom:6px;">Feriados nacionais, 9 de julho, 8 de dezembro, Carnaval, Sexta-feira Santa, Corpus Christi e a suspensão de 20/12 a 20/01 já são considerados.</div>'+
+      '<div style="display:flex;gap:6px;"><input class="fi" id="rg-feriados" placeholder="AAAA-MM-DD, separados por vírgula" value="'+esc((window.FERIADOS_EXTRA||[]).join(', '))+'"><button class="btn-o" style="padding:6px 14px;font-size:11px;" onclick="salvarFeriados()">Salvar</button></div>'+
+    '</div>';
+    popularSelectColaboradoras();
+  };
+  window.salvarRegra=function(){
+    var tipo=getVal('rg-tipo'),valor=getVal('rg-valor').trim(),cid=getVal('rg-colab');
+    if(!cid){toast('Selecione a responsável',true);return;}
+    if(tipo!=='padrao'&&!valor){toast('Informe o valor da regra',true);return;}
+    var c=colabPorId(cid)||{};
+    window._fbSaveDoc('regras_atribuicao',{ordem:parseInt(getVal('rg-ordem'))||10,tipo:tipo,valor:tipo==='assunto'||tipo==='texto'?valor.toUpperCase():valor,colaboradoraId:cid,colaboradoraNome:c.nome||'',descricao:TIPOS[tipo]+(valor?' '+valor:''),ativo:true});
+    toast('✓ Regra adicionada');
+  };
+  window.excluirRegra=function(id){if(confirm('Excluir esta regra?'))window._fbDeleteDoc('regras_atribuicao',id);};
+  window.gravarRegrasPadrao=function(){
+    REGRAS_PADRAO.forEach(function(r){var c=colabPorNome(r.colaboradoraNome);window._fbSaveDoc('regras_atribuicao',Object.assign({},r,{colaboradoraId:c?c.id:'',colaboradoraNome:c?c.nome:r.colaboradoraNome}));});
+    toast('✓ Regras padrão gravadas. Confira se Rafaela, Amanda e Débora estão cadastradas em Colaboradoras.');
+  };
+  window.salvarFeriados=function(){
+    var datas=getVal('rg-feriados').split(/[,;\s]+/).filter(function(x){return /^\d{4}-\d{2}-\d{2}$/.test(x);});
+    window._fbSaveDoc('config',{id:'feriados',datas:datas});toast('✓ '+datas.length+' data(s) salvas');
+  };
+})();
+</script>
+
 </body>
 </html>
